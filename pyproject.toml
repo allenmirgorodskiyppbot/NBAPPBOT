@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "knicks-projection-bot"
+version = "0.1.0"
+description = "Auditable Knicks projections, data maintenance, and prospective paper analysis"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy==2.3.5", "scipy==1.17.0", "openpyxl==3.1.5",
+  "fastapi==0.141.1", "uvicorn==0.52.1", "httpx==0.28.1"
+]
+
+[project.scripts]
+nbabot = "nbabot.cli:main"
+
+[tool.setuptools.package-data]
+nbabot = ["static/*"]
+
+[tool.setuptools.packages.find]
+include = ["nbabot*"]
+exclude = ["data*", "reports*", "tests*"]

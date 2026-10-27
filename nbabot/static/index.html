@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Knicks Projection Desk</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<header><a class="brand" href="/">NY<span>↗</span><b>PROJECTION DESK</b></a><div class="header-note">KNICKS + OPPONENTS <span class="dot"></span> RESEARCH & PAPER TRACKING</div><button id="reload">Refresh view ↻</button></header>
+<main>
+<div class="eyebrow">NEW YORK BASKETBALL / DATA → DISTRIBUTIONS → DECISIONS</div>
+<section class="hero"><div><h1>Find the edge.<br><em>Respect the uncertainty.</em></h1><p>Player opportunities, actual offers, and an auditable record of what was known. Every projection starts with its evidence.</p></div><div class="edition"><span>MODEL STATUS</span><strong>Experimental</strong><small>Conditional on playing<br>Calibration and market validation required</small></div></section>
+<div id="notice" class="notice" role="status">Loading database…</div>
+<section id="master-upload-panel" class="master-panel" hidden>
+<div class="section-head"><h2>Your master spreadsheet</h2><span class="tag">SPREADSHEET ONLY</span></div>
+<p>The bot focuses on the master you upload here. Outside sources wait for your approval. Until then, new games and other changes require an updated spreadsheet.</p>
+<form id="master-upload-form"><label for="master-file">Choose master workbook</label><input id="master-file" type="file" accept=".xlsx" required><button id="master-upload-button" type="submit">Upload privately</button></form>
+<p id="master-upload-status" role="status">No master workbook uploaded.</p><a id="master-download" href="/api/master/download" hidden>Download your accepted master ↗</a>
+</section>
+<section class="metrics" id="metrics"></section>
+<section><div class="section-head"><h2><span>01</span> On the schedule</h2><small>ALL GAME TIMES AMERICA/NEW_YORK</small></div><div id="games" class="game-grid"></div></section>
+<section class="desk"><div><div class="section-head"><h2><span>02</span> Player projections</h2><select id="game-filter" aria-label="Game"></select></div><div class="filters"><input id="search" placeholder="Search player or team" aria-label="Search players"><select id="market" aria-label="Market"><option value="points">Points</option><option value="rebounds">Rebounds</option><option value="assists">Assists</option><option value="threes">Threes made</option></select><span>80% predictive interval · played games</span></div><div class="table-wrap"><table><thead><tr><th>Player / team</th><th>Minutes · 80% range</th><th>Mean / median</th><th>80% range</th><th>Prior games</th><th>Availability</th></tr></thead><tbody id="projections"></tbody></table></div><p class="caption">Historical candidates are labeled when live rosters are unverified. No injury, headline, or estimated defender effect is invented.</p></div><aside><h3>DATA HEALTH</h3><div id="freshness"></div><h3>DAILY MAINTENANCE</h3><div id="scheduler"></div><h3>MASTER PACKAGE</h3><div id="package"></div><div class="downloads" id="package-downloads"><a href="/api/export/Knicks_Historical_Organized.xlsx">Organized Excel ↗</a><a href="/api/export/Master_Data.xlsx">Canonical Excel ↗</a><a href="/api/export/NBA_Player_Games.csv">Player games CSV ↗</a><a href="/api/export/manifest.json">Manifest ↗</a></div></aside></section>
+<section><div class="section-head"><h2><span>03</span> Actual offers & selection review</h2><small>MORE + LESS · NO AUTOMATIC ENTRY SUBMISSION</small></div><div id="offers"></div></section>
+<section class="bottom-grid"><div><div class="section-head"><h2><span>04</span> Evaluation</h2></div><div id="evaluation"></div></div><div><div class="section-head"><h2><span>05</span> Paper ledger</h2></div><div id="bankroll"></div></div></section>
+<section><div class="section-head"><h2><span>06</span> Injury assumptions & news</h2></div><div id="news"></div></section>
+<footer><span>NBAPPBOT / v0.1</span><span id="updated"></span><span>Evidence first. “No qualifying picks” is a valid result.</span></footer>
+</main></body></html>

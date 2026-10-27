@@ -1,0 +1,59 @@
+---
+# Start empty; upload the master privately through the authenticated dashboard.
+# Replace REPLACE_IMAGE_DIGEST with the digest from the successful Actions run.
+# Review the Console's accepted denomination, provider bid and real cost estimate.
+version: "2.0"
+services:
+  nba:
+    image: ghcr.io/allenmirgorodskiyppbot/nbappbot@sha256:REPLACE_IMAGE_DIGEST
+    env:
+      - NBABOT_DEPLOYMENT_KIND=akash
+      - NBABOT_INIT_MODE=spreadsheet
+      - NBABOT_CONFIG=/data/state/config.json
+      - NBABOT_DASHBOARD_USER=owner
+      # Replace this in your PRIVATE Console form or secure environment settings.
+      # The runtime refuses to start with a missing or placeholder password.
+      # Do not commit the filled password to GitHub or post the filled SDL publicly.
+      - NBABOT_DASHBOARD_PASSWORD=REPLACE_WITH_A_PRIVATE_PASSWORD
+    expose:
+      - port: 8000
+        as: 80
+        # Bytes and milliseconds, per the official Akash SDL HTTP-options schema.
+        # The app itself accepts masters up to 32 MiB; ingress allows 40 MiB.
+        http_options:
+          max_body_size: 41943040
+          read_timeout: 180000
+          send_timeout: 180000
+        to:
+          - global: true
+    params:
+      storage:
+        nba-data:
+          mount: /data
+          readOnly: false
+profiles:
+  compute:
+    nba:
+      resources:
+        cpu:
+          units: 2
+        memory:
+          size: 6Gi
+        storage:
+          - size: 4Gi
+          - name: nba-data
+            size: 64Gi
+            attributes:
+              persistent: true
+              class: beta3
+  placement:
+    akash:
+      pricing:
+        nba:
+          denom: uact
+          amount: 10000
+deployment:
+  nba:
+    akash:
+      profile: nba
+      count: 1

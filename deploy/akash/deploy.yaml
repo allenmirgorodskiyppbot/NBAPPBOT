@@ -1,0 +1,50 @@
+---
+# Replace the image with a pushed, immutable linux/amd64 registry digest.
+# Review actual bids and the Console's accepted pricing denomination before funding.
+version: "2.0"
+services:
+  nba:
+    image: ghcr.io/REPLACE_OWNER/nbappbot@sha256:REPLACE_IMAGE_DIGEST
+    env:
+      - NBABOT_DEPLOYMENT_KIND=akash
+      - NBABOT_CONFIG=/data/state/config.json
+      - NBABOT_SEED_URL=REPLACE_WITH_HTTPS_SEED_URL
+      - NBABOT_SEED_SHA256=REPLACE_WITH_64_CHARACTER_SHA256
+      # On restart, an existing verified /data/state is kept; seed URL is unused.
+      # Keep personal feeds/provider tokens in the deployment's secure settings.
+    expose:
+      - port: 8000
+        as: 80
+        to:
+          - global: true
+    params:
+      storage:
+        nba-data:
+          mount: /data
+          readOnly: false
+profiles:
+  compute:
+    nba:
+      resources:
+        cpu:
+          units: 2
+        memory:
+          size: 6Gi
+        storage:
+          - size: 4Gi
+          - name: nba-data
+            size: 64Gi
+            attributes:
+              persistent: true
+              class: beta3
+  placement:
+    akash:
+      pricing:
+        nba:
+          denom: uact
+          amount: 10000
+deployment:
+  nba:
+    akash:
+      profile: nba
+      count: 1

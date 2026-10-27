@@ -1,0 +1,53 @@
+{
+  "data_dir": "data",
+  "daily_time": "09:00",
+  "timezone": "America/New_York",
+  "pregame_minutes": [
+    120,
+    60,
+    15
+  ],
+  "season": "2026-27",
+  "nba_enabled": false,
+  "public_context_enabled": false,
+  "provider_url": null,
+  "provider_file": null,
+  "provider_token_env": "NBA_PROVIDER_TOKEN",
+  "provider_auth_header": "Authorization",
+  "provider_auth_scheme": "Bearer",
+  "provider_allowed_hosts": [],
+  "http_timeout": 15,
+  "freshness_hours": {
+    "stats": 30,
+    "schedule": 30,
+    "rosters": 24,
+    "injuries": 3,
+    "lineups": 3,
+    "news": 6,
+    "offers": 1
+  },
+  "simulations": 4000,
+  "min_games": 20,
+  "paper_bankroll": 100,
+  "flat_stake": 1,
+  "selection_policy": null,
+  "organized_players": [
+    "1628973",
+    "1626157",
+    "1628384",
+    "1628404",
+    "1628969",
+    "1630540",
+    "1630631",
+    "203083"
+  ],
+  "historical_context_enabled": false,
+  "package_retention_days": 14,
+  "package_min_versions": 7,
+  "scoped_history_enabled": false,
+  "historical_retry_hours": 24,
+  "historical_rotation_batch_size": 8,
+  "data_source_mode": "spreadsheet",
+  "external_sources_approved": false,
+  "external_source_approvals": []
+}

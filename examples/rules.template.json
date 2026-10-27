@@ -1,0 +1,15 @@
+{
+  "id": "REPLACE_WITH_UNIQUE_RULES_VERSION",
+  "verified": false,
+  "verified_at": "REPLACE_AFTER_REVIEW_WITH_ISO_TIMESTAMP",
+  "effective_from": "REPLACE_WITH_EFFECTIVE_TIMESTAMP",
+  "effective_to": null,
+  "source_url": "https://www.prizepicks.com/",
+  "contest": "REPLACE_WITH_EXACT_CONTEST_AND_JURISDICTION",
+  "eligibility": {"min_legs": 2, "max_legs": null, "min_teams": 2, "max_per_team": null, "same_game_allowed": false},
+  "treatment": {"tie": null, "dnp": null, "void": null, "reboot": null},
+  "below_minimum_multiplier": null,
+  "ineligible_reduction_multiplier": null,
+  "payouts": {},
+  "special_offers": {}
+}

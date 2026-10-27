@@ -1,0 +1,18 @@
+{
+  "board_id": "REPLACE_WITH_UNIQUE_CAPTURE_ID",
+  "offers": [{
+    "player_id": "REPLACE_WITH_DATABASE_PLAYER_ID",
+    "game_id": "REPLACE_WITH_DATABASE_GAME_ID",
+    "market": "points",
+    "line": null,
+    "sides": ["more", "less"],
+    "offer_type": "standard",
+    "captured_at": "REPLACE_WITH_ISO_TIMESTAMP_WITH_OFFSET",
+    "expires_at": null,
+    "source_url": "https://app.prizepicks.com/",
+    "evidence_type": "manual_review",
+    "reviewed": true,
+    "contest": "REPLACE_WITH_EXACT_CONTEST_FORMAT",
+    "rules_id": "REPLACE_WITH_APPLICABLE_RULES_VERSION"
+  }]
+}
