@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import io
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
@@ -34,7 +35,9 @@ BOARD_EXAMPLE = '/board YYYY-MM-DD\nJalen Brunson | points | more | 24.5\nJosh H
 HELP = '''Knicks Research bot
 /today — today’s NBA games
 /news — recent relevant news
+/summary [injuries|news|trades] — fast summary of collected reports (default: injuries)
 /status — feed freshness and bot status
+/ai_status — local AI readiness, busy state and last failure category
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
 /stats <JSON list> — import manually supplied box-score rows
@@ -143,9 +146,11 @@ def parse_board_text(argument: str):
 
 
 class TelegramBot:
-    def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None):
+    def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None,
+                 model_status_callback=None):
         self.store = store
         self.answer_callback = answer_callback
+        self.model_status_callback = model_status_callback
         self.token = token if token is not None else os.getenv('TELEGRAM_BOT_TOKEN', '')
         configured = (os.getenv('TELEGRAM_ALLOWED_USER_IDS') or
                       os.getenv('TELEGRAM_ALLOWED_USER_ID', ''))
@@ -374,6 +379,35 @@ class TelegramBot:
             return HELP
         if command == '/status':
             return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
+        if command == '/ai_status':
+            if argument:
+                return 'Use /ai_status alone to check local model readiness without making an AI request.'
+            if self.model_status_callback is None:
+                return 'AI status reporting is not configured for this deployment. /status still shows data-feed and Telegram health.'
+            try:
+                report = await asyncio.wait_for(self.model_status_callback(), timeout=3)
+                if not isinstance(report, dict):
+                    raise ValueError('AI status metadata must be an object.')
+                safe = {}
+                for key in ('phase', 'model', 'last_failure_category', 'last_failure_time',
+                            'last_success_time', 'source_ref'):
+                    if key in report:
+                        safe[key] = str(report[key])[:160] if report[key] is not None else None
+                for key in ('active', 'busy'):
+                    if key in report:
+                        safe[key] = bool(report[key])
+                elapsed = report.get('active_elapsed_seconds')
+                if isinstance(elapsed, (int, float)) and math.isfinite(elapsed):
+                    safe['active_elapsed_seconds'] = round(max(0, elapsed), 1)
+                failure = report.get('last_failure')
+                if isinstance(failure, dict):
+                    safe['last_failure'] = {key: str(failure[key])[:160] if failure[key] is not None else None
+                                            for key in ('category', 'time', 'at') if key in failure}
+                return 'Local AI status:\n' + self._compact(safe)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                return 'AI status is temporarily unavailable. /status still shows data-feed and Telegram health.'
         if command == '/diagnose':
             if argument:
                 return 'Use /diagnose alone. It checks only the built-in public feed endpoints; custom URLs are not accepted.'
@@ -385,6 +419,13 @@ class TelegramBot:
             return f'NBA games for {today} (Eastern):\n' + self._compact(self.store.games(today))
         if command == '/news':
             return 'Recent collected news — check each source timestamp:\n' + self._compact(self.store.recent_news(limit=10))
+        if command == '/summary':
+            topic = argument.lower() or 'injuries'
+            if topic not in {'injuries', 'news', 'trades'}:
+                return 'Use /summary for injuries, /summary news for all collected reports, or /summary trades for roster transactions.'
+            from news_digest import news_summary
+            report = await asyncio.to_thread(news_summary, self.store, topic=topic, limit=5)
+            return report if isinstance(report, str) else self._compact(report)
         if command == '/importstats':
             return 'Attach a CSV/JSON box-score file with the caption /importstats. For pasted JSON rows, use /stats <JSON list>. Screenshots remain OCR drafts.'
         if command == '/stats':

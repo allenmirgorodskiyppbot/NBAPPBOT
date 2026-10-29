@@ -216,6 +216,83 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('403', messages[0]['text'])
         self.assertIn('custom URLs are not accepted', messages[1]['text'])
 
+    async def test_summary_defaults_to_injuries_and_uses_collected_reports_without_ai(self):
+        calls = []
+
+        def summary(store, *, topic='injuries', limit=5):
+            calls.append((store, topic, limit))
+            return f'Collected {topic} summary with source timestamps.'
+
+        with patch.dict('sys.modules', {'news_digest': types.SimpleNamespace(news_summary=summary)}):
+            await self.bot.process_update(update(110, '/summary'))
+            await self.bot.process_update(update(111, '/summary news'))
+            await self.bot.process_update(update(112, '/summary trades'))
+            await self.bot.process_update(update(113, '/summary unsupported'))
+        self.assertEqual([(topic, limit) for _, topic, limit in calls],
+                         [('injuries', 5), ('news', 5), ('trades', 5)])
+        self.assertTrue(all(store is self.store for store, _, _ in calls))
+        self.assertEqual(self.received_questions, [])
+        messages = self.rows('telegram_outbox')
+        self.assertEqual(messages[0]['text'], 'Collected injuries summary with source timestamps.')
+        self.assertEqual(messages[1]['text'], 'Collected news summary with source timestamps.')
+        self.assertIn('/summary trades', messages[3]['text'])
+
+    async def test_ai_status_uses_only_safe_local_metadata_and_does_not_call_model(self):
+        calls = []
+
+        async def model_status():
+            calls.append(True)
+            return {'phase': 'ready', 'model': 'qwen3:4b', 'busy': True, 'active': 'private-job-id',
+                    'last_failure_category': 'timeout', 'last_failure_time': '2026-10-29T12:00:00Z',
+                    'active_elapsed_seconds': 42.25, 'last_success_time': '2026-10-29T11:30:00Z',
+                    'source_ref': 'a' * 40,
+                    'last_failure': {'category': 'timeout', 'at': '2026-10-29T12:00:00Z',
+                                     'text': 'PRIVATE ERROR BODY'},
+                    'secret': TOKEN, 'answer': 'PRIVATE GENERATED TEXT'}
+
+        bot = TelegramBot(self.store, self.answer, token=TOKEN, allowed_user_ids=[USER_ID],
+                          model_status_callback=model_status)
+        await bot.process_update(update(114, '/ai_status'))
+        await bot.process_update(update(115, '/ai_status extra'))
+        self.assertEqual(calls, [True])
+        self.assertEqual(self.received_questions, [])
+        response = self.rows('telegram_outbox')[0]['text']
+        self.assertIn('qwen3:4b', response)
+        self.assertIn('timeout', response)
+        self.assertIn('"busy": true', response)
+        self.assertIn('"active_elapsed_seconds": 42.2', response)
+        self.assertIn('2026-10-29T11:30:00Z', response)
+        self.assertIn('a' * 40, response)
+        for private in [TOKEN, 'private-job-id', 'PRIVATE ERROR BODY', 'PRIVATE GENERATED TEXT']:
+            self.assertNotIn(private, response)
+        await self.bot.process_update(update(116, '/ai_status'))
+        self.assertIn('not configured', self.rows('telegram_outbox')[-1]['text'])
+
+    async def test_summary_and_ai_status_are_private_and_listed_in_help(self):
+        summary_calls, status_calls = [], []
+
+        def summary(store, **kwargs):
+            summary_calls.append(True)
+            return 'Private news summary'
+
+        async def model_status():
+            status_calls.append(True)
+            return {'phase': 'ready'}
+
+        bot = TelegramBot(self.store, self.answer, token=TOKEN, allowed_user_ids=[USER_ID],
+                          model_status_callback=model_status)
+        with patch.dict('sys.modules', {'news_digest': types.SimpleNamespace(news_summary=summary)}):
+            for number, command in enumerate(['/summary', '/ai_status'], 120):
+                self.assertFalse(await bot.process_update(update(number, command, user=999)))
+                self.assertFalse(await bot.process_update(update(number + 10, command, chat_type='group', chat_id=-100)))
+        self.assertEqual(summary_calls, [])
+        self.assertEqual(status_calls, [])
+        self.assertEqual(self.rows('telegram_outbox'), [])
+        await bot.process_update(update(140, '/help'))
+        help_text = ''.join(row['text'] for row in self.rows('telegram_outbox'))
+        self.assertIn('/summary [injuries|news|trades]', help_text)
+        self.assertIn('/ai_status', help_text)
+
     async def test_diagnose_cannot_be_invoked_by_unauthorized_users_or_groups(self):
         calls = []
 

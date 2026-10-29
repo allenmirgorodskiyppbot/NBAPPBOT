@@ -134,5 +134,29 @@ class FeedAccessTests(unittest.TestCase):
             self.assertTrue(feeds['espn_games']['error'].startswith('Disabled:'))
             self.assertIsNotNone(feeds['rss_1']['last_success'])
 
+    def test_promotional_trade_offer_is_archived_without_sending_trade_alert(self):
+        with tempfile.TemporaryDirectory() as directory:
+            master = MasterStore(Path(directory) / 'master.sqlite')
+            master.set_checkpoint('feeds_initialized', True)
+            alerts = []
+            async def notify(text, event_key=None):
+                alerts.append(text)
+            async def run():
+                with patch.dict('os.environ', {'NBA_DATA_SOURCE': 'manual', 'NEWS_SOURCE': 'rss',
+                                              'NEWS_ALERT_SCOPE': 'league'}):
+                    worker = FeedWorker(master, notify=notify)
+                    await worker.save_news({'id': 'promo',
+                        'title': 'OG Promo Code ELITE: Trade $25, Get $50 Bonus',
+                        'body': 'Offer for trading on NBA and NFL markets.',
+                        'source': 'Elite Sports NY', 'url': 'https://elitesportsny.com/og-promo-code/'})
+                    await worker.save_news({'id': 'transaction',
+                        'title': 'Knicks acquire player in trade', 'body': 'A reported roster transaction.',
+                        'source': 'Publisher', 'url': 'https://publisher.example/knicks-trade'})
+            asyncio.run(run())
+            self.assertEqual(master.status()['counts']['news'], 2)
+            self.assertEqual(len(alerts), 1)
+            self.assertIn('Knicks acquire player', alerts[0])
+            self.assertNotIn('Promo Code', alerts[0])
+
 
 if __name__=='__main__':unittest.main()

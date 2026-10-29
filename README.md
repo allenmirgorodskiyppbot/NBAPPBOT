@@ -1,8 +1,40 @@
 # NBAPPBOT — always-on Knicks research and PrizePicks tracking
 
 This version runs NBA collectors, a durable master dataset, manual PrizePicks line
-analysis, entry grading, private Telegram chat and a local Qwen3 model on Akash.
+analysis, entry grading, private Telegram chat and a local Qwen2.5 3B model on Akash.
 News/statistics services do not depend on the AI model finishing an answer. No OpenAI key is used.
+
+## CPU chat and fast news summaries
+
+The default `OLLAMA_MODEL=qwen2.5:3b` is a small instruction model with tool support,
+using the existing four-CPU/eight-GiB model service. The previous Qwen3 configuration
+was observed generating reasoning until its output limit even on a tiny `/no_think`
+test. A successful HTTP response alone does not establish a complete AI answer.
+The [model registry](https://ollama.com/library/qwen2.5:3b) documents the model and its license.
+
+- `/summary` returns a fast, deterministic digest of collected injury, availability and
+  roster reports without model inference. `/summary trades` narrows it to transactions;
+  `/summary news` includes all material report categories. Publisher wording, dates and
+  source links remain explicit; unknown timezones are not guessed. These are collected
+  reports, not a complete official participation list.
+- Natural-language requests to summarize news use one short AI request over selected
+  reports, without the workbook catalog or tools. If inference times out, returns an
+  empty/unreadable answer, or exhausts its output limit, the reply explicitly reports
+  that failure and falls back to the saved report digest. This fallback is not an AI summary.
+- `/ai_status` reports the configured model, startup phase, whether a request is active,
+  and the last sanitized failure category/time. It makes no model request, and is separate
+  from `/status` data-feed health. Failure categories are logged without question text,
+  response bodies, credentials or private URLs. The diagnostic state resets on restart.
+- Explicit promo-code/affiliate-offer articles stay in the raw collected news archive but
+  are excluded from digests and automatic injury/trade alerts. This is a targeted noise
+  filter, not a guarantee that every irrelevant article is identified.
+
+For an existing deployment, update both `SOURCE_REF` from the current `deploy.yaml` and
+`OLLAMA_MODEL=qwen2.5:3b` under **chatbot → Vars & secrets**, preserving private credentials
+and the existing `/data` volume. Applying the update downloads the new model if needed;
+watch the chatbot logs for `KNICKS CHAT READY`. Then test `/summary`, `/ai_status`, and
+a normal news-summary question. The new model's end-to-end behavior must be verified
+from the actual provider; offline tests use mocked model responses.
 
 **Implemented does not mean deployed:** importing this repository alone does not start
 Akash services. Telegram stays disabled until its token and numeric user ID are supplied
@@ -221,7 +253,7 @@ Games grade automatically after the collected status becomes final. For account 
 has $20 net profit; zero return records a financial loss. Use `/settle` again with a note
 if PrizePicks corrects the payout; the earlier settlement stays in the audit trail.
 
-`/today`, `/news`, `/newsnote`, `/status`, `/diagnose`, `/importstats`, `/boards`, `/entries`, `/results` and ordinary questions are
+`/today`, `/news`, `/summary`, `/newsnote`, `/status`, `/ai_status`, `/diagnose`, `/importstats`, `/boards`, `/entries`, `/results` and ordinary questions are
 also supported. CSV/JSON board documents use fields `date,player,team,stat,line,side`.
 No unplaced suggestion is counted as one of your actual bets.
 
@@ -247,6 +279,7 @@ from the deployed container.
    NEWS_SOURCE=rss
    NEWS_FEED_URLS=https://www.rotowire.com/rss/news.php?sport=NBA,https://sny.tv/knicks-feed,https://elitesportsny.com/category/nyc-teams/e-new-york-knicks/feed
    NEWS_ALERT_SCOPE=league
+   OLLAMA_MODEL=qwen2.5:3b
    ```
 
 3. Apply the update. After bootstrap completes, send `/diagnose` to your Telegram bot.
