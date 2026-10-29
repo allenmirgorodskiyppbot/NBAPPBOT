@@ -46,7 +46,9 @@ def _feed_health(status, now):
     healthy = []
     for feed in feeds:
         name = str(feed.get('name', ''))
-        if not (name.startswith(('espn_', 'rss_')) or
+        if str(feed.get('error') or '').startswith('Disabled:'):
+            continue
+        if not (name.startswith(('espn_', 'nba_', 'rss_')) or
                 name in {'injuries_configured', 'availability_coverage', 'collector'}):
             continue
         stamp = feed.get('last_success')
@@ -68,7 +70,7 @@ def _feed_health(status, now):
     availability = [name for name in healthy if any(t in name.casefold() for t in ('injur', 'availability'))]
     if not availability:
         warnings.append('No fresh availability feed is active. Player participation must be checked manually.')
-    warnings.append('ESPN public availability snapshots are not complete official NBA injury-report coverage.')
+    warnings.append('Public box-score/headline coverage is not complete official NBA injury-report coverage.')
     return {'feeds': feeds, 'fresh_feeds': healthy, 'fresh_availability_feeds': availability,
             'warnings': warnings}
 

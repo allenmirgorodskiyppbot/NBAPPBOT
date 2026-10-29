@@ -2,21 +2,68 @@
 
 This version runs NBA collectors, a durable master dataset, manual PrizePicks line
 analysis, entry grading, private Telegram chat and a local Qwen3 model on Akash.
-The collectors do not depend on the AI model finishing an answer. No OpenAI key is used.
+News/statistics services do not depend on the AI model finishing an answer. No OpenAI key is used.
 
 **Implemented does not mean deployed:** importing this repository alone does not start
 Akash services. Telegram stays disabled until its token and numeric user ID are supplied
 privately. The public template contains no credentials.
 
+## Current free setup: automatic news, manually supplied statistics
+
+The new SDL defaults to `NBA_DATA_SOURCE=manual`, `NEWS_SOURCE=rss`, and NBA-wide
+material-news alerts. The blocked ESPN game collectors stop; your historical data,
+entries, Telegram configuration and persistent volume remain. News collection continues
+independently from these publisher-listed feeds:
+
+- RotoWire NBA player news: `https://www.rotowire.com/rss/news.php?sport=NBA`
+- SNY Knicks: `https://sny.tv/knicks-feed`
+- Elite Sports NY Knicks: `https://elitesportsny.com/category/nyc-teams/e-new-york-knicks/feed`
+
+These feeds are published for RSS readers; they need no paid API key. They were checked
+against publisher directories, but their reachability **must still be verified from your
+Akash deployment** using `/diagnose` and `/status`. The ESPN403, NBA timeout and CBS429
+checks do not tell us whether these other publishers are accessible. A feed that refuses
+access stays failed/stale and receives a cooldown; no proxy or access workaround is used.
+
+The first successful fetch of each feed establishes a baseline visible in `/news`, so old
+articles do not flood Telegram. New or changed injury/trade/lineup reports then generate
+source-linked alerts. Publication time is retained; unknown times stay unknown. Rumor
+language is labeled unconfirmed; other articles remain publisher reports, not independent
+verification. This is a watchlist of configured public sources, not an exhaustive crawler
+of the entire internet or a promise of instantaneous breaking news.
+
+For game-statistics updates, attach a CSV/JSON file in Telegram with caption `/importstats`,
+or use **Import game statistics** in the web research desk. Required columns are:
+
+```text
+date,player,team,opponent,game_status,appearance_state,minutes,pts,reb,ast,tpm,season_type
+```
+
+Use an exact `YYYY-MM-DD` date, recognized team abbreviations, `game_status` final/live,
+and `appearance_state` Played/DNP. Played rows require positive actual minutes; final
+Played rows require points. Other missing statistics stay missing, never zero. Provide
+`season_type` explicitly when known (Regular Season/Playoffs/etc.). Unknown phase is not
+guessed. Use actual box-score values, not a PrizePicks projection or prediction.
+
+A template is at [`examples/player_stats_template.csv`](examples/player_stats_template.csv).
+Save an Excel table as CSV if needed. Imports validate the document, keep an audit record,
+and publish game/player changes atomically. First-time final uploads can contain a partial
+roster; they do not establish complete league coverage. A live-to-final update must include
+previously observed live players so omitted preliminary values cannot be graded as final.
+Placed entries grade against the uploaded finals; credited payouts still use `/settle`.
+
+A personal note can be added with `/newsnote HEADLINE` followed by the detail on the next
+line. It is explicitly unverified and is not broadcast as a confirmed breaking report.
+
 ## What this version does
 
 - Seeds the master database once from the embedded Excel history: 6,350 player-game
   observations. The larger companion ZIP has not been imported.
-- Collects available NBA schedules and box scores for **all teams**, including live and
-  completed games, rather than only Knicks games.
-- Checks ESPN NBA news and partial game-summary availability snapshots; sends relevant
+- Can collect available NBA schedules and box scores for **all teams** in explicitly selected
+  automatic-source mode. The current free SDL uses manual statistics because tested endpoints failed.
+- Supports NBA CDN or ESPN game collection and published RSS or ESPN news; sends relevant
   Knicks, opponent and tracked-player updates to your private Telegram chat.
-- Runs normally every 5 minutes and every minute during live games or the pre-Knicks-tip
+- Waits normally 5 minutes between completed cycles, or 1 minute during live games/pre-Knicks-tip
   window. Source freshness and collection time are different: polling cannot make an
   upstream source instantaneous. Periodic API quotas/availability still apply.
 - Initially backfills 7 days, revisits 3 recent days for corrections and resumes missed
@@ -35,8 +82,8 @@ privately. The public template contains no credentials.
 
 ## What remains limited
 
-The free ESPN endpoints are best-effort public sources without a service guarantee.
-Their availability information is **not a complete official NBA injury report**. Trades
+The free NBA CDN, ESPN endpoints and publisher RSS feeds are best-effort public sources without a service guarantee.
+NBA CDN box scores and publisher headlines **do not provide a complete official NBA injury report**; ESPN availability snapshots are also incomplete. Trades
 may appear as news, but a complete structured transaction/lineup feed is not implemented.
 No direct PrizePicks account/board connection exists; you supply available lines and slips.
 Additional licensed or published feeds can supplement the baseline, as explained below.
@@ -174,20 +221,79 @@ Games grade automatically after the collected status becomes final. For account 
 has $20 net profit; zero return records a financial loss. Use `/settle` again with a note
 if PrizePicks corrects the payout; the earlier settlement stays in the audit trail.
 
-`/today`, `/news`, `/status`, `/boards`, `/entries`, `/results` and ordinary questions are
+`/today`, `/news`, `/newsnote`, `/status`, `/diagnose`, `/importstats`, `/boards`, `/entries`, `/results` and ordinary questions are
 also supported. CSV/JSON board documents use fields `date,player,team,stat,line,side`.
 No unplaced suggestion is counted as one of your actual bets.
 
+## Repairing HTTP 403 feed failures on an existing deployment
+
+HTTP403 means a responding server/proxy refused the request. It does not by itself
+prove the cause or that moving providers will help. Passwords and Telegram tokens do
+not authenticate requests to these public sports feeds.
+
+This patch adds an independent NBA CDN adapter, RSS news sources and an owner-only
+`/diagnose` command. It does not claim that another free source is guaranteed accessible.
+Source fixtures, parsing and selection are tested; actual reachability must be checked
+from the deployed container.
+
+1. Open your **existing deployment → Edit/Update SDL**. Preserve your private password,
+   Telegram token, allowed user ID and the existing `/data` persistent-volume settings.
+2. Copy the new `SOURCE_REF` value from this repository's raw `deploy.yaml`. Replace
+   that source reference and use the current free setup below. The independent news feeds
+   must still succeed on your provider before they can supply updates:
+
+   ```text
+   NBA_DATA_SOURCE=manual
+   NEWS_SOURCE=rss
+   NEWS_FEED_URLS=https://www.rotowire.com/rss/news.php?sport=NBA,https://sny.tv/knicks-feed,https://elitesportsny.com/category/nyc-teams/e-new-york-knicks/feed
+   NEWS_ALERT_SCOPE=league
+   ```
+
+3. Apply the update. After bootstrap completes, send `/diagnose` to your Telegram bot.
+   It checks fixed public URLs and reports status, content type and selected safe
+   response headers. It never prints tokens, cookies, environment variables or private
+   subscriber URLs. You can share this report for diagnosis.
+4. Send `/status` and look for successful `rss_1`, `rss_2` and `rss_3` updates and a rising
+   news count. Statistics remain manually supplied; disabled game collectors are expected.
+   Superseded ESPN entries are explicitly marked disabled. The optional NBA CDN adapter
+   can be selected only if its provider-side connectivity check succeeds.
+   A successful schedule alone does not prove final player statistics are available.
+5. If NBA CDN also returns403, it remains unavailable—do not count old imported data
+   as refreshed. Use the diagnostic report with provider support to determine whether
+   an egress policy or upstream refusal applies. A source-authorized API plan may be
+   needed if free sources remain inaccessible.
+
+Repeated401/403/429 responses put that hostname into a persistent 15-minute cooldown
+with capped backoff (up to 1 hour; a longer numeric Retry-After is honored up to 24 hours).
+Other publishers can continue independently. A manual `/diagnose` is a one-shot check
+for the owner, not a proxy, rotating identity or access-control bypass.
+
+The NBA CDN adapter uses native NBA game IDs only for its own box-score requests, keeps
+existing canonical database IDs, preserves valid fields absent from another source and
+rejects incomplete/mismatched final box scores. It cannot provide comprehensive injuries.
+
 ## News and availability feeds
 
-ESPN games/news start automatically: no key is needed for the baseline. Add optional
+The SDL uses manual game statistics and automatic published RSS news.
+Optional ESPN/NBA CDN game adapters can be selected explicitly after access is verified. They require
+no API key, but are not verified working replacements: a check from the deployed Akash
+container returned ESPN HTTP403, NBA CDN ReadTimeout, and CBS HTTP429. Local CDN checks
+also returned403. Publisher directories validate the RSS URLs, not Akash access.
+
+Use `/diagnose` after the patch to check fixed public URLs, including the ESNY Knicks
+feed. Do not assume an accessible headline feed restores player statistics or injuries.
+
+You can explicitly choose `NBA_DATA_SOURCE=espn` or `NEWS_SOURCE=espn` if those endpoints
+are accessible. No automatic IP/hostname/header workarounds are attempted after a denial.
+
+Add optional
 published/licensed RSS or Atom URLs in private configuration as a comma-separated value:
 
 ```text
 NEWS_FEED_URLS=https://your-published-feed.example/nba.xml,https://another-feed.example/knicks.xml
 ```
 
-Those are placeholders, not working subscriptions. Follow the publisher's usage terms.
+Those example domains are placeholders, not working subscriptions. Follow each publisher's usage terms.
 The bot deduplicates and timestamps articles; text is treated as evidence, not instructions.
 
 `INJURY_FEED_URL` is optional. It must return this **normalized JSON schema**, not an arbitrary
@@ -198,7 +304,7 @@ Sportradar/RotoWire endpoint; a provider-specific adapter is needed for differen
 ```
 
 Keep private feed keys out of GitHub. Without this setting `/status` explicitly marks it
-disabled. ESPN summary availability remains partial. For low-latency professional coverage,
+disabled. The NBA CDN selection does not produce a dedicated injury-status feed. ESPN summary availability, when explicitly selected, remains partial. For low-latency professional coverage,
 select and license a provider before adding its adapter; no paid subscription is configured.
 
 ## Maintenance and development
@@ -246,3 +352,9 @@ mocked Telegram tests are not evidence of a connected production bot.
 - [Telegram long polling](https://core.telegram.org/bots/api#getupdates)
 - [Official NBA injury reports](https://official.nba.com/nba-injury-report-2026-27-season/)
 - [PrizePicks DNPs, Reboots and ties](https://www.prizepicks.com/help-center/dnps-reboots-and-ties)
+
+- [CBS published RSS directory](https://www.cbssports.com/xml/rss)
+- [Elite Sports NY published RSS directory](https://elitesportsny.com/esny-rss-feeds/)
+
+- [RotoWire published RSS directory](https://www.rotowire.com/rss/)
+- [SNY published RSS directory](https://sny.tv/rss)

@@ -6,7 +6,7 @@ what PrizePicks actually returned; the model never decides settlement.
 from __future__ import annotations
 
 import datetime as dt
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import hashlib
 import json
 import math
@@ -135,11 +135,13 @@ class MasterStore:
         db.execute('INSERT OR IGNORE INTO raw_snapshots VALUES (?,?,?,?,?,?)',
                    (snapshot_id, kind, str(key), str(payload.get('source', '')), text, now()))
 
-    def _upsert(self, table, fields, keys, payload):
+    def _upsert(self, table, fields, keys, payload, db=None):
         if not all(payload.get(k) is not None and str(payload[k]) for k in keys):
             raise ValueError('Missing required identifier: ' + ', '.join(keys))
         where = ' AND '.join(k + '=?' for k in keys)
-        with self.connect() as db:
+        # A bundle supplies one connection so no per-row context can commit a
+        # partial box score. Standalone calls retain their existing transaction.
+        with (nullcontext(db) if db is not None else self.connect()) as db:
             old = db.execute(f'SELECT * FROM {table} WHERE {where}',
                              tuple(str(payload[k]) for k in keys)).fetchone()
             values = {name: payload[name] if name in payload else (old[name] if old else None)
@@ -159,17 +161,41 @@ class MasterStore:
                        [values[k] for k in fields] + [str(payload.get('updated_at') or now())])
             return True
 
-    def upsert_game(self, game):
-        return self._upsert('games', GAME_FIELDS, ['id'], dict(game))
+    def upsert_game(self, game, *, db=None):
+        return self._upsert('games', GAME_FIELDS, ['id'], dict(game), db=db)
 
-    def upsert_player_game(self, stat):
+    def upsert_player_game(self, stat, *, db=None):
         stat = dict(stat)
         if not stat.get('player_id') and stat.get('player'):
             stat['player_id'] = 'name:' + normalized_name(stat['player'])
         for field in set(PLAYER_FIELDS) & set(STAT_COMPONENTS):
             if field in stat and stat[field] is not None:
                 stat[field] = finite_number(stat[field], field, 0)
-        return self._upsert('player_games', PLAYER_FIELDS, ['game_id', 'player_id'], stat)
+        return self._upsert('player_games', PLAYER_FIELDS, ['game_id', 'player_id'], stat, db=db)
+
+    def upsert_game_bundle(self, game, rows):
+        """Atomically publish one game and its player observations/raw snapshots.
+
+        Readers see either the previous complete version or the committed new
+        version, including when a final box score is corrected. Any invalid row
+        rolls back every update; the game status is written after its players.
+        """
+        game = dict(game)
+        if game.get('id') is None or not str(game['id']):
+            raise ValueError('Game bundle needs a game id.')
+        game_id = str(game['id'])
+        player_rows = list(rows)
+        changed_rows = 0
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            for row in player_rows:
+                row = dict(row)
+                if str(row.get('game_id', '')) != game_id:
+                    raise ValueError('Every player row in a bundle must match its game id.')
+                changed_rows += self.upsert_player_game(row, db=db)
+            game_changed = self.upsert_game(game, db=db)
+        return {'game_changed': game_changed, 'player_rows': len(player_rows),
+                'player_rows_changed': changed_rows}
 
     def record_news(self, item):
         item = dict(item)
@@ -435,6 +461,10 @@ class MasterStore:
     def grade_entries(self):
         changed = []
         with self.connect() as db:
+            # This method reads several rows and then writes grades. Reserve the
+            # short write transaction first so a concurrent final publication
+            # cannot land between its player-stat and game-status observations.
+            db.execute('BEGIN IMMEDIATE')
             entries = [dict(row) for row in db.execute('SELECT * FROM entries')]
             for entry in entries:
                 legs = json.loads(entry['legs_json'])

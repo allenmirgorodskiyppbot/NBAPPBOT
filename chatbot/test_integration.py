@@ -111,4 +111,23 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(len(calls),2)
 
 
+    def test_manual_csv_import_updates_master_and_grades_without_claiming_payout(self):
+        with patch.object(app,'DATA_DIR',self.root),patch.object(app,'CHAT_PASSWORD',PASSWORD),patch.object(app,'initialize',fake_initialize):
+            with TestClient(app.app) as client:
+                legs=[{'player':'Jalen Brunson','team':'NYK','stat':'pts','side':'more','line':20.5,'date':'2026-10-27'},
+                      {'player':'Cade Cunningham','team':'DET','stat':'pts','side':'less','line':30.5,'date':'2026-10-27'}]
+                entry=client.post('/api/entries',headers=HEADERS,json={'legs':legs,'stake':10,'entry_type':'power','payout_multiplier':3}).json()
+                content='date,player,team,opponent,game_status,appearance_state,minutes,pts\n2026-10-27,Jalen Brunson,NYK,DET,final,Played,35:30,24\n2026-10-27,Cade Cunningham,DET,NYK,final,Played,36,25\n'
+                response=client.post('/api/import/stats',headers=HEADERS,json={'filename':'finals.csv','content':content})
+                self.assertEqual(response.status_code,200,response.text)
+                self.assertEqual(response.json()['status'],'complete')
+                saved=app.app.state.master.get_entry(entry['id'])
+                self.assertEqual(saved['provisional_status'],'won')
+                self.assertIsNone(saved['actual_payout'])
+                self.assertIn('Manual',saved['grades'][0]['source'])
+                wrong=client.post('/api/import/stats',headers=HEADERS,json={'filename':'board.csv','content':'player,stat,line,side\nJalen Brunson,pts,22.5,more\n'})
+                self.assertEqual(wrong.status_code,422)
+                self.assertEqual(app.app.state.master.status()['counts']['player_games'],2)
+
+
 if __name__ == '__main__': unittest.main()

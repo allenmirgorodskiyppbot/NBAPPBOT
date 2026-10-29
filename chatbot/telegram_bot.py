@@ -35,6 +35,10 @@ HELP = '''Knicks Research bot
 /today — today’s NBA games
 /news — recent relevant news
 /status — feed freshness and bot status
+/diagnose — check the built-in public NBA feed connections
+/importstats — attach CSV/JSON box scores with this caption to import manual stats
+/stats <JSON list> — import manually supplied box-score rows
+/newsnote HEADLINE then optional details — save an unverified personal news note
 /boards — uploaded PrizePicks boards
 /board DATE then player | stat | more/less | line — save available lines
 /analyze BOARD_ID — analyze an uploaded board
@@ -45,6 +49,10 @@ HELP = '''Knicks Research bot
 /settle ENTRY_ID PAYOUT [note] — confirm the actual total return shown by PrizePicks
 
 You can also send a question, a CSV/JSON board file, or a screenshot. Screenshot OCR is a draft: correct the player, market, line, side and game date before saving it. Available lines are separate from entries actually placed.
+
+For the manual-stats fallback, attach a CSV/JSON file with the caption /importstats. A file without that caption is treated as a PrizePicks board. Screenshots stay OCR drafts and never import master statistics automatically. Imported stats are labeled as manual user data. Missing statistics must remain blank, not zero.
+
+/newsnote saves your note as user-supplied and unverified; it does not broadcast an alert or claim the report is official.
 
 Board example (use the actual game date):
 ''' + BOARD_EXAMPLE + '''
@@ -336,9 +344,22 @@ class TelegramBot:
         document = message.get('document')
         if document:
             filename = document.get('file_name', '')
+            caption = str(message.get('caption', '')).strip()
+            caption_parts = caption.split(maxsplit=1)
+            caption_command = caption_parts[0].split('@', 1)[0].lower() if caption_parts else ''
+            import_stats_file = caption_command == '/importstats'
+            if import_stats_file and len(caption_parts) > 1:
+                raise ValueError('Use only /importstats as the file caption; box scores must be in the attached CSV/JSON file.')
             if not filename.lower().endswith(('.csv', '.json')):
-                raise ValueError('Send board files as CSV/JSON; send screenshots as Telegram photos.')
+                raise ValueError('Send board or manual-stat files as CSV/JSON; send screenshots as Telegram photos.')
             payload = await self._download(document['file_id'], document.get('file_size', 0))
+            if import_stats_file:
+                from manual_import import import_stats, parse_stats_document
+                rows = await asyncio.to_thread(parse_stats_document, filename, payload)
+                report = await asyncio.to_thread(import_stats, self.store, rows,
+                                                  source=f'Manual user upload (Telegram {update_id})')
+                return ('Manual statistics import complete — user-supplied data, not independently verified:\n'
+                        + self._compact(report))
             legs = parse_board_document(filename, payload)
             board = self.store.create_board(legs, source=f'telegram:{update_id}:{filename[:100]}')
             return f'PrizePicks board saved: {board["id"]}\n{len(board["legs"])} lines. No placed entry recorded.\n/analyze {board["id"]}'
@@ -353,11 +374,39 @@ class TelegramBot:
             return HELP
         if command == '/status':
             return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
+        if command == '/diagnose':
+            if argument:
+                return 'Use /diagnose alone. It checks only the built-in public feed endpoints; custom URLs are not accepted.'
+            from feed_diagnostics import diagnose_feeds
+            report = await diagnose_feeds()
+            return 'Public feed connection checks:\n' + self._compact(report)
         if command == '/today':
             today = datetime.now(ZoneInfo('America/New_York')).date().isoformat()
             return f'NBA games for {today} (Eastern):\n' + self._compact(self.store.games(today))
         if command == '/news':
             return 'Recent collected news — check each source timestamp:\n' + self._compact(self.store.recent_news(limit=10))
+        if command == '/importstats':
+            return 'Attach a CSV/JSON box-score file with the caption /importstats. For pasted JSON rows, use /stats <JSON list>. Screenshots remain OCR drafts.'
+        if command == '/stats':
+            if not argument:
+                return 'Use /stats followed by a JSON list of box-score rows, or attach a CSV/JSON file with caption /importstats.'
+            from manual_import import import_stats
+            rows = json.loads(argument)
+            if not isinstance(rows, list):
+                raise ValueError('Manual stats must be a JSON list of box-score rows.')
+            report = await asyncio.to_thread(import_stats, self.store, rows,
+                                              source=f'Manual user upload (Telegram {update_id})')
+            return ('Manual statistics import complete — user-supplied data, not independently verified:\n'
+                    + self._compact(report))
+        if command == '/newsnote':
+            if not argument:
+                return 'Use /newsnote HEADLINE followed by optional details on later lines. The note is saved as user-supplied/unverified and does not send an automatic alert.'
+            from manual_import import record_manual_news
+            title, _, detail = argument.partition('\n')
+            note = await asyncio.to_thread(record_manual_news, self.store, title.strip(),
+                                            detail=detail.strip(), team='NYK')
+            return ('Personal news note saved as user-supplied/unverified. No automatic alert was broadcast:\n'
+                    + self._compact(note))
         if command == '/boards':
             method = getattr(self.store, 'list_boards', None) or self.store.boards
             return 'Uploaded boards:\n' + self._compact(method())

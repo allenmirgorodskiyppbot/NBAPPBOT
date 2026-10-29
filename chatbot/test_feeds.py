@@ -143,7 +143,10 @@ class CollectionTests(unittest.IsolatedAsyncioTestCase):
             if request.url.path.endswith('scoreboard'):
                 day = request.url.params['dates']
                 date = day[:4] + '-' + day[4:6] + '-' + day[6:8]
-                return httpx.Response(200, json={'events': [event(date)]})
+                item = event(date)
+                if date > NOW.astimezone(dt.timezone(dt.timedelta(hours=-4))).date().isoformat():
+                    item['status']['type'] = {'completed': False, 'state': 'pre', 'name': 'STATUS_SCHEDULED'}
+                return httpx.Response(200, json={'events': [item]})
             if request.url.path.endswith('summary'):
                 return httpx.Response(200, json=summary(self.points))
             if self.fail_news:

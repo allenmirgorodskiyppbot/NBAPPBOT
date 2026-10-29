@@ -198,6 +198,149 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('https://', str(error.exception))
         self.assertGreaterEqual(logging.getLogger('httpx').level, logging.WARNING)
 
+    async def test_diagnose_returns_safe_report_without_model_or_custom_urls(self):
+        calls = []
+
+        async def diagnose():
+            calls.append(True)
+            return [{'source': 'espn_scoreboard', 'status_code': 403,
+                     'content_type': 'text/html', 'category': 'access_denied'}]
+
+        with patch.dict('sys.modules', {'feed_diagnostics': types.SimpleNamespace(diagnose_feeds=diagnose)}):
+            await self.bot.process_update(update(70, '/diagnose'))
+            await self.bot.process_update(update(71, '/diagnose https://user-supplied.example'))
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(self.received_questions, [])
+        messages = self.rows('telegram_outbox')
+        self.assertIn('espn_scoreboard', messages[0]['text'])
+        self.assertIn('403', messages[0]['text'])
+        self.assertIn('custom URLs are not accepted', messages[1]['text'])
+
+    async def test_diagnose_cannot_be_invoked_by_unauthorized_users_or_groups(self):
+        calls = []
+
+        async def diagnose():
+            calls.append(True)
+            return []
+
+        with patch.dict('sys.modules', {'feed_diagnostics': types.SimpleNamespace(diagnose_feeds=diagnose)}):
+            self.assertFalse(await self.bot.process_update(update(72, '/diagnose', user=999)))
+            self.assertFalse(await self.bot.process_update(update(73, '/diagnose', chat_type='group', chat_id=-100)))
+        self.assertEqual(calls, [])
+        self.assertEqual(self.rows('telegram_outbox'), [])
+
+    async def test_stats_document_requires_explicit_caption_and_keeps_boards_separate(self):
+        observed = []
+        stats = [{'game_id': 'nba-test-1', 'player': 'Jalen Brunson', 'date': '2026-10-29', 'pts': 25}]
+        board = [{'player': 'Jalen Brunson', 'stat': 'pts', 'line': 24.5,
+                  'side': 'more', 'date': '2026-10-29'}]
+
+        async def download(file_id, declared_size=0):
+            return b'game_id,player,date,pts\nnba-test-1,Jalen Brunson,2026-10-29,25\n' if file_id == 'stats-file' else json.dumps(board).encode()
+
+        def parse(filename, payload):
+            observed.append(('parse', filename))
+            return stats
+
+        def import_rows(store, rows, source='Manual user upload'):
+            observed.append(('import', rows, source))
+            return {'imported_rows': len(rows), 'source': source}
+
+        stats_message = update(80)
+        stats_message['message'].update(document={'file_id': 'stats-file', 'file_name': 'boxscores.csv'}, caption='/importstats')
+        board_message = update(81)
+        board_message['message'].update(document={'file_id': 'board-file', 'file_name': 'board.json'})
+        with patch.object(self.bot, '_download', download), patch.dict('sys.modules', {
+                'manual_import': types.SimpleNamespace(parse_stats_document=parse, import_stats=import_rows)}):
+            await self.bot.process_update(stats_message)
+            await self.bot.process_update(board_message)
+        self.assertEqual([call[0] for call in observed], ['parse', 'import'])
+        self.assertEqual(observed[1][1], stats)
+        self.assertTrue(observed[1][2].startswith('Manual user upload'))
+        self.assertEqual(len(self.store.boards_data), 1)
+        self.assertEqual(self.store.entries_data, [])
+        messages = self.rows('telegram_outbox')
+        self.assertIn('Manual statistics import complete', messages[0]['text'])
+        self.assertIn('not independently verified', messages[0]['text'])
+        self.assertIn('PrizePicks board saved', messages[1]['text'])
+
+    async def test_manual_stat_and_news_commands_are_authorized_and_do_not_broadcast(self):
+        imported, notes, downloads = [], [], []
+
+        def import_rows(store, rows, source='Manual user upload'):
+            imported.append((rows, source))
+            return {'imported_rows': len(rows)}
+
+        def record_note(store, title, detail='', url='', team='NYK'):
+            notes.append((title, detail, team))
+            return {'title': title, 'body': detail, 'source': 'Manual user note', 'verification': 'unverified'}
+
+        async def download(file_id, declared_size=0):
+            downloads.append(file_id)
+            return b'[]'
+
+        async def forbidden_notification(*args, **kwargs):
+            self.fail('A manual note must not automatically broadcast a notification.')
+
+        document = update(82, user=999)
+        document['message'].update(document={'file_id': 'not-authorized', 'file_name': 'stats.json'}, caption='/importstats')
+        with patch.dict('sys.modules', {'manual_import': types.SimpleNamespace(
+                import_stats=import_rows, record_manual_news=record_note)}), \
+                patch.object(self.bot, '_download', download), \
+                patch.object(self.bot, 'notify', forbidden_notification):
+            self.assertFalse(await self.bot.process_update(document))
+            self.assertFalse(await self.bot.process_update(update(83, '/stats []', user=999)))
+            self.assertFalse(await self.bot.process_update(update(84, '/newsnote Unverified rumor', user=999)))
+            self.assertFalse(await self.bot.process_update(update(85, '/newsnote Group rumor', chat_type='group', chat_id=-100)))
+            self.assertEqual(self.rows('telegram_outbox'), [])
+            await self.bot.process_update(update(86, '/stats [{"game_id":"nba-test","player":"Jalen Brunson","date":"2026-10-29","pts":25}]'))
+            await self.bot.process_update(update(87, '/newsnote Brunson availability note\nPersonal note: verify official injury report.'))
+        self.assertEqual(downloads, [])
+        self.assertEqual(len(imported), 1)
+        self.assertEqual(notes, [('Brunson availability note', 'Personal note: verify official injury report.', 'NYK')])
+        self.assertEqual(self.store.boards_data, [])
+        self.assertEqual(self.store.entries_data, [])
+        self.assertIn('user-supplied/unverified', self.rows('telegram_outbox')[-1]['text'])
+        self.assertIn('No automatic alert was broadcast', self.rows('telegram_outbox')[-1]['text'])
+
+    async def test_manual_stats_column_errors_are_safe_and_photo_stays_a_draft(self):
+        imports, photos = [], []
+
+        def parse(filename, payload):
+            raise ValueError('Missing required columns: game_id, player, date.')
+
+        def import_rows(*args, **kwargs):
+            imports.append(True)
+            return {}
+
+        async def download(file_id, declared_size=0):
+            return b'wrong_column\n123\n'
+
+        async def photo_draft(message, update_id):
+            photos.append(update_id)
+            return 'Screenshot draft saved; no statistics were imported.'
+
+        bad_file = update(88)
+        bad_file['message'].update(document={'file_id': 'bad-stats', 'file_name': 'stats.csv'}, caption='/importstats')
+        photo = update(89)
+        photo['message'].update(photo=[{'file_id': 'photo-stats', 'file_size': 100}], caption='/importstats')
+        with patch.dict('sys.modules', {'manual_import': types.SimpleNamespace(
+                parse_stats_document=parse, import_stats=import_rows)}), \
+                patch.object(self.bot, '_download', download), \
+                patch.object(self.bot, '_handle_photo', photo_draft):
+            await self.bot.process_update(bad_file)
+            await self.bot.process_update(photo)
+            await self.bot.process_update(update(90, '/stats {"pts":25}'))
+        self.assertEqual(imports, [])
+        self.assertEqual(photos, [89])
+        self.assertEqual(self.store.boards_data, [])
+        self.assertEqual(self.store.entries_data, [])
+        messages = self.rows('telegram_outbox')
+        self.assertIn('Missing required columns: game_id, player, date', messages[0]['text'])
+        self.assertNotIn(TOKEN, messages[0]['text'])
+        self.assertIn('Screenshot draft', messages[1]['text'])
+        self.assertIn('JSON list of box-score rows', messages[2]['text'])
+
     async def test_slow_model_does_not_block_alerts_or_status_commands(self):
         started, release = asyncio.Event(), asyncio.Event()
         alert_delivered, status_delivered = asyncio.Event(), asyncio.Event()

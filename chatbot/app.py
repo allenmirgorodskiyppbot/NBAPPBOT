@@ -58,7 +58,11 @@ def master_context(master):
     result = master.status()
     result['today_eastern'] = dt.datetime.now(ZoneInfo('America/New_York')).date().isoformat()
     result['scope'] = ('Workbook embedded history plus all NBA games collected since deployment. '
-                       'Not the full companion ZIP. ESPN public feeds are best effort, not a licensed SLA.')
+                       'Not the full companion ZIP. Public feeds are best effort, not a licensed SLA.')
+    result['active_sources'] = {'games': os.getenv('NBA_DATA_SOURCE', 'espn'),
+                                'news': os.getenv('NEWS_SOURCE', 'espn')}
+    result['collection_mode'] = ('Game statistics require manual uploads; public news is polled automatically.'
+                                 if os.getenv('NBA_DATA_SOURCE') == 'manual' else 'Automatic games/news; inspect feed freshness.')
     result['schemas'] = {}
     with master.connect() as db:
         for table in ['games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events']:
@@ -122,7 +126,7 @@ async def notify_feed_health(master, notify, current=None):
     updated = dict(previous)
     for feed in master.status()['feeds']:
         name = feed['name']
-        if name not in {'espn_games', 'espn_news', 'availability_coverage', 'injuries_configured'} and not name.startswith('rss_'):
+        if name not in {'espn_games', 'nba_cdn_games', 'espn_news', 'availability_coverage', 'injuries_configured'} and not name.startswith('rss_'):
             continue
         if str(feed.get('error') or '').startswith('Disabled:'):
             continue
@@ -314,7 +318,11 @@ SYSTEM = '''You are Knicks Research Chat, answering questions using the supplied
 The historical workbook is a static snapshot through 27 Oct 2026, containing 53 sheets and
 only its embedded rows. The full companion ZIP has not been loaded. A separate persistent
 master database is seeded from the workbook and updated by NBA collectors. Use master_status
-and query_master for current information; state the source's actual timestamp and coverage.
+to check active_sources: when games='manual', statistics change only through explicit uploads.
+News polling can continue independently in manual statistics mode. You have no general web
+browser; only configured accessible feeds are collected. Preserve rumor/unconfirmed labels.
+Use master_status
+and query_master for current information; state the active source, actual timestamp and coverage.
 Never claim feeds are current if they have errors, are disabled, or stale. ESPN injuries are
 incomplete availability snapshots, not comprehensive official NBA injury coverage. You have
 no direct PrizePicks board or account access: the user supplies lines and placed entries.
@@ -531,6 +539,12 @@ async def get_master_status():
     return result
 
 
+@app.post('/api/diagnostics/feeds', dependencies=[Depends(authenticate)])
+async def get_feed_diagnostics():
+    from feed_diagnostics import diagnose_feeds
+    return await diagnose_feeds()
+
+
 @app.get('/api/games', dependencies=[Depends(authenticate)])
 async def get_games(date: str = ''):
     try:
@@ -594,3 +608,26 @@ async def download_backup():
     path = await call_service(save_backup, app.state.master, directory)
     return FileResponse(path, filename='NBA_Master_Backup.sqlite', media_type='application/octet-stream',
                         background=BackgroundTask(shutil.rmtree, directory, ignore_errors=True))
+
+
+class StatsImportRequest(BaseModel):
+    filename: str = Field(default='statistics.csv', max_length=120)
+    content: str | None = Field(default=None, max_length=2000000)
+    rows: list[dict] | None = Field(default=None, max_length=2000)
+
+
+@app.post('/api/import/stats', dependencies=[Depends(authenticate)])
+async def import_statistics(request: StatsImportRequest):
+    from manual_import import parse_stats_document, import_stats
+    if request.rows is not None and request.content is not None:
+        raise HTTPException(422, 'Supply a document or rows, not both.')
+    if request.content is not None:
+        try:
+            rows = parse_stats_document(request.filename, request.content.encode('utf-8'))
+        except ValueError as error:
+            raise HTTPException(422, str(error)[:500]) from None
+    elif request.rows is not None:
+        rows = request.rows
+    else:
+        raise HTTPException(422, 'Supply a CSV/JSON statistics document or row objects.')
+    return await call_service(import_stats, app.state.master, rows, source='Manual web upload: ' + request.filename)

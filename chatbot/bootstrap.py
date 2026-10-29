@@ -33,7 +33,8 @@ def main():
     root = Path('/app')
     root.mkdir(parents=True, exist_ok=True)
     for name in ['app.py', 'workbook.py', 'requirements.txt', 'index.html', 'master.py',
-                 'feeds.py', 'seed_master.py', 'analysis_engine.py', 'telegram_bot.py']:
+                 'feeds.py', 'seed_master.py', 'analysis_engine.py', 'telegram_bot.py',
+                 'nba_cdn.py', 'feed_diagnostics.py', 'manual_import.py']:
         print('Downloading ' + name, flush=True)
         download(f'https://raw.githubusercontent.com/{REPOSITORY}/{ref}/chatbot/{name}', root / name)
     data = Path(os.getenv('DATA_DIR', '/data'))

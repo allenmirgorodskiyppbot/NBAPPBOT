@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from master import MasterStore
 
@@ -58,6 +59,93 @@ class MasterTests(unittest.TestCase):
         with reopened.connect() as db:
             snapshots = db.execute("SELECT COUNT(*) FROM raw_snapshots WHERE kind='player_games'").fetchone()[0]
         self.assertEqual(snapshots, 2)
+
+    def test_game_bundle_rolls_back_invalid_rows_and_raw_snapshots(self):
+        with self.assertRaises(ValueError):
+            self.store.upsert_game_bundle(self.game(), [self.stat(),
+                self.stat(player_id='nba:p2', pts=float('nan'))])
+        self.assertEqual(self.store.status()['counts']['games'], 0)
+        self.assertEqual(self.store.status()['counts']['player_games'], 0)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM raw_snapshots').fetchone()[0], 0)
+        with self.assertRaises(ValueError):
+            self.store.upsert_game_bundle(self.game(), [self.stat(),
+                self.stat(game_id='wrong-game', player_id='nba:p2')])
+        self.assertEqual(self.store.status()['counts']['player_games'], 0)
+
+    def test_final_game_bundle_publishes_player_rows_before_final_status(self):
+        original_upsert = self.store._upsert
+        operations = []
+
+        def inspect(table, fields, keys, payload, db=None):
+            changed = original_upsert(table, fields, keys, payload, db=db)
+            operations.append(table)
+            if table == 'games':
+                # The writer itself already has every new player before the
+                # final marker is written, although no reader can yet see it.
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM player_games').fetchone()[0], 2)
+                self.assertEqual(db.execute('SELECT status FROM games').fetchone()[0], 'final')
+                with sqlite3.connect(self.path) as reader:
+                    self.assertEqual(reader.execute('SELECT COUNT(*) FROM games').fetchone()[0], 0)
+                    self.assertEqual(reader.execute('SELECT COUNT(*) FROM player_games').fetchone()[0], 0)
+            return changed
+
+        with patch.object(self.store, '_upsert', side_effect=inspect):
+            result = self.store.upsert_game_bundle(self.game(), [self.stat(), self.stat(player_id='nba:p2')])
+        self.assertEqual(operations, ['player_games', 'player_games', 'games'])
+        self.assertEqual(result, {'game_changed': True, 'player_rows': 2, 'player_rows_changed': 2})
+        self.assertEqual(self.store.status()['counts']['player_games'], 2)
+        self.assertFalse(self.store.upsert_game_bundle(self.game(),
+                         [self.stat(), self.stat(player_id='nba:p2')])['game_changed'])
+
+    def test_corrected_bundle_is_never_visible_as_mixed_player_versions(self):
+        self.store.upsert_game_bundle(self.game(), [self.stat(pts=10),
+            self.stat(player_id='nba:p2', pts=20)])
+        original_upsert = self.store._upsert
+        observations = []
+
+        def inspect(table, fields, keys, payload, db=None):
+            changed = original_upsert(table, fields, keys, payload, db=db)
+            with sqlite3.connect(self.path) as reader:
+                observations.append(reader.execute(
+                    'SELECT player_id,pts FROM player_games ORDER BY player_id').fetchall())
+                self.assertEqual(reader.execute('SELECT home_score FROM games').fetchone()[0], 111)
+            return changed
+
+        with patch.object(self.store, '_upsert', side_effect=inspect):
+            self.store.upsert_game_bundle(self.game(home_score=112), [self.stat(pts=25),
+                self.stat(player_id='nba:p2', pts=30)])
+        self.assertEqual(observations, [[('nba:p1', 10), ('nba:p2', 20)]] * 3)
+        self.assertEqual(self.store.query('SELECT pts FROM player_games ORDER BY player_id')['rows'], [(25,), (30,)])
+        self.assertEqual(self.store.games('2026-10-27')[0]['home_score'], 112)
+        with self.assertRaises(ValueError):
+            self.store.upsert_game_bundle(self.game(home_score=113), [self.stat(pts=100),
+                self.stat(player_id='nba:p2', reb=-1)])
+        self.assertEqual(self.store.query('SELECT pts FROM player_games ORDER BY player_id')['rows'], [(25,), (30,)])
+        self.assertEqual(self.store.games('2026-10-27')[0]['home_score'], 112)
+
+    def test_grading_holds_one_snapshot_against_concurrent_publish(self):
+        self.store.upsert_game_bundle(self.game(), [self.stat()])
+        entry = self.entry()
+        original_grade = self.store._grade_leg
+        attempted_writes = []
+
+        def inspect(db, leg):
+            # A second writer cannot publish between the grader's separate
+            # SELECTs; WAL readers remain available throughout this transaction.
+            with sqlite3.connect(self.path, timeout=0.01) as concurrent:
+                with self.assertRaisesRegex(sqlite3.OperationalError, 'locked'):
+                    concurrent.execute('UPDATE player_games SET pts=0')
+            attempted_writes.append(True)
+            return original_grade(db, leg)
+
+        with patch.object(self.store, '_grade_leg', side_effect=inspect):
+            self.store.grade_entries()
+        self.assertEqual(len(attempted_writes), 2)
+        self.assertEqual(self.store.get_entry(entry['id'])['provisional_status'], 'won')
+        self.store.upsert_game_bundle(self.game(), [self.stat(pts=0)])
+        self.store.grade_entries()
+        self.assertEqual(self.store.get_entry(entry['id'])['provisional_status'], 'lost')
 
     def test_schema_one_migrates_and_preserves_tipoff_across_partial_updates(self):
         old_path = str(Path(self.directory.name) / 'legacy.sqlite')

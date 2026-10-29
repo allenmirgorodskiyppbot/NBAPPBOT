@@ -32,9 +32,9 @@
     <p id="login-error" role="alert"></p>
   </section>
   <div id="desk" hidden>
-    <section><h2>Live research desk</h2><p class="muted">Data updates run in the background. Use Telegram for line screenshots and entry tracking.</p>
+    <section><h2>Research desk</h2><p class="muted">News monitoring runs in the background. Manual statistics mode needs your box-score uploads. Use Telegram for line screenshots and entry tracking.</p>
       <div class="examples"><button id="live-health" type="button">Feed status</button><button id="live-news" type="button">Latest news</button><button id="live-results" type="button">Entry results</button><button id="live-export" type="button">Download master Excel</button><button id="live-backup" type="button">Download backup</button></div>
-      <pre id="live-output" style="white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 system-ui"></pre>
+      <p class="muted">Import player-game statistics (CSV/JSON, up to 2 MB). This does not upload PrizePicks lines or record a placed entry.</p><input id="stats-file" type="file" accept=".csv,.json"><button id="stats-import" type="button" style="margin-top:10px">Import game statistics</button><pre id="live-output" style="white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 system-ui"></pre>
       <details class="muted"><summary>Upload PrizePicks lines in Telegram</summary><p>Send a screenshot to get an OCR draft, or use this dated text format. These examples show the format, not actual recommendations. For an opponent player, add the correct team in a fifth field.</p><pre style="white-space:pre-wrap">/board YYYY-MM-DD
 Jalen Brunson | points | more | LINE | NYK
 Opponent player | rebounds | less | LINE | TEAM
@@ -109,13 +109,14 @@ $('clear').addEventListener('click',()=>{if(busy)return;history=[];$('messages')
 function showLive(value){$('live-output').textContent=typeof value==='string'?value:JSON.stringify(value,null,2);}
 async function liveRequest(path,format){try{showLive('Loading…');const result=await api(path);showLive(format?format(result):result);}catch(error){showLive(error.message);}}
 $('live-health').addEventListener('click',()=>liveRequest('/api/master/status',data=>{
-  const counts=data.counts||{};const lines=[`Master: ${counts.games||0} games · ${counts.player_games||0} player records`,`Telegram: ${data.telegram.enabled?'configured':'not configured'}`];
+  const counts=data.counts||{};const lines=[`Sources: games=${data.active_sources?.games||"unknown"}, news=${data.active_sources?.news||"unknown"}`,`Master: ${counts.games||0} games · ${counts.player_games||0} player records`,`Telegram: ${data.telegram.enabled?'configured':'not configured'}`];
   for(const feed of data.feeds||[])lines.push(`${feed.name}: ${feed.error||feed.detail||'updated'}\n  Last success: ${feed.last_success||'never'}`);
   return lines.join('\n\n');
 }));
 $('live-news').addEventListener('click',()=>liveRequest('/api/news',rows=>rows.length?rows.map(item=>`${item.title}\n${item.published_at||'Publication time unknown'} · ${item.source||''}\n${item.url||''}`).join('\n\n'):'No news has been collected yet.'));
 $('live-results').addEventListener('click',()=>liveRequest('/api/results',data=>`Entries: ${data.entries} · Settled: ${data.settled_entries}\nConfirmed wins: ${data.settled_wins} · Losses: ${data.settled_losses} · Break-even: ${data.settled_break_even}\nConfirmed net profit: $${data.net_profit} · ROI: ${data.roi_percent===null?'not available':data.roi_percent+'%'}\n\nProvisional entry results: ${JSON.stringify(data.provisional_entry_results)}\n${data.note}`));
 async function download(path,name){try{showLive('Preparing download…');const response=await fetch(path,{headers:{'X-Chat-Password':password}});if(!response.ok)throw new Error('Download unavailable. Check data readiness and password.');const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);showLive('Download ready. Keep backups somewhere outside this provider too.');}catch(error){showLive(error.message);}}
+$('stats-import').addEventListener('click',async()=>{try{const file=$('stats-file').files[0];if(!file)throw new Error('Choose a CSV or JSON box-score file.');if(file.size>2000000)throw new Error('Use a file smaller than 2 MB.');showLive('Validating statistics…');const result=await api('/api/import/stats',{method:'POST',body:JSON.stringify({filename:file.name,content:await file.text()})});showLive(result);}catch(error){showLive(error.message);}});
 $('live-export').addEventListener('click',()=>download('/api/export/master.xlsx','NBA_Master.xlsx'));
 $('live-backup').addEventListener('click',()=>download('/api/export/backup.sqlite','NBA_Master_Backup.sqlite'));
 refresh();setInterval(refresh,5000);

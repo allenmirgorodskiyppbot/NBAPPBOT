@@ -216,11 +216,54 @@ class FeedWorker:
         self._last_request = 0.0
         self._notified_bootstrap = bool(self.store.get_checkpoint('feeds_initialized', False))
         self._cycle_lock = asyncio.Lock()
+        self.data_source = os.getenv('NBA_DATA_SOURCE', 'espn').strip().lower()
+        if self.data_source not in {'espn', 'nba_cdn', 'manual'}:
+            raise ValueError('NBA_DATA_SOURCE must be espn, nba_cdn or manual.')
+        self.news_source = os.getenv('NEWS_SOURCE', 'espn').strip().lower()
+        if self.news_source not in {'espn', 'rss'}:
+            raise ValueError('NEWS_SOURCE must be espn or rss.')
+        self._nba_source = None
+        if self.data_source == 'nba_cdn':
+            from nba_cdn import NBADataSource
+            self._nba_source = NBADataSource(store, self.request, now=self.now)
+            for name in ('espn_games', 'espn_schedule', 'espn_reconciliation', 'espn_live_carryover'):
+                if any(feed['name'] == name for feed in store.status().get('feeds', [])):
+                    store.feed_failure(name, 'Disabled: NBA_DATA_SOURCE=nba_cdn; see nba_cdn_* feed status.')
+        if self.news_source == 'rss':
+            store.feed_failure('espn_news', 'Disabled: NEWS_SOURCE=rss; see rss_* feed status.')
+        if self.data_source == 'manual':
+            for feed in store.status().get('feeds', []):
+                if feed['name'].startswith(('espn_', 'nba_cdn_')) and feed['name'] != 'espn_news':
+                    store.feed_failure(feed['name'], 'Disabled: NBA_DATA_SOURCE=manual; game statistics require explicit uploads.')
+            store.feed_failure('automatic_games', 'Disabled: manual statistics mode; automatic news monitoring remains available.')
+
+    def check_cooldown(self, host):
+        state = self.store.get_checkpoint('feed_http_cooldown:' + host, {})
+        if state.get('until', 0) > time.time():
+            remaining = max(1, int(state['until'] - time.time()))
+            raise RuntimeError(f"HTTP {state.get('status')} cooldown for {host}; retry in {remaining}s. Use /diagnose for a manual public-source check.")
+
+    def http_status(self, response):
+        status = response.status_code
+        host = response.request.url.host
+        if status in {401, 403, 429}:
+            key = 'feed_http_cooldown:' + host
+            old = self.store.get_checkpoint(key, {})
+            attempts = min(4, int(old.get('attempts', 0)) + 1)
+            delay = min(3600, 900 * 2 ** (attempts - 1))
+            retry = response.headers.get('retry-after', '')
+            if retry.isdigit():
+                delay = max(delay, min(86400, int(retry)))
+            self.store.set_checkpoint(key, {'status': status, 'until': time.time() + delay,
+                                           'attempts': attempts})
+        response.raise_for_status()
+        self.store.set_checkpoint('feed_http_cooldown:' + host, {})
 
     async def request(self, url, json_response=True):
         parsed = urlparse(url)
         if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError('Feed URLs must use HTTPS without credentials in the URL.')
+        self.check_cooldown(parsed.hostname)
         # Global pacing also applies to startup/catchup, without concurrent hammering.
         delay = max(0, 0.3 - (time.monotonic() - self._last_request))
         if delay:
@@ -230,7 +273,7 @@ class FeedWorker:
             async with httpx.AsyncClient(timeout=25, follow_redirects=True,
                                          headers={'User-Agent': 'NBAPPBOT/2.0 personal research'}) as client:
                 async with client.stream('GET', url) as response:
-                    response.raise_for_status()
+                    self.http_status(response)
                     data = bytearray()
                     async for chunk in response.aiter_bytes():
                         data.extend(chunk)
@@ -238,7 +281,7 @@ class FeedWorker:
                             raise ValueError('Feed response exceeds the configured size limit.')
         else:
             response = await self.client.get(url)
-            response.raise_for_status()
+            self.http_status(response)
             data = response.content
             if len(data) > MAX_RESPONSE_BYTES:
                 raise ValueError('Feed response exceeds the configured size limit.')
@@ -292,14 +335,27 @@ class FeedWorker:
         return self.poll_seconds
 
     async def save_news(self, item, alerts=True):
+        item = dict(item)
+        if not item.get('verification'):
+            text = (item.get('title', '') + ' ' + item.get('body', '')).lower()
+            rumor = re.search(r'\b(rumou?rs?|could|may|might|reportedly|speculat\w*|trade interest|trade target)\b', text)
+            item['verification'] = 'rumor/unconfirmed' if rumor else 'publisher-reported; not independently verified'
         changed = await asyncio.to_thread(self.store.record_news, item)
-        if changed and alerts and self._notified_bootstrap and self.relevant_news(item):
+        material = bool(MATERIAL.search(item.get('title', '') + ' ' + item.get('body', '')))
+        league_alert = os.getenv('NEWS_ALERT_SCOPE', 'relevant') == 'league' and material
+        if changed and alerts and self._notified_bootstrap and (league_alert or self.relevant_news(item)):
             digest = hashlib.sha256(json.dumps(item, sort_keys=True, default=str).encode()).hexdigest()[:16]
-            await self.announce('NBA update: ' + item['title'] + '\n' + str(item.get('url', '')),
+            await self.announce('NBA update [' + item['verification'] + ']: ' + item['title'] + '\n'
+                                + 'Published: ' + str(item.get('published_at') or 'not supplied') + '\n'
+                                + 'Source: ' + str(item.get('source', '')) + '\n' + str(item.get('url', '')),
                                 'news:' + item['id'] + ':' + digest)
         return changed
 
     async def update_games(self, day, summaries=True):
+        if self.data_source == 'manual':
+            return 0, 0
+        if self._nba_source is not None:
+            return await self._nba_source.update_games(day, with_boxscores=summaries)
         document = await self.request(ESPN + 'scoreboard?dates=' + day.replace('-', ''))
         if 'events' not in document or not isinstance(document['events'], list):
             raise ValueError('Scoreboard response is missing its event list.')
@@ -307,9 +363,9 @@ class FeedWorker:
         errors = []
         for event in document['events']:
             game = parse_game(event)
-            await asyncio.to_thread(self.store.upsert_game, game)
             count += 1
-            if not summaries or game['status'] in {'postponed', 'canceled'}:
+            if (not summaries and game['status'] != 'final') or game['status'] in {'postponed', 'canceled'}:
+                await asyncio.to_thread(self.store.upsert_game, game)
                 continue
             try:
                 summary = await self.request(ESPN + 'summary?event=' + game['provider_game_id'])
@@ -321,9 +377,18 @@ class FeedWorker:
                             and row.get('pts') is not None and row.get('minutes') is not None
                             for row in rows):
                         raise ValueError('Final game box score is not yet available.')
-                    for row in rows:
-                        await asyncio.to_thread(self.store.upsert_player_game, row)
+                    played = [row for row in rows if row['appearance_state'] == 'Played']
+                    if any(row.get('pts') is None or row.get('minutes') is None for row in played):
+                        raise ValueError('Played box-score rows are missing points or minutes.')
+                    if hasattr(self.store, 'upsert_game_bundle'):
+                        await asyncio.to_thread(self.store.upsert_game_bundle, game, rows)
+                    else:
+                        for row in rows:
+                            await asyncio.to_thread(self.store.upsert_player_game, row)
+                        await asyncio.to_thread(self.store.upsert_game, game)
                     stat_count += len(rows)
+                else:
+                    await asyncio.to_thread(self.store.upsert_game, game)
                 current_day = self.now().astimezone(EASTERN).date().isoformat()
                 availability = (summary.get('injuries') or []) if day == current_day else []
                 for team in availability:
@@ -410,18 +475,26 @@ class FeedWorker:
     async def collect_once(self, date=None):
         async with self._cycle_lock:
             today = self.now().astimezone(EASTERN).date()
+            prefix = self.data_source
+            if self.data_source == 'manual':
+                if date:
+                    raise ValueError('Manual statistics mode does not fetch game data.')
+                await self.collect_news_sources()
+                await asyncio.to_thread(self.store.set_checkpoint, 'feeds_initialized', True)
+                self._notified_bootstrap = True
+                return
             if date:
                 target = dt.date.fromisoformat(str(date))
-                return await self.guarded('espn_games', lambda: self.update_games(target.isoformat()))
-            current_ok = await self.guarded('espn_games', lambda: self.update_games(today.isoformat()),
+                return await self.guarded(prefix + '_games', lambda: self.update_games(target.isoformat()))
+            current_ok = await self.guarded(prefix + '_games', lambda: self.update_games(today.isoformat()),
                                             'All NBA teams; current-day scoreboard and available player box scores')
             carry_dates = {game.get('date') for game in self.store.games()
                            if game.get('status') == 'live' and game.get('date')
                            and (today - dt.timedelta(days=3)).isoformat() <= game['date'] < today.isoformat()}
             for old_date in sorted(carry_dates):
-                await self.guarded('espn_live_carryover', lambda d=old_date: self.update_games(d),
+                await self.guarded(prefix + '_live_carryover', lambda d=old_date: self.update_games(d),
                                    'Live NBA games that started before Eastern midnight')
-            await self.guarded('espn_schedule', lambda: self.update_games((today + dt.timedelta(days=1)).isoformat(), False),
+            await self.guarded(prefix + '_schedule', lambda: self.update_games((today + dt.timedelta(days=1)).isoformat(), False),
                                'Next-day NBA schedule')
             checkpoint = self.store.get_checkpoint('last_reconciled_date')
             if checkpoint != today.isoformat():
@@ -442,33 +515,46 @@ class FeedWorker:
                 # than a rolling window. On a normal day this is just the correction window.
                 batch_end = min(today, start + dt.timedelta(days=self.backfill_days))
                 while day < batch_end:
-                    ok = await self.guarded('espn_reconciliation', lambda d=day: self.update_games(d.isoformat()),
+                    ok = await self.guarded(prefix + '_reconciliation', lambda d=day: self.update_games(d.isoformat()),
                                              'Recent NBA games revisited for corrections and restart recovery')
                     reconciled = ok and reconciled
                     day += dt.timedelta(days=1)
                 if reconciled and current_ok:
                     await asyncio.to_thread(self.store.set_checkpoint, 'last_reconciled_date', batch_end.isoformat())
-            await self.guarded('espn_news', self.collect_news,
-                               'ESPN NBA article headlines/descriptions; best-effort news coverage')
-            for number, url in enumerate(self.rss_urls, 1):
-                async def update_rss(feed_url=url):
-                    content = await self.request(feed_url, json_response=False)
-                    for item in parse_rss(content, urlparse(feed_url).hostname):
-                        await self.save_news(item)
-                await self.guarded('rss_' + str(number), update_rss, 'Configured RSS/Atom news feed')
-            if self.injury_url:
-                await self.guarded('injuries_configured', self.collect_injuries, 'Configured injury provider; source coverage applies')
-            else:
-                await asyncio.to_thread(self.store.feed_failure, 'injuries_configured',
-                                        'Disabled: INJURY_FEED_URL not configured. ESPN summaries provide partial availability snapshots only.')
-            if current_ok:
+            await self.collect_news_sources()
+            if current_ok and self.data_source == 'espn':
                 await asyncio.to_thread(self.store.feed_success, 'availability_coverage',
                                         'ESPN game-summary snapshots only; no complete official NBA injury-report adapter')
-            else:
+            elif self.data_source == 'espn':
                 await asyncio.to_thread(self.store.feed_failure, 'availability_coverage',
                                         'Current ESPN game-summary collection incomplete; no full official injury-report coverage.')
             await asyncio.to_thread(self.store.set_checkpoint, 'feeds_initialized', True)
             self._notified_bootstrap = True
+
+    async def collect_news_sources(self):
+        if self.news_source == 'espn':
+            await self.guarded('espn_news', self.collect_news,
+                               'ESPN NBA article headlines/descriptions; best-effort news coverage')
+        elif not self.rss_urls:
+            await asyncio.to_thread(self.store.feed_failure, 'rss_news',
+                                    'NEWS_SOURCE=rss but NEWS_FEED_URLS is empty. Add published RSS feed URLs.')
+        for number, url in enumerate(self.rss_urls, 1):
+            async def update_rss(feed_url=url):
+                content = await self.request(feed_url, json_response=False)
+                baseline_key = 'rss_baseline:' + hashlib.sha256(feed_url.encode()).hexdigest()
+                initialized = self.store.get_checkpoint(baseline_key, False)
+                for item in parse_rss(content, urlparse(feed_url).hostname):
+                    await self.save_news(item, alerts=initialized)
+                self.store.set_checkpoint(baseline_key, True)
+            await self.guarded('rss_' + str(number), update_rss, 'Configured RSS/Atom news feed')
+        if self.injury_url:
+            await self.guarded('injuries_configured', self.collect_injuries, 'Configured injury provider; source coverage applies')
+        else:
+            await asyncio.to_thread(self.store.feed_failure, 'injuries_configured',
+                                    'Disabled: INJURY_FEED_URL not configured. News and box scores do not establish complete injury coverage.')
+        if self.data_source != 'espn':
+            await asyncio.to_thread(self.store.feed_failure, 'availability_coverage',
+                                    'Unavailable: collected headlines/manual statistics are not a complete official injury report. Verify current player availability.')
 
     async def run(self):
         while True:
