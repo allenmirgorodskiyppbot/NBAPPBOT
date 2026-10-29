@@ -1,4 +1,4 @@
-# Private setup: set CHAT_PASSWORD, TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_USER_ID in Akash, not GitHub.
+# Free news scanning + manual statistics. Preserve private credentials and existing /data volume when updating.
 version: '2.0'
 services:
   chatbot:
@@ -17,13 +17,15 @@ services:
       exec(compile(code, 'bootstrap.py', 'exec'), {'__name__': '__main__'})
       PY
     env:
-    - SOURCE_REF=781b80d5b0606bd6de056f81432c65c7b52e8c09
+    - NBA_DATA_SOURCE=manual
+    - NEWS_SOURCE=rss
+    - SOURCE_REF=03ede0fdbdf48b9ceccb7a9892852d133679b96b
     - DATA_DIR=/data
     - TELEGRAM_BOT_TOKEN=
     - TELEGRAM_ALLOWED_USER_ID=
     - FEED_POLL_SECONDS=300
     - FEED_FAST_POLL_SECONDS=60
-    - NEWS_FEED_URLS=
+    - NEWS_FEED_URLS=https://www.rotowire.com/rss/news.php?sport=NBA,https://sny.tv/knicks-feed,https://elitesportsny.com/category/nyc-teams/e-new-york-knicks/feed
     - INJURY_FEED_URL=
     - INSTALL_OCR=1
     - CHAT_PASSWORD=REPLACE_WITH_A_PRIVATE_PASSWORD_16_CHARS_OR_LONGER
@@ -35,6 +37,7 @@ services:
     - FEED_BACKFILL_DAYS=7
     - FEED_CORRECTION_DAYS=3
     - ALERT_TEAMS=NYK
+    - NEWS_ALERT_SCOPE=league
     expose:
     - port: 8000
       as: 80
