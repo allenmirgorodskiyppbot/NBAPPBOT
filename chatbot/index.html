@@ -25,14 +25,25 @@
 </head>
 <body>
 <main>
-  <header><div class="badge" aria-hidden="true">NYK</div><div><h1>Knicks Research Chat</h1><div class="muted">Your workbook. Your questions.</div></div></header>
+  <header><div class="badge" aria-hidden="true">NYK</div><div><h1>Knicks Research Chat</h1><div class="muted">NBA research, news and PrizePicks tracking.</div></div></header>
   <div id="status" role="status" aria-live="polite">Connecting to your chatbot…</div>
   <section id="login"><h2>Open your research desk</h2><p class="muted">Enter the chat password you set when deploying.</p>
     <form id="login-form"><label for="password">Chat password</label><div class="login-row"><input id="password" type="password" autocomplete="current-password" required><button type="submit">Open chat</button></div></form>
     <p id="login-error" role="alert"></p>
   </section>
   <div id="desk" hidden>
-    <section id="welcome"><h2>Ask about the Knicks</h2><p class="muted">Explore player averages, game logs and matchup research from your Excel workbook. Answers should cite their source sheets.</p>
+    <section><h2>Live research desk</h2><p class="muted">Data updates run in the background. Use Telegram for line screenshots and entry tracking.</p>
+      <div class="examples"><button id="live-health" type="button">Feed status</button><button id="live-news" type="button">Latest news</button><button id="live-results" type="button">Entry results</button><button id="live-export" type="button">Download master Excel</button><button id="live-backup" type="button">Download backup</button></div>
+      <pre id="live-output" style="white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 system-ui"></pre>
+      <details class="muted"><summary>Upload PrizePicks lines in Telegram</summary><p>Send a screenshot to get an OCR draft, or use this dated text format. These examples show the format, not actual recommendations. For an opponent player, add the correct team in a fifth field.</p><pre style="white-space:pre-wrap">/board YYYY-MM-DD
+Jalen Brunson | points | more | LINE | NYK
+Opponent player | rebounds | less | LINE | TEAM
+
+/analyze BOARD_ID
+/track BOARD_ID STAKE power MULTIPLIER
+/settle ENTRY_ID TOTAL_RETURNED note</pre><p>A board contains available lines. /track records the exact 2–6 selections you actually placed. Correct screenshot readings before recording an entry.</p></details>
+    </section>
+    <section id="welcome"><h2>Ask about the Knicks</h2><p class="muted">Explore player averages, game logs and collected NBA news. Answers should identify their sources and when they were updated.</p>
       <div class="examples"><button type="button">What is Brunson averaging in 2026–27?</button><button type="button">Compare Towns and Hart’s current rebounds per game.</button><button type="button">What does the workbook say about Brunson vs Derrick White?</button></div>
     </section>
     <div id="messages" aria-live="polite" aria-relevant="additions"></div>
@@ -40,7 +51,7 @@
     <form id="chat-form"><label for="question" hidden>Your question</label><textarea id="question" placeholder="Ask a question about your Knicks data…" maxlength="3000" rows="2" required></textarea><button id="send" type="submit">Ask →</button></form>
     <button id="clear" type="button">New conversation</button>
   </div>
-  <footer>Snapshot through 27 Oct 2026 · Built 28 Oct 2026 · Qwen3 4B hosted on Akash<br>Answers use the Excel file only. Check cited rows before relying on a result. CPU answers can take a few minutes.</footer>
+  <footer>Historical seed through 27 Oct 2026 · Live-feed freshness shown in Feed status · Qwen3 hosted on Akash<br>Public feeds are best effort. Pick analysis is descriptive research; verify availability and PrizePicks rules. CPU answers can take a few minutes.</footer>
 </main>
 <script>
 'use strict';
@@ -95,6 +106,18 @@ $('chat-form').addEventListener('submit',async event=>{
 $('question').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('chat-form').requestSubmit();}});
 document.querySelectorAll('.examples button').forEach(button=>button.addEventListener('click',()=>{$('question').value=button.textContent;$('question').focus();}));
 $('clear').addEventListener('click',()=>{if(busy)return;history=[];$('messages').replaceChildren();$('welcome').hidden=false;$('chat-error').textContent='';});
+function showLive(value){$('live-output').textContent=typeof value==='string'?value:JSON.stringify(value,null,2);}
+async function liveRequest(path,format){try{showLive('Loading…');const result=await api(path);showLive(format?format(result):result);}catch(error){showLive(error.message);}}
+$('live-health').addEventListener('click',()=>liveRequest('/api/master/status',data=>{
+  const counts=data.counts||{};const lines=[`Master: ${counts.games||0} games · ${counts.player_games||0} player records`,`Telegram: ${data.telegram.enabled?'configured':'not configured'}`];
+  for(const feed of data.feeds||[])lines.push(`${feed.name}: ${feed.error||feed.detail||'updated'}\n  Last success: ${feed.last_success||'never'}`);
+  return lines.join('\n\n');
+}));
+$('live-news').addEventListener('click',()=>liveRequest('/api/news',rows=>rows.length?rows.map(item=>`${item.title}\n${item.published_at||'Publication time unknown'} · ${item.source||''}\n${item.url||''}`).join('\n\n'):'No news has been collected yet.'));
+$('live-results').addEventListener('click',()=>liveRequest('/api/results',data=>`Entries: ${data.entries} · Settled: ${data.settled_entries}\nConfirmed wins: ${data.settled_wins} · Losses: ${data.settled_losses} · Break-even: ${data.settled_break_even}\nConfirmed net profit: $${data.net_profit} · ROI: ${data.roi_percent===null?'not available':data.roi_percent+'%'}\n\nProvisional entry results: ${JSON.stringify(data.provisional_entry_results)}\n${data.note}`));
+async function download(path,name){try{showLive('Preparing download…');const response=await fetch(path,{headers:{'X-Chat-Password':password}});if(!response.ok)throw new Error('Download unavailable. Check data readiness and password.');const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);showLive('Download ready. Keep backups somewhere outside this provider too.');}catch(error){showLive(error.message);}}
+$('live-export').addEventListener('click',()=>download('/api/export/master.xlsx','NBA_Master.xlsx'));
+$('live-backup').addEventListener('click',()=>download('/api/export/backup.sqlite','NBA_Master_Backup.sqlite'));
 refresh();setInterval(refresh,5000);
 </script>
 </body>

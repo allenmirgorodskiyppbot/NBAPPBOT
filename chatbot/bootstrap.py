@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import shutil
 
 REPOSITORY = 'allenmirgorodskiyppbot/NBAPPBOT'
 WORKBOOK_REF = '1188dd88beb128acba8afc66fb6918b6cc82ae6e'
@@ -31,15 +32,31 @@ def main():
         raise ValueError('SOURCE_REF must be the full GitHub commit SHA.')
     root = Path('/app')
     root.mkdir(parents=True, exist_ok=True)
-    for name in ['app.py', 'workbook.py', 'requirements.txt', 'index.html']:
+    for name in ['app.py', 'workbook.py', 'requirements.txt', 'index.html', 'master.py',
+                 'feeds.py', 'seed_master.py', 'analysis_engine.py', 'telegram_bot.py']:
         print('Downloading ' + name, flush=True)
         download(f'https://raw.githubusercontent.com/{REPOSITORY}/{ref}/chatbot/{name}', root / name)
-    workbook = root / 'Knicks_2026_27_Completed.xlsx'
-    print('Downloading Knicks workbook', flush=True)
-    download(f'https://raw.githubusercontent.com/{REPOSITORY}/{WORKBOOK_REF}'
-             '/data/Knicks_2026_27_Completed.xlsx', workbook)
-    if hashlib.sha256(workbook.read_bytes()).hexdigest() != WORKBOOK_SHA256:
-        raise ValueError('Workbook checksum does not match the approved snapshot.')
+    data = Path(os.getenv('DATA_DIR', '/data'))
+    data.mkdir(parents=True, exist_ok=True)
+    workbook = data / 'seed' / 'Knicks_2026_27_Completed.xlsx'
+    workbook.parent.mkdir(parents=True, exist_ok=True)
+    valid = workbook.exists() and hashlib.sha256(workbook.read_bytes()).hexdigest() == WORKBOOK_SHA256
+    if not valid:
+        print('Downloading Knicks workbook seed', flush=True)
+        temporary = workbook.with_suffix('.download')
+        download(f'https://raw.githubusercontent.com/{REPOSITORY}/{WORKBOOK_REF}'
+                 '/data/Knicks_2026_27_Completed.xlsx', temporary)
+        if hashlib.sha256(temporary.read_bytes()).hexdigest() != WORKBOOK_SHA256:
+            raise ValueError('Workbook checksum does not match the approved snapshot.')
+        temporary.replace(workbook)
+    if os.getenv('INSTALL_OCR', '1') == '1' and not shutil.which('tesseract'):
+        print('Installing screenshot OCR', flush=True)
+        try:
+            subprocess.run(['apt-get', 'update'], check=True, timeout=180)
+            subprocess.run(['apt-get', 'install', '-y', '--no-install-recommends', 'tesseract-ocr'],
+                           check=True, timeout=300)
+        except (subprocess.SubprocessError, OSError):
+            print('OCR installation unavailable; use text, CSV or JSON line uploads instead.', flush=True)
     subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-cache-dir',
                     '-r', str(root / 'requirements.txt')], check=True)
     os.environ['WORKBOOK_PATH'] = str(workbook)

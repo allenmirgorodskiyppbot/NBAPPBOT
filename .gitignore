@@ -7,3 +7,5 @@ __pycache__/
 *.sqlite
 *.sqlite-*
 deploy.private.yaml
+runtime/
+*.download
