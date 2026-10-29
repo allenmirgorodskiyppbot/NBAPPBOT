@@ -51,7 +51,7 @@ Opponent player | rebounds | less | LINE | TEAM
     <form id="chat-form"><label for="question" hidden>Your question</label><textarea id="question" placeholder="Ask a question about your Knicks data…" maxlength="3000" rows="2" required></textarea><button id="send" type="submit">Ask →</button></form>
     <button id="clear" type="button">New conversation</button>
   </div>
-  <footer>Historical seed through 27 Oct 2026 · Live-feed freshness shown in Feed status · Qwen3 hosted on Akash<br>Public feeds are best effort. Pick analysis is descriptive research; verify availability and PrizePicks rules. CPU answers can take a few minutes.</footer>
+  <footer>Historical seed through 27 Oct 2026 · Live-feed freshness shown in Feed status · AI model hosted on Akash<br>Public feeds are best effort. Pick analysis is descriptive research; verify availability and PrizePicks rules. CPU answers can take a few minutes.</footer>
 </main>
 <script>
 'use strict';
@@ -104,7 +104,7 @@ $('chat-form').addEventListener('submit',async event=>{
   finally{busy=false;$('working').hidden=true;$('send').disabled=!ready;$('question').focus();}
 });
 $('question').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('chat-form').requestSubmit();}});
-document.querySelectorAll('.examples button').forEach(button=>button.addEventListener('click',()=>{$('question').value=button.textContent;$('question').focus();}));
+document.querySelectorAll('#welcome .examples button').forEach(button=>button.addEventListener('click',()=>{$('question').value=button.textContent;$('question').focus();}));
 $('clear').addEventListener('click',()=>{if(busy)return;history=[];$('messages').replaceChildren();$('welcome').hidden=false;$('chat-error').textContent='';});
 function showLive(value){$('live-output').textContent=typeof value==='string'?value:JSON.stringify(value,null,2);}
 async function liveRequest(path,format){try{showLive('Loading…');const result=await api(path);showLive(format?format(result):result);}catch(error){showLive(error.message);}}

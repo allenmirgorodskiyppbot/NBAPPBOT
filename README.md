@@ -17,10 +17,17 @@ The [model registry](https://ollama.com/library/qwen2.5:3b) documents the model 
   `/summary news` includes all material report categories. Publisher wording, dates and
   source links remain explicit; unknown timezones are not guessed. These are collected
   reports, not a complete official participation list.
-- Natural-language requests to summarize news use one short AI request over selected
-  reports, without the workbook catalog or tools. If inference times out, returns an
-  empty/unreadable answer, or exhausts its output limit, the reply explicitly reports
-  that failure and falls back to the saved report digest. This fallback is not an AI summary.
+- Natural-language news summaries use one short, structured AI request to select
+  relevant saved reports. The app renders their original wording, dates, source links,
+  uncertainty and stale-report warnings, and enforces the requested bullet limit
+  (default three, maximum five). Model-written medical claims are not accepted.
+  This avoids dropped dates, invented statuses and five-bullet replies to a three-bullet
+  request. Reports with unknown timezones are ordered within each publisher; their
+  collection order does not establish when an injury update was published.
+  If inference times out, returns invalid references/JSON, or exhausts its output limit,
+  the reply reports the failure and shows a cited deterministic digest. Ollama's
+  [structured-output API](https://docs.ollama.com/capabilities/structured-outputs) supplies
+  the schema; the app also validates the result before displaying it.
 - `/ai_status` reports the configured model, startup phase, whether a request is active,
   and the last sanitized failure category/time. It makes no model request, and is separate
   from `/status` data-feed health. Failure categories are logged without question text,
@@ -28,6 +35,24 @@ The [model registry](https://ollama.com/library/qwen2.5:3b) documents the model 
 - Explicit promo-code/affiliate-offer articles stay in the raw collected news archive but
   are excluded from digests and automatic injury/trade alerts. This is a targeted noise
   filter, not a guarantee that every irrelevant article is identified.
+
+## Test the bot without a live PrizePicks board
+
+After applying the latest `SOURCE_REF` in your existing deployment, send `/selftest`
+in your private Telegram chat. It checks imports, invalid-input rejection, final-stat
+corrections, provisional grades, confirmed win/loss accounting, duplicate handling,
+Telegram authorization/outbox recovery, Excel export, database reopen and backup restore.
+All sample games and financial entries are confined to temporary databases and removed
+afterward. It also checks the live master and latest local backup read-only and reports
+RSS freshness. Warnings for a feed or missing backup are not counted as successful checks.
+It does not call the model, contact a sportsbook or inject test news into your live dataset.
+
+Then send `/ai_status` and a normal request such as “Summarize the latest collected
+injury news in three short bullets.” Each displayed report should retain its source,
+publication time, link and any stale-report warning. Tomorrow's actual lines, an actual
+PrizePicks settlement, and provider-level recovery after a real service restart remain
+separate acceptance checks. Local tests mock model/network transports; they do not
+establish new provider-side inference or feed connectivity by themselves.
 
 For an existing deployment, update both `SOURCE_REF` from the current `deploy.yaml` and
 `OLLAMA_MODEL=qwen2.5:3b` under **chatbot → Vars & secrets**, preserving private credentials

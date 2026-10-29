@@ -38,6 +38,7 @@ HELP = '''Knicks Research bot
 /summary [injuries|news|trades] — fast summary of collected reports (default: injuries)
 /status — feed freshness and bot status
 /ai_status — local AI readiness, busy state and last failure category
+/selftest — isolated data/backup tests and read-only live health checks
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
 /stats <JSON list> — import manually supplied box-score rows
@@ -147,10 +148,11 @@ def parse_board_text(argument: str):
 
 class TelegramBot:
     def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None,
-                 model_status_callback=None):
+                 model_status_callback=None, self_test_callback=None):
         self.store = store
         self.answer_callback = answer_callback
         self.model_status_callback = model_status_callback
+        self.self_test_callback = self_test_callback
         self.token = token if token is not None else os.getenv('TELEGRAM_BOT_TOKEN', '')
         configured = (os.getenv('TELEGRAM_ALLOWED_USER_IDS') or
                       os.getenv('TELEGRAM_ALLOWED_USER_ID', ''))
@@ -379,6 +381,19 @@ class TelegramBot:
             return HELP
         if command == '/status':
             return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
+        if command == '/selftest':
+            if argument:
+                return 'Use /selftest alone. Sample imports and entries stay in temporary test databases.'
+            if self.self_test_callback is None:
+                return 'Self-test is not configured for this deployment. Use /status and /ai_status.'
+            try:
+                report = await asyncio.wait_for(self.self_test_callback(), timeout=60)
+                return report if isinstance(report, str) else 'Self-test did not return a usable report.'
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                log.warning('Self-test could not finish (%s)', type(error).__name__)
+                return 'Self-test could not finish. Check the chatbot logs; no sample entries were added to your master.'
         if command == '/ai_status':
             if argument:
                 return 'Use /ai_status alone to check local model readiness without making an AI request.'

@@ -2,7 +2,7 @@ import datetime as dt
 import json
 import unittest
 
-from news_digest import compact_news_context, is_promotion, news_summary
+from news_digest import compact_news_context, is_promotion, news_summary, cited_news_summary, summary_limit
 
 
 class FakeStore:
@@ -37,6 +37,41 @@ class NewsDigestTests(unittest.TestCase):
 
     def healthy_feed(self):
         return {'name': 'rss_1', 'last_success': self.stamp, 'error': None}
+
+    def test_same_publisher_unknown_times_sort_by_publication_not_backfill_arrival(self):
+        date = self.now.date().isoformat()
+        prior = self.report('Fixture player questionable', id='early', published_at=date + 'T10:06:00',
+                            updated_at=(self.now + dt.timedelta(seconds=10)).isoformat())
+        latest = self.report('Fixture player doubtful', id='late', published_at=date + 'T11:57:00')
+        context = compact_news_context(FakeStore([prior, latest]))
+        self.assertEqual([report['id'] for report in context['reports']], ['late', 'early'])
+        self.assertTrue(all('timezone unconfirmed' in report['published_label'] for report in context['reports']))
+
+    def test_cited_summary_preserves_old_warning_and_never_accepts_model_facts(self):
+        old = self.report('Fixture guard: Out with ankle injury',
+                          published_at=(self.now - dt.timedelta(days=2)).isoformat())
+        context = compact_news_context(FakeStore([old], [self.healthy_feed()]))
+        summary = cited_news_summary(context, [1], limit=1)
+        self.assertEqual(len([line for line in summary.splitlines() if line.startswith('- ')]), 1)
+        self.assertIn('Published:', summary)
+        self.assertIn(old['url'], summary)
+        self.assertIn('not a fresh status update', summary)
+        for selection in [[999], [True], [1, 1]]:
+            with self.subTest(selection=selection), self.assertRaises(ValueError):
+                cited_news_summary(context, selection)
+
+    def test_very_old_naive_publication_is_not_made_fresh_by_collection(self):
+        old = (self.now - dt.timedelta(days=5)).replace(tzinfo=None).isoformat()
+        context = compact_news_context(FakeStore([self.report(published_at=old)]))
+        self.assertIn('not a fresh status update', context['reports'][0]['age_note'])
+        self.assertIn('timezone unconfirmed', context['reports'][0]['published_label'])
+
+    def test_requested_bullet_limits_are_bounded(self):
+        self.assertEqual(summary_limit('three short bullets'), 3)
+        self.assertEqual(summary_limit('one bullet'), 1)
+        self.assertEqual(summary_limit('2 updates'), 2)
+        self.assertEqual(summary_limit('99 reports'), 5)
+        self.assertEqual(summary_limit('summarize injuries'), 3)
 
     def test_promotion_code_trade_text_is_not_a_player_trade(self):
         promo = self.report('OG PromoCode Trade25 Get50: Signup bonus offer',

@@ -1,0 +1,16 @@
+{
+  "scope": "Real read-only uploaded workbook; temporary app databases. Model and RSS transports are mocked. Live Akash records/messages are not changed.",
+  "workbook_seed": {
+    "sheets": 53,
+    "games": 3758,
+    "player_games": 6350,
+    "checksum_preserved": true
+  },
+  "authentication_and_background_services": "PASS",
+  "structured_summary_count_dates_links": "PASS (mocked model)",
+  "owner_selftest": "Self-test: 14 passed, 0 failed, 0 warnings.\nPASS: Live database integrity (read-only)\nPASS: Recent successful rss_1\nPASS: Recent successful rss_2\nPASS: Recent successful rss_3\nPASS: Latest live backup integrity (read-only)\nPASS: CSV import and provisional grading\nPASS: Invalid statistics rejected without partial write\nPASS: Corrected final statistics update provisional results\nPASS: Confirmed wins/losses and duplicate-settlement accounting\nPASS: Cited injury digest excludes promotional offers\nPASS: Telegram allowlist, duplicate handling and durable outbox\nPASS: Saved records survive database reopen\nPASS: Backup restores records and confirmed ledger\nPASS: Master Excel export contains imported data\nSample data is confined to temporary databases. Live checks are read-only. AI generation and tomorrow's actual PrizePicks lines are separate tests.\nAI startup phase: ready; model: qwen2.5:3b\nTelegram: not connected",
+  "real_master_export_and_backup_restore": "PASS",
+  "restart_preserves_seed_and_collected_news": "PASS",
+  "elapsed_seconds": 16.42,
+  "generated_at": "2026-10-29T20:43:23.221861+00:00"
+}

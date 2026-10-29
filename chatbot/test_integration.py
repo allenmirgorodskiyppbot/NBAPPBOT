@@ -33,6 +33,18 @@ class IntegrationTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
+    def test_application_selftest_uses_only_temporary_fixtures(self):
+        import asyncio
+        with patch.object(app, 'DATA_DIR', self.root), patch.object(app, 'CHAT_PASSWORD', PASSWORD), \
+                patch.object(app, 'initialize', fake_initialize):
+            with TestClient(app.app):
+                master = app.app.state.master
+                before = master.status()['counts']
+                report = asyncio.run(app.self_test())
+                self.assertIn('0 failed', report)
+                self.assertIn('temporary databases', report)
+                self.assertEqual(master.status()['counts'], before)
+
     def test_web_entry_settlement_download_and_restart(self):
         legs = [{'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts', 'side': 'more', 'line': 20.5,
                  'date': '2026-10-27'}, {'player': 'Derrick White', 'team': 'BOS', 'stat': 'ast',

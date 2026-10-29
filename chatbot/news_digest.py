@@ -121,7 +121,19 @@ def _aware(value):
             return None
     if instant.tzinfo is None or instant.utcoffset() is None:
         return None
-    return instant.astimezone(dt.timezone.utc)
+    try:
+        return instant.astimezone(dt.timezone.utc)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _publisher_clock(value):
+    """Sortable wall-clock value within one publisher, never an inferred timezone."""
+    try:
+        instant = dt.datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        return instant.toordinal() * 86400 + instant.hour * 3600 + instant.minute * 60 + instant.second
+    except (TypeError, ValueError, OverflowError):
+        return 0
 
 
 def _publication_label(value):
@@ -225,17 +237,32 @@ def compact_news_context(store, limit=8, topic='injuries'):
             age_note = 'Publisher timestamp is in the future; verify it.'
         elif not instant and observed and (now - observed).total_seconds() > 86400:
             age_note = 'Collected more than 24 hours ago; publisher time is not timezone-confirmed.'
+        elif not instant and published:
+            try:
+                clock = dt.datetime.fromisoformat(published)
+                # This is a conservative age bound, not a timezone assignment.
+                # Even UTC-14 cannot make this old publisher clock current.
+                latest_possible = clock.replace(tzinfo=dt.timezone.utc) + dt.timedelta(hours=14)
+                if (now - latest_possible).total_seconds() > 86400:
+                    age_note = 'Publisher date is old despite its unknown timezone; not a fresh status update.'
+            except (ValueError, OverflowError):
+                pass
         report = {'id': _clean(item.get('id'), 80), 'title': title or 'Untitled collected report',
                   'excerpt': excerpt, 'categories': categories,
                   'source': _clean(item.get('source'), 80) or 'not supplied',
                   'published_at': published, 'published_label': _publication_label(published),
                   'collected_at': collected, 'verification': _verification(item, metadata, title, excerpt),
                   'url': _url(item.get('url')), 'age_note': age_note}
-        sort_time = instant or observed
-        selected.append((sort_time.timestamp() if sort_time else float('-inf'), -index, report))
-    selected.sort(key=lambda value: (value[0], value[1]), reverse=True)
+        # Never let the order of a backfill make a 10:06 publisher item appear
+        # newer than its 11:57 update. Unknown timezones stay grouped by source;
+        # their wall clocks are not compared as real UTC instants across sources.
+        rank = 3 if age_note and 'future' in age_note else 2 if age_note else 0 if instant else 1
+        group = '' if instant else report['source'].casefold()
+        sort_clock = instant.timestamp() if instant else _publisher_clock(published)
+        selected.append(((rank, group, -sort_clock, index), report))
+    selected.sort(key=lambda value: value[0])
     context['matching_count'] = len(selected)
-    context['reports'] = [value[2] for value in selected[:limit]]
+    context['reports'] = [value[1] for value in selected[:limit]]
     fresh_sources = [feed for feed in context['feed_status'] if feed['name'] != 'manual_news' and not feed['error']
                      and _aware(feed['last_success'])
                      and -60 <= (now - _aware(feed['last_success'])).total_seconds() <= 1800]
@@ -252,6 +279,51 @@ def compact_news_context(store, limit=8, topic='injuries'):
     while context['reports'] and len(json.dumps(context, ensure_ascii=True)) > MAX_CONTEXT_CHARS:
         context['reports'].pop()
     return context
+
+
+def summary_limit(question, default=3):
+    words = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5}
+    match = re.search(r'\b(one|two|three|four|five|\d{1,2})\s+(?:short\s+)?'
+                      r'(?:bullets?|reports?|items?|updates?)\b', str(question), re.I)
+    if not match:
+        return default
+    token = match.group(1).lower()
+    return max(1, min(5, words[token] if token in words else int(token)))
+
+
+def cited_news_summary(context, selection=None, limit=3):
+    """Render cited source wording. AI can select reports, never rewrite provenance."""
+    reports = context.get('reports', [])
+    if selection is None:
+        selection = list(range(1, min(limit, len(reports)) + 1))
+    if (not isinstance(selection, list) or any(type(number) is not int
+            or not 1 <= number <= len(reports) for number in selection)
+            or len(set(selection)) != len(selection)):
+        raise ValueError('Summary selection must contain distinct report numbers.')
+    chosen = [reports[number - 1] for number in selection[:limit]]
+    if not chosen:
+        return 'No matching collected reports are available. ' + COVERAGE
+    blocks = []
+    for report in chosen:
+        lines = ['- ' + report['title']]
+        if report.get('excerpt'):
+            lines.append('  Source excerpt: ' + report['excerpt'])
+        lines.extend(['  Source: ' + report['source'],
+                      '  Published: ' + report['published_label'],
+                      '  ' + report['verification']])
+        if report.get('age_note'):
+            lines.append('  ' + report['age_note'])
+        if report.get('url'):
+            lines.append('  ' + report['url'])
+        block = '\n'.join(lines)
+        # Reserve room for the mandatory coverage note and freshness warning.
+        if len('\n\n'.join(blocks + [block])) + len(COVERAGE) + 400 > MAX_MESSAGE_CHARS:
+            break
+        blocks.append(block)
+    footer = [COVERAGE]
+    if context.get('warnings'):
+        footer.append(context['warnings'][0])
+    return '\n\n'.join(blocks + footer)
 
 
 def news_summary(store, limit=5, topic='injuries'):

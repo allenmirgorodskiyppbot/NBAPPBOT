@@ -237,6 +237,24 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(messages[1]['text'], 'Collected news summary with source timestamps.')
         self.assertIn('/summary trades', messages[3]['text'])
 
+    async def test_selftest_is_owner_only_and_never_invokes_ai(self):
+        calls = []
+        async def self_test():
+            calls.append(True)
+            return 'Self-test: 12 passed, 0 failed. Isolated fixtures only.'
+        bot = TelegramBot(self.store, self.answer, token=TOKEN, allowed_user_ids=[USER_ID],
+                          self_test_callback=self_test)
+        self.assertFalse(await bot.process_update(update(145, '/selftest', user=999)))
+        self.assertFalse(await bot.process_update(update(146, '/selftest', chat_type='group', chat_id=-100)))
+        await bot.process_update(update(147, '/selftest extra'))
+        self.assertEqual(calls, [])
+        await bot.process_update(update(148, '/selftest'))
+        self.assertEqual(calls, [True])
+        self.assertEqual(self.received_questions, [])
+        self.assertIn('12 passed', self.rows('telegram_outbox')[-1]['text'])
+        await self.bot.process_update(update(149, '/selftest'))
+        self.assertIn('not configured', self.rows('telegram_outbox')[-1]['text'])
+
     async def test_ai_status_uses_only_safe_local_metadata_and_does_not_call_model(self):
         calls = []
 

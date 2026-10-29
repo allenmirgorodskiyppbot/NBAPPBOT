@@ -55,11 +55,14 @@ class AIRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(data['messages'][-1]['content'].endswith('/no_think'))
             self.assertIn('Jalen Smith', data['messages'][-1]['content'])
             self.assertIn('finger sprain', data['messages'][-1]['content'])
-            return httpx.Response(200, json={'message': {'content': 'RotoWire reports Smith questionable.'},
+            self.assertEqual(data['format']['properties']['reports']['maxItems'], 1)
+            return httpx.Response(200, json={'message': {'content': '{"reports":[1]}'},
                                            'done_reason': 'stop'})
         with self.mock_client(reply):
             answer = await app.telegram_answer('Summarize my latest collected injury news.')
-        self.assertIn('Smith questionable', answer)
+        self.assertIn('Jalen Smith: Listed as questionable', answer)
+        self.assertIn('Published:', answer)
+        self.assertIn('https://www.rotowire.com/basketball/player/jalen-smith', answer)
         self.assertEqual(len(seen), 1)
         state = await app.ai_status()
         self.assertIsNotNone(state['last_success_time'])
@@ -130,6 +133,34 @@ class AIRuntimeTests(unittest.IsolatedAsyncioTestCase):
             answer = await app.telegram_answer('Summarize the latest trades.')
         self.assertIsInstance(answer, str)
         self.assertIsNone((await app.ai_status())['last_success_time'])
+
+    async def test_invalid_or_duplicate_report_references_get_cited_fallback(self):
+        for content in ['{"reports":[99]}', '{"reports":[1,1]}', '{"reports":[true]}',
+                        'Here are five reports without dates']:
+            with self.subTest(content=content), self.mock_client(lambda request: httpx.Response(200,
+                    json={'message': {'content': content}, 'done_reason': 'stop'})):
+                answer = await app.telegram_answer('Summarize injury news in one bullet.')
+                self.assertEqual(len([line for line in answer.splitlines() if line.startswith('- ')]), 1)
+                self.assertIn('Published:', answer)
+                self.assertIn('Saved reports', answer)
+
+    async def test_model_only_selects_report_numbers_count_and_dates_are_app_controlled(self):
+        for index in range(4):
+            self.master.record_news({'id': 'extra-' + str(index),
+                'title': 'Fixture player ' + str(index) + ': Out with ankle injury',
+                'source': 'Fixture publisher', 'published_at': dt.datetime.now(dt.timezone.utc).isoformat(),
+                'url': 'https://example.com/injury-' + str(index)})
+        seen = []
+        def reply(request):
+            data = json.loads(request.content)
+            seen.append(data)
+            return httpx.Response(200, json={'message': {'content': '{"reports":[1,2,3]}'}})
+        with self.mock_client(reply):
+            answer = await app.telegram_answer('Summarize the latest injury news in three short bullets.')
+        self.assertEqual(len([line for line in answer.splitlines() if line.startswith('- ')]), 3)
+        self.assertEqual(answer.count('Published:'), 3)
+        self.assertEqual(seen[0]['format']['properties']['reports']['maxItems'], 3)
+        self.assertNotIn('foo fabricated status', answer)
 
     def test_summary_routing_does_not_replace_statistics_or_parlay_analysis(self):
         self.assertEqual(app.news_summary_topic('Summarize latest injuries'), 'injuries')
