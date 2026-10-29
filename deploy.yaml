@@ -1,0 +1,82 @@
+# Import this raw file into Akash Console. Change CHAT_PASSWORD before deploying.
+version: "2.0"
+services:
+  chatbot:
+    image: python:3.12.12-slim-bookworm
+    command:
+      - /bin/sh
+      - -c
+    args:
+      - |
+        python -u - <<'PY'
+        import os, urllib.request
+        ref = os.environ['SOURCE_REF']
+        url = 'https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/' + ref + '/chatbot/bootstrap.py'
+        with urllib.request.urlopen(url, timeout=120) as response:
+            code = response.read()
+        exec(compile(code, 'bootstrap.py', 'exec'), {'__name__': '__main__'})
+        PY
+    env:
+      - SOURCE_REF=402ab2d8e7f807f2092803af564d12580428d922
+      - CHAT_PASSWORD=REPLACE_WITH_A_PRIVATE_PASSWORD_16_CHARS_OR_LONGER
+      - OLLAMA_URL=http://model:11434
+      - OLLAMA_MODEL=qwen3:4b
+      - MODEL_THREADS=4
+      - PYTHONUNBUFFERED=1
+      - PIP_DISABLE_PIP_VERSION_CHECK=1
+    expose:
+      - port: 8000
+        as: 80
+        proto: tcp
+        to:
+          - global: true
+  model:
+    image: ollama/ollama:0.40.13
+    env:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_NO_CLOUD=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_CONTEXT_LENGTH=16384
+      - OLLAMA_KEEP_ALIVE=30m
+    expose:
+      - port: 11434
+        proto: tcp
+        to:
+          - service: chatbot
+profiles:
+  compute:
+    chatbot:
+      resources:
+        cpu:
+          units: 1
+        memory:
+          size: 2Gi
+        storage:
+          - size: 3Gi
+    model:
+      resources:
+        cpu:
+          units: 4
+        memory:
+          size: 8Gi
+        storage:
+          - size: 20Gi
+  placement:
+    akash:
+      pricing:
+        chatbot:
+          denom: uact
+          amount: 100
+        model:
+          denom: uact
+          amount: 500
+deployment:
+  chatbot:
+    akash:
+      profile: chatbot
+      count: 1
+  model:
+    akash:
+      profile: model
+      count: 1
