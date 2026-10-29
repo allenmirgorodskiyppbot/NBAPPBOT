@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#091628">
+  <title>Knicks Research Chat</title>
+  <style>
+    :root{color-scheme:dark;--bg:#091321;--panel:#111f32;--ink:#edf3fb;--muted:#a7b6cd;--line:#293a51;--orange:#fa8b3b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,sans-serif}
+    main{max-width:900px;margin:auto;padding:32px 22px}header{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:24px}
+    .badge{background:var(--orange);color:#111b2a;font-weight:900;font-size:20px;padding:12px;border-radius:12px}h1{font-size:24px;margin:0;letter-spacing:-.5px}
+    .muted{color:var(--muted);font-size:14px}#status{padding:14px 0;color:var(--muted);font-size:14px}#status[data-ready="true"]{color:#8fe0ad}
+    section{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;margin:16px 0}h2{font-size:18px;margin:0 0 12px}
+    p{margin:8px 0}label{display:block;font-size:14px;margin-bottom:8px}input,textarea{font:inherit;background:#0a1625;color:var(--ink);border:1px solid #40526c;border-radius:10px;padding:12px;width:100%}
+    input:focus,textarea:focus{outline:2px solid var(--orange);outline-offset:2px}button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:11px 18px;background:var(--orange);color:#101c2b;font-weight:700}
+    button:disabled{opacity:.5;cursor:wait}.login-row{display:flex;gap:12px}#login-error,#chat-error{color:#ffb3a7;font-size:14px}.examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+    .examples button{background:transparent;border:1px solid var(--line);color:var(--ink);font-size:13px;font-weight:500}.message{padding:20px 0;border-bottom:1px solid var(--line)}
+    .who{text-transform:uppercase;font-size:11px;letter-spacing:1.5px;font-weight:800;color:var(--orange);margin-bottom:6px}.message.user .who{color:var(--muted)}
+    .body{white-space:pre-wrap;overflow-wrap:anywhere}.evidence{font-size:12px;color:var(--muted);margin-top:12px}.evidence pre{white-space:pre-wrap;overflow-wrap:anywhere}
+    #chat-form{display:flex;align-items:flex-end;gap:10px;margin-top:22px;position:sticky;bottom:0;background:var(--bg);padding:12px 0}textarea{resize:vertical;min-height:76px;max-height:240px}
+    #working{font-size:14px;color:var(--muted)}footer{color:var(--muted);font-size:12px;padding:18px 0}#clear{background:transparent;border:1px solid var(--line);color:var(--muted);font-size:12px;padding:6px 10px;margin-top:12px}
+    [hidden]{display:none!important}@media(max-width:520px){main{padding:20px 14px}h1{font-size:20px}section{padding:18px}.login-row{flex-direction:column}#chat-form{align-items:stretch}#send{padding:12px}}
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="badge" aria-hidden="true">NYK</div><div><h1>Knicks Research Chat</h1><div class="muted">Your workbook. Your questions.</div></div></header>
+  <div id="status" role="status" aria-live="polite">Connecting to your chatbot…</div>
+  <section id="login"><h2>Open your research desk</h2><p class="muted">Enter the chat password you set when deploying.</p>
+    <form id="login-form"><label for="password">Chat password</label><div class="login-row"><input id="password" type="password" autocomplete="current-password" required><button type="submit">Open chat</button></div></form>
+    <p id="login-error" role="alert"></p>
+  </section>
+  <div id="desk" hidden>
+    <section id="welcome"><h2>Ask about the Knicks</h2><p class="muted">Explore player averages, game logs and matchup research from your Excel workbook. Answers should cite their source sheets.</p>
+      <div class="examples"><button type="button">What is Brunson averaging in 2026–27?</button><button type="button">Compare Towns and Hart’s current rebounds per game.</button><button type="button">What does the workbook say about Brunson vs Derrick White?</button></div>
+    </section>
+    <div id="messages" aria-live="polite" aria-relevant="additions"></div>
+    <p id="working" role="status" hidden></p><p id="chat-error" role="alert"></p>
+    <form id="chat-form"><label for="question" hidden>Your question</label><textarea id="question" placeholder="Ask a question about your Knicks data…" maxlength="3000" rows="2" required></textarea><button id="send" type="submit">Ask →</button></form>
+    <button id="clear" type="button">New conversation</button>
+  </div>
+  <footer>Snapshot through 27 Oct 2026 · Built 28 Oct 2026 · Qwen3 4B hosted on Akash<br>Answers use the Excel file only. Check cited rows before relying on a result. CPU answers can take a few minutes.</footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+let password='',history=[],ready=false,busy=false;
+const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function api(path,options={}){
+  const response=await fetch(path,{...options,headers:{'Content-Type':'application/json','X-Chat-Password':password,...options.headers}});
+  const data=await response.json();
+  if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'The request could not be completed.');
+  return data;
+}
+async function refresh(){
+  try{
+    const response=await fetch('/api/status');
+    if(!response.ok)throw new Error();
+    const data=await response.json();ready=data.phase==='ready';
+    $('status').textContent=data.password_configured?data.detail:'Set a private CHAT_PASSWORD in your Akash deployment to enable chat.';
+    $('status').dataset.ready=String(ready&&data.password_configured);
+  }catch(error){$('status').textContent='Reconnecting to the chatbot…';ready=false;}
+  $('send').disabled=busy||!ready;
+}
+$('login-form').addEventListener('submit',async event=>{
+  event.preventDefault();password=$('password').value;$('login-error').textContent='';
+  try{await api('/api/session',{method:'POST'});$('password').value='';$('login').hidden=true;$('desk').hidden=false;$('question').focus();}
+  catch(error){password='';$('login-error').textContent=error.message;}
+});
+function addMessage(role,text,sources=[]){
+  const wrapper=document.createElement('article');wrapper.className='message '+role;
+  const label=document.createElement('div');label.className='who';label.textContent=role==='user'?'You':'Knicks Research';
+  const body=document.createElement('div');body.className='body';body.textContent=text;wrapper.append(label,body);
+  if(sources.length){const details=document.createElement('details');details.className='evidence';const summary=document.createElement('summary');summary.textContent='Workbook lookups';details.append(summary);const pre=document.createElement('pre');pre.textContent=sources.map(s=>s.tool+' '+JSON.stringify(s.arguments)).join('\n');details.append(pre);wrapper.append(details);}
+  $('messages').append(wrapper);wrapper.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+$('chat-form').addEventListener('submit',async event=>{
+  event.preventDefault();const question=$('question').value.trim();if(!question||busy||!ready)return;
+  busy=true;$('send').disabled=true;$('chat-error').textContent='';$('working').hidden=false;$('working').textContent='Reading your question…';
+  addMessage('user',question);$('question').value='';$('welcome').hidden=true;
+  try{
+    const job=await api('/api/chat',{method:'POST',body:JSON.stringify({message:question,history:history.slice(-6)})});
+    const deadline=Date.now()+16*60*1000;
+    while(true){
+      if(Date.now()>deadline)throw new Error('This answer is taking too long. Try a shorter question.');
+      await pause(2000);const result=await api('/api/jobs/'+encodeURIComponent(job.job_id));
+      if(result.status==='error')throw new Error(result.error);
+      if(result.status==='done'){addMessage('assistant',result.answer,result.sources);history.push({role:'user',content:question},{role:'assistant',content:result.answer.slice(0,4000)});history=history.slice(-6);break;}
+      $('working').textContent=result.detail+'… CPU answers can take a few minutes.';
+    }
+  }catch(error){$('chat-error').textContent=error.message;$('question').value=question;}
+  finally{busy=false;$('working').hidden=true;$('send').disabled=!ready;$('question').focus();}
+});
+$('question').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('chat-form').requestSubmit();}});
+document.querySelectorAll('.examples button').forEach(button=>button.addEventListener('click',()=>{$('question').value=button.textContent;$('question').focus();}));
+$('clear').addEventListener('click',()=>{if(busy)return;history=[];$('messages').replaceChildren();$('welcome').hidden=false;$('chat-error').textContent='';});
+refresh();setInterval(refresh,5000);
+</script>
+</body>
+</html>
