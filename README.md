@@ -4,6 +4,53 @@ This version runs NBA collectors, a durable master dataset, manual PrizePicks li
 analysis, entry grading, private Telegram chat and a local Qwen2.5 3B model on Akash.
 News/statistics services do not depend on the AI model finishing an answer. No OpenAI key is used.
 
+## Knicks game-day injury digest
+
+Automatic news delivery now defaults to `NEWS_ALERT_MODE=knicks_gameday`. The bot
+continues collecting the configured feeds silently every few minutes, including on
+off days. It queues **one Telegram injury/availability/roster digest per Eastern
+Knicks game day, 60 minutes before the scheduled tipoff**, covering the Knicks and
+their opponent. A 7pm Eastern tipoff means a 6pm digest; other start times and DST
+are handled from the schedule. `KNICKS_DIGEST_MINUTES_BEFORE` changes that lead time
+(15–180 minutes). `/summary` remains available on request at any time.
+
+The independent scheduler checks the official current-season NBA JSON schedule
+every 15 minutes even when `NBA_DATA_SOURCE=manual`. It stores calendar data outside
+the game/settlement ledger. The default `KNICKS_SCHEDULE_URL` is
+`https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json`; a separately
+configured source must return that same complete current-season JSON schema.
+This is **not yet verified reachable from the user's Akash provider**: the earlier
+NBA scoreboard check timed out, and this environment's schedule request returned403.
+If schedule access fails or becomes stale, the bot records `knicks_schedule` in
+`/status` and pauses automatic timing. It does not infer an off day or invent a
+tipoff from historical workbook rows or news. `/diagnose` includes the actual
+schedule endpoint; `/reminder` displays the next game/send time or the blocker.
+
+At send time the bot refreshes its configured news feeds and renders source titles,
+publication dates/timezone uncertainty, and links without waiting for the AI model.
+Only recent matching Knicks/opponent reports are selected; explicit promotional
+offers are excluded. Name matching also uses each player's latest stored team, which
+may be old in manual mode. This remains partial publisher coverage, not a current
+official roster or complete NBA injury report. Missing reports never establish health.
+Source failures appear in the digest and `/status`, rather than separate push alerts.
+
+Scheduled messages use a persistent per-day outbox key, so restarts do not enqueue
+another digest. A restart after the target time catches up only before tipoff.
+Pending digests expire at tipoff instead of arriving after a delivery outage.
+Unknown-time, canceled, postponed, live, or final games do not trigger a digest;
+schedule changes discovered before queuing update its timing. Pending old individual
+headline and feed-health alerts are canceled on upgrade. Entry-result notices and
+replies to your questions continue independently. Telegram's send API itself has no
+exactly-once receipt guarantee if a delivery succeeds but its acknowledgement is lost.
+
+To activate this revision on the existing lease, update `SOURCE_REF` to the commit
+pinned in [deploy.yaml](deploy.yaml), retain private credentials and the `/data`
+volume, and apply the deployment update. The new defaults need no extra variable
+entries. After startup, send `/reminder` and verify a real next game/send time;
+`schedule_unavailable` means automatic timing is still blocked. `NEWS_ALERT_SCOPE`
+is only used with the optional `NEWS_ALERT_MODE=instant`; `off` silences automatic
+news delivery altogether. These modes do not stop news collection.
+
 ## CPU chat and fast news summaries
 
 The default `OLLAMA_MODEL=qwen2.5:3b` is a small instruction model with tool support,
@@ -124,8 +171,9 @@ checks do not tell us whether these other publishers are accessible. A feed that
 access stays failed/stale and receives a cooldown; no proxy or access workaround is used.
 
 The first successful fetch of each feed establishes a baseline visible in `/news`, so old
-articles do not flood Telegram. New or changed injury/trade/lineup reports then generate
-source-linked alerts. Publication time is retained; unknown times stay unknown. Rumor
+articles do not flood Telegram. New or changed injury/trade/lineup reports are saved
+quietly for the game-day digest; immediate alerts require `NEWS_ALERT_MODE=instant`.
+Publication time is retained; unknown times stay unknown. Rumor
 language is labeled unconfirmed; other articles remain publisher reports, not independent
 verification. This is a watchlist of configured public sources, not an exhaustive crawler
 of the entire internet or a promise of instantaneous breaking news.
@@ -159,15 +207,15 @@ line. It is explicitly unverified and is not broadcast as a confirmed breaking r
   observations. The larger companion ZIP has not been imported.
 - Can collect available NBA schedules and box scores for **all teams** in explicitly selected
   automatic-source mode. The current free SDL uses manual statistics because tested endpoints failed.
-- Supports NBA CDN or ESPN game collection and published RSS or ESPN news; sends relevant
-  Knicks, opponent and tracked-player updates to your private Telegram chat.
+- Supports NBA CDN or ESPN game collection and published RSS or ESPN news; the default
+  sends one Knicks/opponent digest before a Knicks game, when schedule access works.
 - Waits normally 5 minutes between completed cycles, or 1 minute during live games/pre-Knicks-tip
   window. Source freshness and collection time are different: polling cannot make an
   upstream source instantaneous. Periodic API quotas/availability still apply.
 - Initially backfills 7 days, revisits 3 recent days for corrections and resumes missed
   dates from durable checkpoints after downtime.
-- Keeps source snapshots, update timestamps and feed errors. Alerts on transitions into
-  feed failure/staleness and recovery; `/status` shows details.
+- Keeps source snapshots, update timestamps and feed errors. `/status` shows details;
+  game-day digests include coverage failures. Separate health pushes require instant mode.
 - Accepts manually uploaded PrizePicks lines, CSV/JSON files and screenshot OCR drafts.
   Available boards and entries actually placed are separate records.
 - Produces versioned historical-support rankings and up to three two-leg **research

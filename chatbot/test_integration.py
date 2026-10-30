@@ -96,6 +96,7 @@ class IntegrationTests(unittest.TestCase):
             workbook.close()
         self.assertFalse(list((self.root/'exports').glob('*.partial.xlsx')))
 
+    @patch.dict('os.environ', {'NEWS_ALERT_MODE': 'instant'})
     def test_feed_failure_alerts_are_transition_based(self):
         master = MasterStore(self.root/'master.sqlite')
         messages=[]

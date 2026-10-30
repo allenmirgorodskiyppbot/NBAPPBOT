@@ -248,6 +248,7 @@ class MasterStore:
     def status(self):
         with self.connect() as db:
             return {'schema_version': 2,
+                    'knicks_digest': self.get_checkpoint('knicks_digest_status', {}),
                     'counts': {table: db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
                                for table in ['games', 'player_games', 'news', 'boards', 'entries']},
                     'feeds': [dict(row) for row in db.execute('SELECT * FROM feed_status ORDER BY name')]}

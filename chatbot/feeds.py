@@ -336,6 +336,7 @@ class FeedWorker:
 
     async def save_news(self, item, alerts=True):
         from news_digest import is_promotion
+        from gameday_digest import alert_mode
         item = dict(item)
         if not item.get('verification'):
             text = (item.get('title', '') + ' ' + item.get('body', '')).lower()
@@ -344,7 +345,7 @@ class FeedWorker:
         changed = await asyncio.to_thread(self.store.record_news, item)
         material = bool(MATERIAL.search(item.get('title', '') + ' ' + item.get('body', '')))
         league_alert = os.getenv('NEWS_ALERT_SCOPE', 'relevant') == 'league' and material
-        if (changed and alerts and self._notified_bootstrap and not is_promotion(item)
+        if (alert_mode() == 'instant' and changed and alerts and self._notified_bootstrap and not is_promotion(item)
                 and (league_alert or self.relevant_news(item))):
             digest = hashlib.sha256(json.dumps(item, sort_keys=True, default=str).encode()).hexdigest()[:16]
             await self.announce('NBA update [' + item['verification'] + ']: ' + item['title'] + '\n'

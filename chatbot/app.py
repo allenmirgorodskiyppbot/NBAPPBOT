@@ -243,6 +243,11 @@ def export_master(master, directory):
 
 
 async def notify_feed_health(master, notify, current=None):
+    from gameday_digest import alert_mode
+    # Scheduled news includes source failures in its digest. Keep off days quiet;
+    # the full live diagnostics remain available on request through /status.
+    if alert_mode() != 'instant':
+        return
     current = current or dt.datetime.now(dt.timezone.utc)
     previous = master.get_checkpoint('feed_alert_state', {})
     updated = dict(previous)
@@ -299,7 +304,10 @@ async def initialize(application):
     try:
         if not state.service_tasks:
             state.worker = FeedWorker(state.master, notify=state.telegram.notify)
+            from gameday_digest import GamedayDigest
+            state.digest = GamedayDigest(state.master, state.worker, state.telegram.notify)
             state.service_tasks.append(asyncio.create_task(state.worker.run(), name='nba-feeds'))
+            state.service_tasks.append(asyncio.create_task(state.digest.run(), name='knicks-gameday-digest'))
             state.service_tasks.append(asyncio.create_task(maintenance(application), name='grading-backups'))
             state.service_tasks.append(asyncio.create_task(state.telegram.run(), name='telegram'))
             log.info('Data collection, entry grading and backups started; Telegram configured=%s', state.telegram.enabled)

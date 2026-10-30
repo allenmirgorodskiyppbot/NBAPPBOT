@@ -119,7 +119,7 @@ class FeedAccessTests(unittest.TestCase):
                 return httpx.Response(200,text='<rss><channel><item><guid>inj1</guid><title>'+title+'</title><link>https://publisher.example/story</link></item></channel></rss>')
             async def run():
                 with patch.dict('os.environ',{'NBA_DATA_SOURCE':'manual','NEWS_SOURCE':'rss',
-                    'NEWS_FEED_URLS':'https://publisher.example/nba.xml','INJURY_FEED_URL':'','NEWS_ALERT_SCOPE':'league'}):
+                    'NEWS_FEED_URLS':'https://publisher.example/nba.xml','INJURY_FEED_URL':'','NEWS_ALERT_SCOPE':'league', 'NEWS_ALERT_MODE':'instant'}):
                     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
                         worker=FeedWorker(master,notify=notify,client=client)
                         await worker.collect_once();await worker.collect_once();await worker.collect_once()
@@ -143,7 +143,7 @@ class FeedAccessTests(unittest.TestCase):
                 alerts.append(text)
             async def run():
                 with patch.dict('os.environ', {'NBA_DATA_SOURCE': 'manual', 'NEWS_SOURCE': 'rss',
-                                              'NEWS_ALERT_SCOPE': 'league'}):
+                                              'NEWS_ALERT_SCOPE': 'league', 'NEWS_ALERT_MODE':'instant'}):
                     worker = FeedWorker(master, notify=notify)
                     await worker.save_news({'id': 'promo',
                         'title': 'OG Promo Code ELITE: Trade $25, Get $50 Bonus',

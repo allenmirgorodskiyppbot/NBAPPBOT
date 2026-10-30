@@ -133,6 +133,9 @@ class ParsingTests(unittest.TestCase):
 
 class CollectionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        mode = patch.dict(os.environ, {'NEWS_ALERT_MODE': 'instant'})
+        mode.start()
+        self.addCleanup(mode.stop)
         self.store = MemoryStore()
         self.calls, self.notices = [], []
         self.points = '22'

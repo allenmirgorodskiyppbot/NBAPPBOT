@@ -10,6 +10,7 @@ import httpx
 PUBLIC_CHECKS = [
     ('espn_scoreboard', 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard'),
     ('nba_cdn_scoreboard', 'https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json'),
+    ('nba_knicks_schedule', 'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json'),
     ('cbs_nba_rss', 'https://www.cbssports.com/rss/headlines/nba'),
     ('rotowire_nba_rss', 'https://www.rotowire.com/rss/news.php?sport=NBA'),
     ('sny_knicks_rss', 'https://sny.tv/knicks-feed'),

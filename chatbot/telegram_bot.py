@@ -36,6 +36,7 @@ HELP = '''Knicks Research bot
 /today — today’s NBA games
 /news — recent relevant news
 /summary [injuries|news|trades] — fast summary of collected reports (default: injuries)
+/reminder — next Knicks game-day digest time and schedule health
 /status — feed freshness and bot status
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
@@ -205,6 +206,14 @@ class TelegramBot:
                     PRIMARY KEY(chat_id,update_id)
                 );
             ''')
+            columns = {row['name'] for row in db.execute('PRAGMA table_info(telegram_outbox)')}
+            if 'expires_at' not in columns:
+                db.execute('ALTER TABLE telegram_outbox ADD COLUMN expires_at REAL')
+            from gameday_digest import alert_mode
+            if alert_mode() != 'instant':
+                # Do not replay previously queued headline/health alerts on upgrade.
+                db.execute("UPDATE telegram_outbox SET status='cancelled' WHERE status='pending' "
+                           "AND (event_key LIKE 'news:%' OR event_key LIKE 'feed-health:%')")
 
     def _conversation(self, chat_id):
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
@@ -254,22 +263,22 @@ class TelegramBot:
         return (chat.get('type') == 'private' and sender.get('id') in self.allowed_user_ids
                 and chat.get('id') == sender.get('id') and not sender.get('is_bot', False))
 
-    def _queue(self, chat_id, text, event_key):
+    def _queue(self, chat_id, text, event_key, expires_at=None):
         if int(chat_id) not in self.allowed_user_ids:
             return
         with self._db() as db:
             for number, part in enumerate(chunks(text)):
                 db.execute('INSERT OR IGNORE INTO telegram_outbox '
-                           '(event_key,chat_id,text,created_at) VALUES (?,?,?,?)',
-                           (f'{event_key}:{chat_id}:{number}', int(chat_id), part, utcnow()))
+                           '(event_key,chat_id,text,created_at,expires_at) VALUES (?,?,?,?,?)',
+                           (f'{event_key}:{chat_id}:{number}', int(chat_id), part, utcnow(), expires_at))
 
-    async def notify(self, text, event_key=None):
+    async def notify(self, text, event_key=None, expires_at=None):
         """Queue a private alert. Delivery retries are handled by run()."""
         if not self.enabled:
             return False
         key = event_key or 'notification:' + uuid.uuid4().hex
         for user_id in self.allowed_user_ids:
-            self._queue(user_id, text, key)
+            self._queue(user_id, text, key, expires_at=expires_at)
         return True
 
     async def _api(self, method, payload):
@@ -291,9 +300,15 @@ class TelegramBot:
         if not self.enabled:
             return
         with self._db() as db:
+            db.execute("UPDATE telegram_outbox SET status='expired' WHERE status='pending' "
+                       'AND expires_at IS NOT NULL AND expires_at<=?', (time.time(),))
             rows = db.execute("SELECT * FROM telegram_outbox WHERE status='pending' "
                               'AND next_attempt<=? ORDER BY id LIMIT 20', (time.time(),)).fetchall()
         for row in rows:
+            if row['expires_at'] is not None and row['expires_at'] <= time.time():
+                with self._db() as db:
+                    db.execute("UPDATE telegram_outbox SET status='expired' WHERE id=?", (row['id'],))
+                continue
             if row['chat_id'] not in self.allowed_user_ids:
                 with self._db() as db:
                     db.execute("UPDATE telegram_outbox SET status='blocked' WHERE id=?", (row['id'],))
@@ -471,6 +486,9 @@ class TelegramBot:
             return f'NBA games for {today} (Eastern):\n' + self._compact(self.store.games(today))
         if command == '/news':
             return 'Recent collected news — check each source timestamp:\n' + self._compact(self.store.recent_news(limit=10))
+        if command == '/reminder':
+            from gameday_digest import reminder_status
+            return reminder_status(self.store)
         if command == '/summary':
             topic = argument.lower() or 'injuries'
             if topic not in {'injuries', 'news', 'trades'}:
