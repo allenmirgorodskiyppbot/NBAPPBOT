@@ -155,8 +155,36 @@ Leg frequencies are not multiplied into a claimed parlay win probability.
 
 PrizePicks lines and account information come from the user; there is no direct
 sportsbook account connection. Send readable text, CSV/JSON, or a screenshot.
-Screenshot OCR produces a draft: verify the player, team, statistic, side, line and
-game date before saving. Saving available lines does not record a placed entry.
+Screenshot intake now reads individual cards with local image preprocessing and
+two corroborating OCR passes. Complete, confidently read full-game cards become a
+research board automatically; unclear cards stay unresolved. The result is a short
+list of up to three distinct players, each with a direction, actual uploaded line,
+reason and relevant availability caution. Both visible More/Less buttons are
+research alternatives, not an assertion that the user selected either one.
+
+Photos in a Telegram album are combined into one response when received together.
+Separate uploads from the same chat/game date are merged for 30 minutes; overlapping
+cards are deduplicated. `/newboard` starts a fresh screenshot set without deleting
+saved boards or entries. Image documents (PNG/JPEG/WebP) preserve original quality.
+Put `YYYY-MM-DD` in a caption for a different game date; otherwise the upload's
+Eastern day is explicitly disclosed and must match a saved game for the player's
+stored team. Player/market/number confidence, unsupported periods, conflicting
+alternate thresholds and unverified offer terms can prevent a recommendation.
+Verify every displayed image-read line: OCR agreement is not visual verification.
+
+The shortlist checks saved workload, opponent and schedule evidence plus recent
+collected player news. It reuses a recent news refresh rather than making another
+request for each picture. It can identify up to two other existing players in the
+same scheduled game as **check these lines** ideas, using observed workload/volume.
+It does not invent their PrizePicks thresholds, available sides or payout terms.
+Insufficient samples and reported absences can produce no pick. The reader and
+shortlist use no additional model inference or paid data provider.
+
+Saving available lines does not record a placed entry. An automatic screenshot
+board cannot be tracked wholesale: first save only the exact selections actually
+placed via `/board`, then `/track` with the actual stake and displayed payout.
+Offensive/defensive rebounds use fields already present in the master; unsupported
+two-point-attempt and partial-game cards require separate manual analysis.
 
 The bot analyzes saved boards, records entries actually placed, and calculates
 provisional outcomes when suitable final statistics become available. DNP/reboot,
@@ -217,6 +245,7 @@ Useful Telegram commands:
 | `/summary [injuries\|news\|trades]` | Saved sourced reports without waiting for AI |
 | `/playerlog NAME \| points \| 5` | Stored game observations and averages |
 | `/boards`, `/analyze BOARD_ID` | Saved available lines and their research report |
+| `/newboard` | Start a fresh screenshot set; leave saved boards/entries intact |
 | `/entries`, `/results` | Recorded entries, provisional outcomes and confirmed account results |
 | `/settle ENTRY_ID TOTAL_RETURN [note]` | Reconcile the actual credited return |
 | `/importstats` | Caption an explicit CSV/JSON statistics upload |
@@ -230,7 +259,7 @@ message delivery.
 
 ## October 30 reliability validation
 
-This release passed **368 automated tests**, **14 isolated PrizePicks workflow
+The preceding chat-reliability release passed **368 automated tests**, **14 isolated PrizePicks workflow
 checks**, and selected semantic checks for **10 real-model conversation/retrieval
 scenarios**, with targeted reruns after fixes. The scenarios include social replies,
 follow-up comparisons, scoped matchups, unavailable official injury coverage,
@@ -244,3 +273,11 @@ kills. The Instruct-2507 Q4_K_M GGUF came from the public DockerHub model artifa
 byte identity with Ollama's registry artifact was not established. Provider latency,
 live Telegram delivery and today's actual PrizePicks lines still need deployment
 checks. These examples do not establish universal factual accuracy or betting performance.
+
+The later screenshot/shortlist release has a separate
+[validation record](docs/validation-screenshots-2026-10-30.json). It passed **417 automated tests** and **12 isolated saved-master smoke checks**.
+Its tests cover synthetic two-column images, spatial pairing, unknown players, ambiguous numbers,
+market periods, album/replay handling, alternate offers, event/availability checks,
+and isolated saved-master research. Original user screenshots were not available
+in the development workspace, so these checks do not establish extraction accuracy
+on those actual images or deployment performance.

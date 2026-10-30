@@ -1,0 +1,130 @@
+{
+  "release": "Screenshot card intake and concise research shortlist",
+  "base_application_ref": "4703a5d20efa1e1e1f34e1826400e6da9ae0a65f",
+  "checked_at": "2026-10-30T22:53:13.672507+00:00",
+  "automated_tests": {
+    "passed": 417,
+    "failed": 0,
+    "elapsed_seconds": 42.547,
+    "runner": "Full unittest discovery; sandbox-only asyncio heartbeat in test runner, not production"
+  },
+  "screenshot_reader_tests": {
+    "passed": 17,
+    "includes_real_tesseract": true,
+    "image_fixture": "Synthetic two-column player-card image; not the original user screenshots"
+  },
+  "isolated_saved_master_smoke": {
+    "passed": 12,
+    "failed": 0,
+    "elapsed_seconds": 0.426,
+    "as_of": "2026-10-30T18:40:00-04:00",
+    "inputs": "Explicitly synthetic/unverified offers; not reconstructed user screenshot values",
+    "checks": [
+      {
+        "name": "enrichment_and_formatting_are_read_only",
+        "passed": true,
+        "detail": {
+          "before": {
+            "games": 3770,
+            "player_games": 6527,
+            "news": 0,
+            "boards": 1,
+            "entries": 0,
+            "analysis_reports": 1
+          },
+          "after": {
+            "games": 3770,
+            "player_games": 6527,
+            "news": 0,
+            "boards": 1,
+            "entries": 0,
+            "analysis_reports": 1
+          }
+        }
+      },
+      {
+        "name": "both_offered_sides_tested",
+        "passed": true
+      },
+      {
+        "name": "positive_supported_side_only",
+        "passed": true
+      },
+      {
+        "name": "shortlist_has_distinct_players",
+        "passed": true
+      },
+      {
+        "name": "small_sample_is_explained",
+        "passed": true
+      },
+      {
+        "name": "source_scope_retained",
+        "passed": true
+      },
+      {
+        "name": "outside_watchlist_is_existing_and_not_uploaded",
+        "passed": true
+      },
+      {
+        "name": "outside_watchlist_never_invents_line_or_direction",
+        "passed": true
+      },
+      {
+        "name": "concise_response_and_reanalysis_command",
+        "passed": true
+      },
+      {
+        "name": "alternate_thresholds_held_for_offer_resolution",
+        "passed": true
+      },
+      {
+        "name": "no_entries_or_settlements_written",
+        "passed": true,
+        "detail": {
+          "before": {
+            "entries": 0,
+            "settlements": 0
+          },
+          "after": {
+            "entries": 0,
+            "settlements": 0
+          }
+        }
+      },
+      {
+        "name": "original_master_hash_unchanged",
+        "passed": true
+      }
+    ],
+    "master_unchanged": true
+  },
+  "deployment_packaging": {
+    "bootstrap_modules_present": true,
+    "added_dependency": "Pillow==12.3.0",
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "additional_model_calls_for_screenshot_shortlist": 0
+  },
+  "limits": [
+    "Original user screenshots were not available in the development workspace; extraction on those images must be checked after deployment.",
+    "OCR agreement across separate passes is not independent visual verification. Unclear names, cards, numbers, partial markets or sides are held rather than guessed.",
+    "Only uploaded readable offers can produce a direction and threshold. Outside research identifies existing same-game players and requests actual offers.",
+    "Alternate thresholds require active-offer and payout context; no easiest-line assumption or calibrated probabilities.",
+    "News is partial publisher-reported evidence. Unknown timestamps and unavailable current official coverage remain visible.",
+    "All tests use temporary databases/mock Telegram delivery. No live Akash or Telegram mutation was performed from this workspace."
+  ],
+  "sha256": {
+    "app.py": "f78e29be30b66e54ba744025c199f76bb7e75e8fcf102f4d2124d0bf0bea073f",
+    "master.py": "eda1d3803523cb3c89f39c938ccb7046df8b81101f2bf3639c5038f04f60152f",
+    "telegram_bot.py": "39e0678383cdefa86ca0d655c23e17ecaabbd2ef0dfcf2c93818980d2578d337",
+    "bootstrap.py": "713e1faa90be3285fb46cc59b12f65248863de5821ff3d823d297fd3d1654ea8",
+    "requirements.txt": "9eb021d71d411df41c97409eb8930020d48281a9d95d33b023faf9508be19a54",
+    "screenshot_board.py": "3ea3f4d81f34376968b448a57697d525e18360b5fb7202db681a5d22d2a9137f",
+    "screenshot_intake.py": "dca711b8d434969e7403797bedf303643017b6e4247789dd356f2dd308c1a9d1",
+    "board_shortlist.py": "bcaee2ce1b3ce9d07809ca528eff5d61310db710b10ad2d0df06cf6cfdfe5d9d",
+    "test_screenshot_board.py": "96c1656963b98b0d5492f0f9a1269bb24abec6bb6b29f188a1e83b45e8dbabb1",
+    "test_screenshot_intake.py": "5c6adc091e86ddaec32d2425b9653483a43de4951959c1f431642c18d054ced6",
+    "test_board_shortlist.py": "65d762d6f33e2ecfa0ef1ee7b738dc03cb8c732b53e0591e05da0d14b70c7731",
+    "test_gameday_digest.py": "69cb3cd3fe4ca7accb7ab33468b5060ac59e2132aa689dca25fe15858502f37c"
+  }
+}

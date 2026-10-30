@@ -169,6 +169,8 @@ class DigestTests(unittest.IsolatedAsyncioTestCase):
         for key, title, team, published in items:
             self.store.record_news({'id': key, 'title': title, 'team': team, 'published_at': published,
                 'source': 'fixture', 'url': 'https://publisher.example/' + key})
+        with self.store.connect() as db:
+            db.execute('UPDATE news SET updated_at=?', (NOW.isoformat(),))
         game = parse_schedule(self.document, NOW.date(), URL)[0]
         message = render_digest(self.store, game, NOW, NOW.isoformat(), True)
         self.assertIn('OG Anunoby', message)

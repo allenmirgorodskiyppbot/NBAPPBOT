@@ -490,8 +490,30 @@ async def lifespan(application):
     state.service_tasks = []
     state.chat_lock = asyncio.Lock()
     state.self_test_lock = asyncio.Lock()
+    state.board_news_lock = asyncio.Lock()
+    state.board_news_attempt = 0.0
+    async def refresh_board_news():
+        # Photos in an album share one refresh. The normal collector already
+        # polls frequently, so a recently successful collection is reused.
+        from news_digest import _aware
+        async with state.board_news_lock:
+            current = dt.datetime.now(dt.timezone.utc)
+            if time.monotonic() - state.board_news_attempt < 300:
+                return
+            feeds = state.master.status().get('feeds', [])
+            relevant = [feed for feed in feeds if feed['name'].startswith('rss_') or feed['name'] == 'espn_news'
+                        if not str(feed.get('error') or '').startswith('Disabled:')]
+            if relevant and all(not feed.get('error') and _aware(feed.get('last_success')) and
+                    0 <= (current - _aware(feed['last_success'])).total_seconds() < 300 for feed in relevant):
+                return
+            worker = getattr(state, 'worker', None)
+            if worker is None:
+                return
+            state.board_news_attempt = time.monotonic()
+            async with worker._cycle_lock:
+                await worker.collect_news_sources()
     state.telegram = TelegramBot(state.master, telegram_answer, model_status_callback=ai_status,
-                                self_test_callback=self_test)
+                                self_test_callback=self_test, research_refresh_callback=refresh_board_news)
     state.temporary = tempfile.TemporaryDirectory(prefix='knicks-')
     state.startup_task = asyncio.create_task(initialize_with_retry(application))
     try:

@@ -39,7 +39,7 @@ def main():
                  'release_checks.py', 'season_calendar.py', 'season_schedule_2026_27.json', 'efficient_ai.py',
                  'nba_daily_export.py', 'nightly_data.py', 'dataset_refresh.py', 'refresh_scope_2026_27.json',
                  'contextual_projection.py', 'advanced_refresh.py', 'matchup_refresh_scope.json', 'mirror_sources.py',
-                 'grounded_reply.py']:
+                 'grounded_reply.py', 'screenshot_board.py', 'screenshot_intake.py', 'board_shortlist.py']:
         print('Downloading ' + name, flush=True)
         download(f'https://raw.githubusercontent.com/{REPOSITORY}/{ref}/chatbot/{name}', root / name)
     data = Path(os.getenv('DATA_DIR', '/data'))

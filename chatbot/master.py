@@ -62,6 +62,7 @@ STAT_COMPONENTS = {
     'pts': ('pts',), 'reb': ('reb',), 'ast': ('ast',), 'tpm': ('tpm',),
     'fga': ('fga',), 'tpa': ('tpa',), 'minutes': ('minutes',),
     'stl': ('stl',), 'blk': ('blk',), 'tov': ('tov',),
+    'oreb': ('oreb',), 'dreb': ('dreb',),
     'pra': ('pts', 'reb', 'ast'), 'pr': ('pts', 'reb'),
     'pa': ('pts', 'ast'), 'ra': ('reb', 'ast'), 'stocks': ('stl', 'blk'),
 }
@@ -71,6 +72,8 @@ STAT_ALIASES = {
     'pts+rebs+asts': 'pra', 'points+rebounds+assists': 'pra',
     'points+rebounds': 'pr', 'points+assists': 'pa', 'rebounds+assists': 'ra',
     'steals': 'stl', 'blocks': 'blk', 'turnovers': 'tov', 'steals+blocks': 'stocks',
+    'offensive rebounds': 'oreb', 'defensive rebounds': 'dreb',
+    'fg attempted': 'fga', 'field goals attempted': 'fga',
 }
 PLAYER_FIELDS = ['game_id', 'player_id', 'player', 'team', 'opponent', 'date',
                  'season', 'season_type', 'appearance_state', 'pts', 'reb', 'ast',

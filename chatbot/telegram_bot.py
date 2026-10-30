@@ -84,6 +84,7 @@ HELP = '''Knicks Research bot
 /stats <JSON list> — import manually supplied box-score rows
 /newsnote HEADLINE then optional details — save an unverified personal news note
 /boards — uploaded PrizePicks boards
+/newboard — start a fresh screenshot set (saved boards and entries stay saved)
 /board DATE then player | stat | more/less | line — save available lines
 /analyze BOARD_ID — analyze an uploaded board
 /track BOARD_ID STAKE power|flex [MULTIPLIER] — record that board as an entry you placed
@@ -92,7 +93,7 @@ HELP = '''Knicks Research bot
 /results — results and confirmed profit/loss
 /settle ENTRY_ID PAYOUT [note] — confirm the actual total return shown by PrizePicks
 
-You can also send a question, a CSV/JSON board file, or a screenshot. Screenshot OCR is a draft: correct the player, market, line, side and game date before saving it. Available lines are separate from entries actually placed.
+You can also send a question, a CSV/JSON board file, or screenshots. Readable full-game cards are combined into a research shortlist; unclear cards stay out. Both visible More/Less choices are compared. The upload's Eastern date is used unless you caption the image YYYY-MM-DD; it must match a saved game. Send images as files for original quality. Check every displayed line. Available lines are separate from entries actually placed.
 
 For the manual-stats fallback, attach a CSV/JSON file with the caption /importstats. A file without that caption is treated as a PrizePicks board. Screenshots stay OCR drafts and never import master statistics automatically. Imported stats are labeled as manual user data. Missing statistics must remain blank, not zero.
 
@@ -139,8 +140,8 @@ def parse_board_document(filename: str, payload: bytes):
         legs = list(csv.DictReader(io.StringIO(text)))
     else:
         raise ValueError('Send a .csv or .json board file, or upload the screenshot as a photo.')
-    if not isinstance(legs, list) or not legs or len(legs) > 200:
-        raise ValueError('The board must contain 1–200 line objects.')
+    if not isinstance(legs, list) or not legs or len(legs) > 100:
+        raise ValueError('The board must contain 1–100 line objects.')
     return legs
 
 
@@ -162,7 +163,9 @@ def parse_board_text(argument: str):
     aliases = {'points': 'pts', 'rebounds': 'reb', 'assists': 'ast', 'threes': 'tpm',
                '3pm': 'tpm', '3-pointers': 'tpm', 'steals': 'stl', 'blocks': 'blk',
                'turnovers': 'tov', 'points+rebounds+assists': 'pra',
-               'points+rebounds': 'pr', 'points+assists': 'pa', 'rebounds+assists': 'ra'}
+               'points+rebounds': 'pr', 'points+assists': 'pa', 'rebounds+assists': 'ra',
+               'offensiverebounds': 'oreb', 'defensiverebounds': 'dreb',
+               'fgattempted': 'fga', 'fieldgoalsattempted': 'fga'}
     legs = []
     for row in lines[1:]:
         parts = [part.strip() for part in row.split('|')]
@@ -181,18 +184,23 @@ def parse_board_text(argument: str):
             raise ValueError('Each line must be a number, such as 24.5.') from None
         legs.append({'player': player, 'stat': normalized_stat, 'side': side.lower(),
                      'line': numeric_line, 'date': date, 'team': parts[4].upper() if len(parts) == 5 else 'NYK'})
-    if not 1 <= len(legs) <= 200:
-        raise ValueError('Use 1–200 board lines.')
+    if not 1 <= len(legs) <= 100:
+        raise ValueError('Use 1–100 board lines.')
     return legs
 
 
 class TelegramBot:
     def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None,
-                 model_status_callback=None, self_test_callback=None):
+                 model_status_callback=None, self_test_callback=None, research_refresh_callback=None):
         self.store = store
         self.answer_callback = answer_callback
         self.model_status_callback = model_status_callback
         self.self_test_callback = self_test_callback
+        self.research_refresh_callback = research_refresh_callback
+        self._photo_locks = {}
+        self._photo_semaphore = asyncio.Semaphore(1)
+        self._album_batches = {}
+        self._album_tasks = set()
         self.token = token if token is not None else os.getenv('TELEGRAM_BOT_TOKEN', '')
         configured = (os.getenv('TELEGRAM_ALLOWED_USER_IDS') or
                       os.getenv('TELEGRAM_ALLOWED_USER_ID', ''))
@@ -287,6 +295,17 @@ class TelegramBot:
         with self._db() as db:
             db.execute('INSERT INTO telegram_state(name,value) VALUES (?,?) '
                        'ON CONFLICT(name) DO UPDATE SET value=excluded.value', (name, str(value)))
+
+    def _reset_screenshots(self, chat_id, update_id):
+        with self._db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            key = f'screenshot_reset_update:{chat_id}'
+            row = db.execute('SELECT value FROM telegram_state WHERE name=?', (key,)).fetchone()
+            if row and int(row['value']) > update_id:
+                return
+            for name, value in ((key, str(update_id)), (f'screenshot_reset:{chat_id}', utcnow())):
+                db.execute('INSERT INTO telegram_state VALUES (?,?) ON CONFLICT(name) '
+                           'DO UPDATE SET value=excluded.value', (name, value))
 
     def status(self):
         with self._db() as db:
@@ -412,9 +431,30 @@ class TelegramBot:
         heading=f'PrizePicks board saved: {board["id"]}\n{len(board["legs"])} uploaded lines. No placed entry recorded.'
         if not callable(getattr(self.store,'connect',None)):
             return heading+'\n/analyze '+board['id']
+        await self._refresh_board_news()
         import analysis_engine
         report=await asyncio.to_thread(analysis_engine.analyze_board,self.store,board['id'])
-        return heading+'\n\n'+analysis_engine.format_analysis(report)[:3200]
+        return heading+'\n\n'+await self._shortlist_reply(report)
+
+    async def _refresh_board_news(self):
+        if self.research_refresh_callback is not None:
+            try:
+                await asyncio.wait_for(self.research_refresh_callback(), timeout=25)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Existing feed timestamps remain visible; failed refreshes do
+                # not get relabeled fresh and never block screenshot processing.
+                log.warning('Board news refresh incomplete; using saved source timestamps.')
+
+    async def _shortlist_reply(self, report):
+        if callable(getattr(self.store, 'connect', None)) and 'original_legs' in report:
+            from board_shortlist import enrich_shortlist, format_shortlist
+            shortlist = await asyncio.to_thread(enrich_shortlist, self.store, report)
+            return format_shortlist(shortlist)
+        import analysis_engine
+        formatter = getattr(analysis_engine, 'format_analysis', None)
+        return formatter(report) if formatter else self._compact(report)
 
     @staticmethod
     def _ocr(payload):
@@ -432,20 +472,104 @@ class TelegramBot:
         return result.stdout.strip()[:16000]
 
     async def _handle_photo(self, message, update_id):
-        photo = max(message['photo'], key=lambda p: p.get('file_size', 0))
-        payload = await self._download(photo['file_id'], photo.get('file_size', 0))
-        text = await asyncio.to_thread(self._ocr, payload)
-        if text is None:
-            return 'Screenshot OCR is not installed in this deployment. Send a CSV/JSON board or paste the lines using /board.\n' + BOARD_EXAMPLE
-        draft_id = uuid.uuid4().hex
-        with self._db() as db:
-            db.execute('INSERT OR IGNORE INTO telegram_drafts '
-                       '(id,update_id,chat_id,kind,text,created_at) VALUES (?,?,?,?,?,?)',
-                       (draft_id, update_id, message['chat']['id'], 'ocr', text, utcnow()))
-        return (f'Screenshot draft saved: {draft_id}\nNo placed entry has been recorded. '
-                'OCR can misread names and numbers. Check the extracted text and save corrected lines with /board. '
-                'Include the game date (YYYY-MM-DD), statistic, line and More/Less side.\n\n'
-                + (text[:2400] or '(No readable text found.)') + '\n\nBoard format:\n' + BOARD_EXAMPLE)
+        group = message.get('media_group_id')
+        if not group:
+            return await self._process_photos([(message, update_id)])
+        key = (message['chat']['id'], str(group))
+        batch = self._album_batches.get(key)
+        if batch is None:
+            batch = {'items': []}
+            self._album_batches[key] = batch
+            async def collect_album():
+                await asyncio.sleep(1.5)
+                self._album_batches.pop(key, None)
+                return await self._process_photos(batch['items'])
+            task = asyncio.create_task(collect_album())
+            batch['task'] = task
+            self._album_tasks.add(task)
+            task.add_done_callback(self._album_tasks.discard)
+        batch['items'].append((message, update_id))
+        response = await asyncio.shield(batch['task'])
+        # All album updates retain their own durable receipt, but only one
+        # sends the combined result. Later fragments still merge via the DB.
+        return response if update_id == max(item[1] for item in batch['items']) else None
+
+    async def _process_photos(self, items):
+        from screenshot_board import extract_screenshot
+        from screenshot_intake import screenshot_date, roster_candidates, resolve_cards, save_extraction, combined_board
+        chat_id = items[0][0]['chat']['id']
+        lock = self._photo_locks.setdefault(chat_id, asyncio.Lock())
+        async with lock:
+            typing = asyncio.create_task(self._typing(chat_id))
+            try:
+                now = datetime.now(timezone.utc)
+                dates, newly_read = set(), 0
+                problems = []
+                captions = {date for message, _ in items for date in
+                            re.findall(r'\b\d{4}-\d{2}-\d{2}\b', str(message.get('caption', '')))}
+                inherited = next(iter(captions)) if len(captions) == 1 else None
+                for message, update_id in sorted(items, key=lambda item: item[1]):
+                    caption = str(message.get('caption', '')).strip()
+                    if caption.startswith('/importstats'):
+                        problems.append('Statistics screenshots are not imported. Send a CSV/JSON file with /importstats.')
+                        continue
+                    if caption.split(maxsplit=1)[:1] == ['/newboard']:
+                        self._reset_screenshots(chat_id, update_id-1)
+                    dated = dict(message)
+                    if inherited and not re.search(r'\b\d{4}-\d{2}-\d{2}\b', caption):
+                        dated['caption'] = inherited
+                    date, basis = screenshot_date(dated, now)
+                    roster = await asyncio.to_thread(roster_candidates, self.store, date)
+                    if not roster:
+                        problems.append('The saved player dataset is not ready yet; resend after /status shows the workbook import.')
+                        continue
+                    photo = (max(message['photo'], key=lambda p: p.get('width', 0)*p.get('height', 0))
+                             if message.get('photo') else message['document'])
+                    try:
+                        payload = await self._download(photo['file_id'], photo.get('file_size', 0))
+                        async with self._photo_semaphore:
+                            extraction = await asyncio.to_thread(extract_screenshot, payload, roster)
+                    except (ValueError, RuntimeError, OSError):
+                        problems.append('One image could not be read; resend a PNG/JPEG crop under 8 MB.')
+                        continue
+                    legs, unresolved = await asyncio.to_thread(resolve_cards, self.store, extraction, date, roster)
+                    await asyncio.to_thread(save_extraction, self.store, chat_id, update_id, date, basis,
+                                            extraction, legs, unresolved, now)
+                    newly_read += len({(leg['player'], leg['stat'], leg['line']) for leg in legs})
+                    dates.add(date)
+                    problems.extend(unresolved)
+                if not newly_read:
+                    details = '\n'.join('• '+str(value)[:160] for value in list(dict.fromkeys(problems))[:3])
+                    return ('I couldn’t read a complete, supported card confidently enough to choose a pick.\n'
+                            + (details+'\n' if details else '') +
+                            'Send a closer crop with the player, full statistic label, line and More/Less buttons visible, '
+                            'preferably as an image file. I kept unclear cards out; no entry was recorded.')
+                messages = []
+                await self._refresh_board_news()
+                for date in sorted(dates):
+                    bundle = await asyncio.to_thread(combined_board, self.store, chat_id, date, now,
+                        self._get_state(f'screenshot_reset:{chat_id}') or None,
+                        int(self._get_state(f'screenshot_reset_update:{chat_id}', '-1')))
+                    board = bundle.get('board')
+                    if not board:
+                        problems.extend(bundle.get('unresolved', []))
+                        continue
+                    import analysis_engine
+                    report = await asyncio.to_thread(analysis_engine.analyze_board, self.store, board['id'])
+                    header = f"Read {bundle['market_count']} distinct lines across {bundle['upload_count']} recent screenshot(s)."
+                    header += ('\nAssumed game date: ' if bundle.get('date_assumed') else '\nGame date: ') + date + ' Eastern; matched saved schedule.'
+                    detail = await self._shortlist_reply(report)
+                    skipped = list(dict.fromkeys(bundle.get('unresolved', []) + problems))
+                    if skipped:
+                        detail += '\nUnread/unsupported cards kept out: ' + '; '.join(skipped[:2])[:270]
+                        if len(skipped)>2:
+                            detail += f' (+{len(skipped)-2} more).'
+                    detail += '\nOnly readable options were compared; check the displayed image-read lines. /newboard starts a fresh set.'
+                    messages.append(header+'\n\n'+detail)
+                return '\n\n'.join(messages)[:7000] or 'No supported board could be assembled. Send fewer complete cards.'
+            finally:
+                typing.cancel()
+                await asyncio.gather(typing, return_exceptions=True)
 
     def _compact(self, value, limit=10000):
         text = json.dumps(value, ensure_ascii=False, indent=2, default=str)
@@ -459,6 +583,8 @@ class TelegramBot:
         document = message.get('document')
         if document:
             filename = document.get('file_name', '')
+            if str(document.get('mime_type', '')).startswith('image/') or filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                return await self._handle_photo(message, update_id)
             caption = str(message.get('caption', '')).strip()
             caption_parts = caption.split(maxsplit=1)
             caption_command = caption_parts[0].split('@', 1)[0].lower() if caption_parts else ''
@@ -591,6 +717,9 @@ class TelegramBot:
         if command == '/boards':
             method = getattr(self.store, 'list_boards', None) or self.store.boards
             return 'Uploaded boards:\n' + self._compact(method())
+        if command == '/newboard':
+            self._reset_screenshots(message['chat']['id'], update_id)
+            return 'Fresh screenshot set started. Send the current cards; previous saved boards and entries are unchanged.'
         if command == '/entries':
             return 'Tracked entries:\n' + self._compact(self.store.list_entries())
         if command == '/results':
@@ -608,6 +737,9 @@ class TelegramBot:
             board = self.store.get_board(parts[0])
             if not board:
                 raise ValueError('Board not found. Use /boards to see uploaded boards.')
+            if str(board.get('source', '')).startswith('screenshot:'):
+                return ('That board contains image-read research alternatives. Save only the exact selections you actually '
+                        'placed with /board, then /track that board with its stake and displayed payout.')
             if not 2 <= len(board['legs']) <= 6:
                 raise ValueError('A placed entry needs 2–6 selections. Save a smaller board containing the exact selections you placed.')
             entry = self.store.create_entry(board['legs'], float(parts[1]), parts[2],
@@ -635,10 +767,10 @@ class TelegramBot:
             board = self.store.get_board(argument)
             if not board:
                 raise ValueError('Board not found. Use /boards to see uploaded boards.')
+            await self._refresh_board_news()
             import analysis_engine
             report = await asyncio.to_thread(analysis_engine.analyze_board, self.store, argument)
-            formatter=getattr(analysis_engine,'format_analysis',None)
-            return formatter(report) if formatter else self._compact(report)
+            return await self._shortlist_reply(report)
         if command.startswith('/'):
             return 'Unknown command. Use /help to see available commands.'
         if len(text) > 3000:
@@ -685,7 +817,8 @@ class TelegramBot:
             except Exception:
                 response = 'That command could not finish. Check /status, /boards and /entries before trying again.'
                 log.warning('Telegram command failed for update %s; no credentials logged.', update_id)
-            self._queue(chat_id, response, f'reply:{update_id}')
+            if response is not None:
+                self._queue(chat_id, response, f'reply:{update_id}')
         with self._db() as db:
             db.execute('UPDATE telegram_updates SET status=?,completed_at=? WHERE update_id=?',
                        ('done' if authorized else 'ignored', utcnow(), update_id))
@@ -767,7 +900,9 @@ class TelegramBot:
             delivery_task.cancel()
             for task in list(command_tasks):
                 task.cancel()
-            await asyncio.gather(delivery_task, *command_tasks, return_exceptions=True)
+            for task in list(self._album_tasks):
+                task.cancel()
+            await asyncio.gather(delivery_task, *command_tasks, *self._album_tasks, return_exceptions=True)
             if self._owns_client:
                 await self.client.aclose()
                 self.client = None
