@@ -19,7 +19,7 @@ services:
     env:
     - NBA_DATA_SOURCE=manual
     - NEWS_SOURCE=rss
-    - SOURCE_REF=a37aabb35b1638560b02e5b832a293723375bb27
+    - SOURCE_REF=7515d586a7abaf41a927b0fb9872cd528cc8dffe
     - DATA_DIR=/data
     - TELEGRAM_BOT_TOKEN=
     - TELEGRAM_ALLOWED_USER_ID=
