@@ -90,6 +90,20 @@ def is_promotion(item):
     return isinstance(item, dict) and _is_promotion(item)
 
 
+def material_categories(item):
+    """Exclude routine box-score recaps from material news, even with minutes boilerplate."""
+    if not isinstance(item, dict) or _is_promotion(item):
+        return []
+    title = _clean(item.get('title'), 500)
+    title_categories = _categories(title, '')
+    recap = re.search(r'\b(drops?|scores?|scored|pours?|tallies|nets|posts?|finishes|double[- ]double|'
+                      r'triple[- ]double)\b.*\b(points?|win|loss|victory|defeat)\b|'
+                      r'\b\d+\s+points?\s+in\s+(?:a\s+)?(?:win|loss)\b', title, re.I)
+    if recap and not title_categories:
+        return []
+    return _categories(title, _excerpt(item.get('body')))
+
+
 def _excerpt(value):
     text = _clean(value, 5000)
     clauses = re.split(r'(?<=[.!?])\s+|\s*[|•]\s*', text)
@@ -222,7 +236,7 @@ def compact_news_context(store, limit=8, topic='injuries'):
             continue
         title = _clean(item.get('title'), 180)
         excerpt = _excerpt(item.get('body'))
-        categories = _categories(title, excerpt)
+        categories = material_categories(item)
         if not categories or (topic == 'trades' and 'trade/roster' not in categories):
             continue
         metadata = _metadata(item)

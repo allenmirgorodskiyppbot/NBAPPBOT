@@ -198,7 +198,10 @@ def parse_players(document, game):
             if appearance == 'Played':
                 for source, target in [('points', 'pts'), ('reboundsTotal', 'reb'), ('assists', 'ast'),
                                        ('threePointersMade', 'tpm'), ('threePointersAttempted', 'tpa'),
-                                       ('fieldGoalsAttempted', 'fga'), ('steals', 'stl'),
+                                       ('fieldGoalsAttempted', 'fga'), ('fieldGoalsMade','fgm'),
+                                       ('freeThrowsMade','ftm'),('freeThrowsAttempted','fta'),
+                                       ('reboundsOffensive','oreb'),('reboundsDefensive','dreb'),
+                                       ('foulsPersonal','fouls'),('steals', 'stl'),
                                        ('blocks', 'blk'), ('turnovers', 'tov')]:
                     value = number(statistics.get(source))
                     if value is not None:

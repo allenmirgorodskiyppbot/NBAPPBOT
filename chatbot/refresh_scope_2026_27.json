@@ -1,0 +1,1152 @@
+{
+  "schema_version": 1,
+  "source": "User-supplied Knicks_2026_27_Completed.xlsx, existing Player_Games scope",
+  "players": [
+    {
+      "player": "AJ Green",
+      "nba_player_id": "1631260"
+    },
+    {
+      "player": "Aaron Gordon",
+      "nba_player_id": "203932"
+    },
+    {
+      "player": "Aaron Nesmith",
+      "nba_player_id": "1630174"
+    },
+    {
+      "player": "Aaron Wiggins",
+      "nba_player_id": "1630598"
+    },
+    {
+      "player": "Ace Bailey",
+      "nba_player_id": "1642846"
+    },
+    {
+      "player": "Adem Bona",
+      "nba_player_id": "1641737"
+    },
+    {
+      "player": "Ajay Mitchell",
+      "nba_player_id": "1642349"
+    },
+    {
+      "player": "Al Horford",
+      "nba_player_id": "201143"
+    },
+    {
+      "player": "Alex Caruso",
+      "nba_player_id": "1627936"
+    },
+    {
+      "player": "Alex Sarr",
+      "nba_player_id": "1642259"
+    },
+    {
+      "player": "Alperen Sengun",
+      "nba_player_id": "1630578"
+    },
+    {
+      "player": "Amen Thompson",
+      "nba_player_id": "1641708"
+    },
+    {
+      "player": "Andre Drummond",
+      "nba_player_id": "203083"
+    },
+    {
+      "player": "Andrew Nembhard",
+      "nba_player_id": "1629614"
+    },
+    {
+      "player": "Andrew Wiggins",
+      "nba_player_id": "203952"
+    },
+    {
+      "player": "Anfernee Simons",
+      "nba_player_id": "1629014"
+    },
+    {
+      "player": "Anthony Black",
+      "nba_player_id": "1641710"
+    },
+    {
+      "player": "Anthony Davis",
+      "nba_player_id": "203076"
+    },
+    {
+      "player": "Anthony Edwards",
+      "nba_player_id": "1630162"
+    },
+    {
+      "player": "Ausar Thompson",
+      "nba_player_id": "1641709"
+    },
+    {
+      "player": "Austin Reaves",
+      "nba_player_id": "1630559"
+    },
+    {
+      "player": "Ayo Dosunmu",
+      "nba_player_id": "1630245"
+    },
+    {
+      "player": "Bam Adebayo",
+      "nba_player_id": "1628389"
+    },
+    {
+      "player": "Ben Sheppard",
+      "nba_player_id": "1641767"
+    },
+    {
+      "player": "Ben Simmons",
+      "nba_player_id": "1627732"
+    },
+    {
+      "player": "Bennedict Mathurin",
+      "nba_player_id": "1631097"
+    },
+    {
+      "player": "Bilal Coulibaly",
+      "nba_player_id": "1641731"
+    },
+    {
+      "player": "Bobby Portis Jr.",
+      "nba_player_id": "1626171"
+    },
+    {
+      "player": "Bradley Beal",
+      "nba_player_id": "203078"
+    },
+    {
+      "player": "Brandin Podziemski",
+      "nba_player_id": "1641764"
+    },
+    {
+      "player": "Brandon Ingram",
+      "nba_player_id": "1627742"
+    },
+    {
+      "player": "Brandon Miller",
+      "nba_player_id": "1641706"
+    },
+    {
+      "player": "Brook Lopez",
+      "nba_player_id": "201572"
+    },
+    {
+      "player": "Bub Carrington",
+      "nba_player_id": "1642267"
+    },
+    {
+      "player": "Buddy Hield",
+      "nba_player_id": "1627741"
+    },
+    {
+      "player": "CJ McCollum",
+      "nba_player_id": "203468"
+    },
+    {
+      "player": "Cade Cunningham",
+      "nba_player_id": "1630595"
+    },
+    {
+      "player": "Caleb Martin",
+      "nba_player_id": "1628997"
+    },
+    {
+      "player": "Cam Spencer",
+      "nba_player_id": "1642285"
+    },
+    {
+      "player": "Cameron Johnson",
+      "nba_player_id": "1629661"
+    },
+    {
+      "player": "Caris LeVert",
+      "nba_player_id": "1627747"
+    },
+    {
+      "player": "Cason Wallace",
+      "nba_player_id": "1641717"
+    },
+    {
+      "player": "Cedric Coward",
+      "nba_player_id": "1642907"
+    },
+    {
+      "player": "Chet Holmgren",
+      "nba_player_id": "1631096"
+    },
+    {
+      "player": "Christian Braun",
+      "nba_player_id": "1631128"
+    },
+    {
+      "player": "Coby White",
+      "nba_player_id": "1629632"
+    },
+    {
+      "player": "Collin Gillespie",
+      "nba_player_id": "1631221"
+    },
+    {
+      "player": "Collin Sexton",
+      "nba_player_id": "1629012"
+    },
+    {
+      "player": "Cooper Flagg",
+      "nba_player_id": "1642843"
+    },
+    {
+      "player": "Daniel Gafford",
+      "nba_player_id": "1629655"
+    },
+    {
+      "player": "Daniss Jenkins",
+      "nba_player_id": "1642450"
+    },
+    {
+      "player": "Darius Garland",
+      "nba_player_id": "1629636"
+    },
+    {
+      "player": "Davion Mitchell",
+      "nba_player_id": "1630558"
+    },
+    {
+      "player": "Day'Ron Sharpe",
+      "nba_player_id": "1630549"
+    },
+    {
+      "player": "De'Aaron Fox",
+      "nba_player_id": "1628368"
+    },
+    {
+      "player": "De'Andre Hunter",
+      "nba_player_id": "1629631"
+    },
+    {
+      "player": "De'Anthony Melton",
+      "nba_player_id": "1629001"
+    },
+    {
+      "player": "DeMar DeRozan",
+      "nba_player_id": "201942"
+    },
+    {
+      "player": "Deandre Ayton",
+      "nba_player_id": "1629028"
+    },
+    {
+      "player": "Dejounte Murray",
+      "nba_player_id": "1627749"
+    },
+    {
+      "player": "Deni Avdija",
+      "nba_player_id": "1630166"
+    },
+    {
+      "player": "Dennis Schr\u00f6der",
+      "nba_player_id": "203471"
+    },
+    {
+      "player": "Dereck Lively II",
+      "nba_player_id": "1641726"
+    },
+    {
+      "player": "Derik Queen",
+      "nba_player_id": "1642852"
+    },
+    {
+      "player": "Derrick Jones Jr.",
+      "nba_player_id": "1627884"
+    },
+    {
+      "player": "Derrick White",
+      "nba_player_id": "1628401"
+    },
+    {
+      "player": "Desmond Bane",
+      "nba_player_id": "1630217"
+    },
+    {
+      "player": "Devin Booker",
+      "nba_player_id": "1626164"
+    },
+    {
+      "player": "Devin Vassell",
+      "nba_player_id": "1630170"
+    },
+    {
+      "player": "Dillon Brooks",
+      "nba_player_id": "1628415"
+    },
+    {
+      "player": "Domantas Sabonis",
+      "nba_player_id": "1627734"
+    },
+    {
+      "player": "Donovan Clingan",
+      "nba_player_id": "1642270"
+    },
+    {
+      "player": "Donovan Mitchell",
+      "nba_player_id": "1628378"
+    },
+    {
+      "player": "Donte DiVincenzo",
+      "nba_player_id": "1628978"
+    },
+    {
+      "player": "Dorian Finney-Smith",
+      "nba_player_id": "1627827"
+    },
+    {
+      "player": "Draymond Green",
+      "nba_player_id": "203110"
+    },
+    {
+      "player": "Dru Smith",
+      "nba_player_id": "1630696"
+    },
+    {
+      "player": "Duncan Robinson",
+      "nba_player_id": "1629130"
+    },
+    {
+      "player": "Dylan Harper",
+      "nba_player_id": "1642844"
+    },
+    {
+      "player": "Dyson Daniels",
+      "nba_player_id": "1630700"
+    },
+    {
+      "player": "Egor D\u00ebmin",
+      "nba_player_id": "1642856"
+    },
+    {
+      "player": "Evan Mobley",
+      "nba_player_id": "1630596"
+    },
+    {
+      "player": "Franz Wagner",
+      "nba_player_id": "1630532"
+    },
+    {
+      "player": "Fred VanVleet",
+      "nba_player_id": "1627832"
+    },
+    {
+      "player": "GG Jackson",
+      "nba_player_id": "1641713"
+    },
+    {
+      "player": "Gary Payton II",
+      "nba_player_id": "1627780"
+    },
+    {
+      "player": "Gary Trent Jr.",
+      "nba_player_id": "1629018"
+    },
+    {
+      "player": "Giannis Antetokounmpo",
+      "nba_player_id": "203507"
+    },
+    {
+      "player": "Goga Bitadze",
+      "nba_player_id": "1629048"
+    },
+    {
+      "player": "Grant Williams",
+      "nba_player_id": "1629684"
+    },
+    {
+      "player": "Grayson Allen",
+      "nba_player_id": "1628960"
+    },
+    {
+      "player": "Harrison Barnes",
+      "nba_player_id": "203084"
+    },
+    {
+      "player": "Herbert Jones",
+      "nba_player_id": "1630529"
+    },
+    {
+      "player": "Immanuel Quickley",
+      "nba_player_id": "1630193"
+    },
+    {
+      "player": "Isaac Okoro",
+      "nba_player_id": "1630171"
+    },
+    {
+      "player": "Isaiah Collier",
+      "nba_player_id": "1642268"
+    },
+    {
+      "player": "Isaiah Hartenstein",
+      "nba_player_id": "1628392"
+    },
+    {
+      "player": "Isaiah Jackson",
+      "nba_player_id": "1630543"
+    },
+    {
+      "player": "Isaiah Joe",
+      "nba_player_id": "1630198"
+    },
+    {
+      "player": "Isaiah Stewart",
+      "nba_player_id": "1630191"
+    },
+    {
+      "player": "Ivica Zubac",
+      "nba_player_id": "1627826"
+    },
+    {
+      "player": "Ja Morant",
+      "nba_player_id": "1629630"
+    },
+    {
+      "player": "Ja'Kobe Walter",
+      "nba_player_id": "1642266"
+    },
+    {
+      "player": "Jabari Smith Jr.",
+      "nba_player_id": "1631095"
+    },
+    {
+      "player": "Jaden McDaniels",
+      "nba_player_id": "1630183"
+    },
+    {
+      "player": "Jaime Jaquez Jr.",
+      "nba_player_id": "1631170"
+    },
+    {
+      "player": "Jake LaRavia",
+      "nba_player_id": "1631222"
+    },
+    {
+      "player": "Jakob Poeltl",
+      "nba_player_id": "1627751"
+    },
+    {
+      "player": "Jalen Brunson",
+      "nba_player_id": "1628973"
+    },
+    {
+      "player": "Jalen Duren",
+      "nba_player_id": "1631105"
+    },
+    {
+      "player": "Jalen Green",
+      "nba_player_id": "1630224"
+    },
+    {
+      "player": "Jalen Johnson",
+      "nba_player_id": "1630552"
+    },
+    {
+      "player": "Jalen Smith",
+      "nba_player_id": "1630188"
+    },
+    {
+      "player": "Jalen Suggs",
+      "nba_player_id": "1630591"
+    },
+    {
+      "player": "Jalen Williams",
+      "nba_player_id": "1631114"
+    },
+    {
+      "player": "Jamal Murray",
+      "nba_player_id": "1627750"
+    },
+    {
+      "player": "Jamal Shead",
+      "nba_player_id": "1642347"
+    },
+    {
+      "player": "James Harden",
+      "nba_player_id": "201935"
+    },
+    {
+      "player": "Jarace Walker",
+      "nba_player_id": "1641716"
+    },
+    {
+      "player": "Jared McCain",
+      "nba_player_id": "1642272"
+    },
+    {
+      "player": "Jaren Jackson Jr.",
+      "nba_player_id": "1628991"
+    },
+    {
+      "player": "Jarred Vanderbilt",
+      "nba_player_id": "1629020"
+    },
+    {
+      "player": "Jarrett Allen",
+      "nba_player_id": "1628386"
+    },
+    {
+      "player": "Jase Richardson",
+      "nba_player_id": "1642859"
+    },
+    {
+      "player": "Jay Huff",
+      "nba_player_id": "1630643"
+    },
+    {
+      "player": "Jaylen Brown",
+      "nba_player_id": "1627759"
+    },
+    {
+      "player": "Jaylen Wells",
+      "nba_player_id": "1642377"
+    },
+    {
+      "player": "Jaylin Williams",
+      "nba_player_id": "1631119"
+    },
+    {
+      "player": "Jaylon Tyson",
+      "nba_player_id": "1642281"
+    },
+    {
+      "player": "Jayson Tatum",
+      "nba_player_id": "1628369"
+    },
+    {
+      "player": "Jerami Grant",
+      "nba_player_id": "203924"
+    },
+    {
+      "player": "Jeremiah Fears",
+      "nba_player_id": "1642847"
+    },
+    {
+      "player": "Jimmy Butler III",
+      "nba_player_id": "202710"
+    },
+    {
+      "player": "Joan Beringer",
+      "nba_player_id": "1642866"
+    },
+    {
+      "player": "Jock Landale",
+      "nba_player_id": "1629111"
+    },
+    {
+      "player": "Joel Embiid",
+      "nba_player_id": "203954"
+    },
+    {
+      "player": "John Collins",
+      "nba_player_id": "1628381"
+    },
+    {
+      "player": "Jonathan Isaac",
+      "nba_player_id": "1628371"
+    },
+    {
+      "player": "Jonathan Kuminga",
+      "nba_player_id": "1630228"
+    },
+    {
+      "player": "Jordan Goodwin",
+      "nba_player_id": "1630692"
+    },
+    {
+      "player": "Jordan Poole",
+      "nba_player_id": "1629673"
+    },
+    {
+      "player": "Jose Alvarado",
+      "nba_player_id": "1630631"
+    },
+    {
+      "player": "Josh Giddey",
+      "nba_player_id": "1630581"
+    },
+    {
+      "player": "Josh Green",
+      "nba_player_id": "1630182"
+    },
+    {
+      "player": "Josh Hart",
+      "nba_player_id": "1628404"
+    },
+    {
+      "player": "Josh Minott",
+      "nba_player_id": "1631169"
+    },
+    {
+      "player": "Josh Okogie",
+      "nba_player_id": "1629006"
+    },
+    {
+      "player": "Jrue Holiday",
+      "nba_player_id": "201950"
+    },
+    {
+      "player": "Julian Champagnie",
+      "nba_player_id": "1630577"
+    },
+    {
+      "player": "Julian Strawther",
+      "nba_player_id": "1631124"
+    },
+    {
+      "player": "Julius Randle",
+      "nba_player_id": "203944"
+    },
+    {
+      "player": "Jusuf Nurki\u0107",
+      "nba_player_id": "203994"
+    },
+    {
+      "player": "Karl-Anthony Towns",
+      "nba_player_id": "1626157"
+    },
+    {
+      "player": "Kasparas Jaku\u010dionis",
+      "nba_player_id": "1642857"
+    },
+    {
+      "player": "Kawhi Leonard",
+      "nba_player_id": "202695"
+    },
+    {
+      "player": "Keegan Murray",
+      "nba_player_id": "1631099"
+    },
+    {
+      "player": "Kel'el Ware",
+      "nba_player_id": "1642276"
+    },
+    {
+      "player": "Kelly Oubre Jr.",
+      "nba_player_id": "1626162"
+    },
+    {
+      "player": "Kentavious Caldwell-Pope",
+      "nba_player_id": "203484"
+    },
+    {
+      "player": "Keon Ellis",
+      "nba_player_id": "1631165"
+    },
+    {
+      "player": "Kevin Durant",
+      "nba_player_id": "201142"
+    },
+    {
+      "player": "Kevin Huerter",
+      "nba_player_id": "1628989"
+    },
+    {
+      "player": "Kevon Looney",
+      "nba_player_id": "1626172"
+    },
+    {
+      "player": "Keyonte George",
+      "nba_player_id": "1641718"
+    },
+    {
+      "player": "Khaman Maluach",
+      "nba_player_id": "1642863"
+    },
+    {
+      "player": "Klay Thompson",
+      "nba_player_id": "202691"
+    },
+    {
+      "player": "Kon Knueppel",
+      "nba_player_id": "1642851"
+    },
+    {
+      "player": "Kris Dunn",
+      "nba_player_id": "1627739"
+    },
+    {
+      "player": "Kristaps Porzi\u0146\u0123is",
+      "nba_player_id": "204001"
+    },
+    {
+      "player": "Kyle Kuzma",
+      "nba_player_id": "1628398"
+    },
+    {
+      "player": "Kyrie Irving",
+      "nba_player_id": "202681"
+    },
+    {
+      "player": "Kyshawn George",
+      "nba_player_id": "1642273"
+    },
+    {
+      "player": "LaMelo Ball",
+      "nba_player_id": "1630163"
+    },
+    {
+      "player": "Lauri Markkanen",
+      "nba_player_id": "1628374"
+    },
+    {
+      "player": "LeBron James",
+      "nba_player_id": "2544"
+    },
+    {
+      "player": "Luguentz Dort",
+      "nba_player_id": "1629652"
+    },
+    {
+      "player": "Luka Don\u010di\u0107",
+      "nba_player_id": "1629029"
+    },
+    {
+      "player": "Luke Kornet",
+      "nba_player_id": "1628436"
+    },
+    {
+      "player": "Malik Monk",
+      "nba_player_id": "1628370"
+    },
+    {
+      "player": "Marcus Smart",
+      "nba_player_id": "203935"
+    },
+    {
+      "player": "Mark Williams",
+      "nba_player_id": "1631109"
+    },
+    {
+      "player": "Matas Buzelis",
+      "nba_player_id": "1641824"
+    },
+    {
+      "player": "Matisse Thybulle",
+      "nba_player_id": "1629680"
+    },
+    {
+      "player": "Max Christie",
+      "nba_player_id": "1631108"
+    },
+    {
+      "player": "Max Strus",
+      "nba_player_id": "1629622"
+    },
+    {
+      "player": "Maxime Raynaud",
+      "nba_player_id": "1642875"
+    },
+    {
+      "player": "Michael Porter Jr.",
+      "nba_player_id": "1629008"
+    },
+    {
+      "player": "Mikal Bridges",
+      "nba_player_id": "1628969"
+    },
+    {
+      "player": "Miles Bridges",
+      "nba_player_id": "1628970"
+    },
+    {
+      "player": "Miles McBride",
+      "nba_player_id": "1630540"
+    },
+    {
+      "player": "Mitchell Robinson",
+      "nba_player_id": "1629011"
+    },
+    {
+      "player": "Moritz Wagner",
+      "nba_player_id": "1629021"
+    },
+    {
+      "player": "Moses Moody",
+      "nba_player_id": "1630541"
+    },
+    {
+      "player": "Myles Turner",
+      "nba_player_id": "1626167"
+    },
+    {
+      "player": "Naji Marshall",
+      "nba_player_id": "1630230"
+    },
+    {
+      "player": "Naz Reid",
+      "nba_player_id": "1629675"
+    },
+    {
+      "player": "Neemias Queta",
+      "nba_player_id": "1629674"
+    },
+    {
+      "player": "Nic Claxton",
+      "nba_player_id": "1629651"
+    },
+    {
+      "player": "Nickeil Alexander-Walker",
+      "nba_player_id": "1629638"
+    },
+    {
+      "player": "Nikola Joki\u0107",
+      "nba_player_id": "203999"
+    },
+    {
+      "player": "Nikola Vu\u010devi\u0107",
+      "nba_player_id": "202696"
+    },
+    {
+      "player": "Nique Clifford",
+      "nba_player_id": "1642363"
+    },
+    {
+      "player": "Noah Clowney",
+      "nba_player_id": "1641730"
+    },
+    {
+      "player": "Norman Powell",
+      "nba_player_id": "1626181"
+    },
+    {
+      "player": "OG Anunoby",
+      "nba_player_id": "1628384"
+    },
+    {
+      "player": "Onyeka Okongwu",
+      "nba_player_id": "1630168"
+    },
+    {
+      "player": "Oso Ighodaro",
+      "nba_player_id": "1642345"
+    },
+    {
+      "player": "P.J. Washington",
+      "nba_player_id": "1629023"
+    },
+    {
+      "player": "Paolo Banchero",
+      "nba_player_id": "1631094"
+    },
+    {
+      "player": "Pascal Siakam",
+      "nba_player_id": "1627783"
+    },
+    {
+      "player": "Patrick Williams",
+      "nba_player_id": "1630172"
+    },
+    {
+      "player": "Paul George",
+      "nba_player_id": "202331"
+    },
+    {
+      "player": "Paul Reed",
+      "nba_player_id": "1630194"
+    },
+    {
+      "player": "Payton Pritchard",
+      "nba_player_id": "1630202"
+    },
+    {
+      "player": "Pelle Larsson",
+      "nba_player_id": "1641796"
+    },
+    {
+      "player": "Peyton Watson",
+      "nba_player_id": "1631212"
+    },
+    {
+      "player": "Quentin Grimes",
+      "nba_player_id": "1629656"
+    },
+    {
+      "player": "Quinten Post",
+      "nba_player_id": "1642366"
+    },
+    {
+      "player": "RJ Barrett",
+      "nba_player_id": "1629628"
+    },
+    {
+      "player": "Reed Sheppard",
+      "nba_player_id": "1642263"
+    },
+    {
+      "player": "Robert Williams III",
+      "nba_player_id": "1629057"
+    },
+    {
+      "player": "Ronald Holland II",
+      "nba_player_id": "1641842"
+    },
+    {
+      "player": "Royce O'Neale",
+      "nba_player_id": "1626220"
+    },
+    {
+      "player": "Rudy Gobert",
+      "nba_player_id": "203497"
+    },
+    {
+      "player": "Rui Hachimura",
+      "nba_player_id": "1629060"
+    },
+    {
+      "player": "Ryan Dunn",
+      "nba_player_id": "1642346"
+    },
+    {
+      "player": "Ryan Kalkbrenner",
+      "nba_player_id": "1641750"
+    },
+    {
+      "player": "Ryan Rollins",
+      "nba_player_id": "1631157"
+    },
+    {
+      "player": "Saddiq Bey",
+      "nba_player_id": "1630180"
+    },
+    {
+      "player": "Sam Hauser",
+      "nba_player_id": "1630573"
+    },
+    {
+      "player": "Sam Merrill",
+      "nba_player_id": "1630241"
+    },
+    {
+      "player": "Scoot Henderson",
+      "nba_player_id": "1630703"
+    },
+    {
+      "player": "Scottie Barnes",
+      "nba_player_id": "1630567"
+    },
+    {
+      "player": "Scotty Pippen Jr.",
+      "nba_player_id": "1630590"
+    },
+    {
+      "player": "Shaedon Sharpe",
+      "nba_player_id": "1631101"
+    },
+    {
+      "player": "Shai Gilgeous-Alexander",
+      "nba_player_id": "1628983"
+    },
+    {
+      "player": "Sion James",
+      "nba_player_id": "1642883"
+    },
+    {
+      "player": "Stephen Curry",
+      "nba_player_id": "201939"
+    },
+    {
+      "player": "Stephon Castle",
+      "nba_player_id": "1642264"
+    },
+    {
+      "player": "Steven Adams",
+      "nba_player_id": "203500"
+    },
+    {
+      "player": "T.J. McConnell",
+      "nba_player_id": "204456"
+    },
+    {
+      "player": "Tari Eason",
+      "nba_player_id": "1631106"
+    },
+    {
+      "player": "Taurean Prince",
+      "nba_player_id": "1627752"
+    },
+    {
+      "player": "Terance Mann",
+      "nba_player_id": "1629611"
+    },
+    {
+      "player": "Thomas Bryant",
+      "nba_player_id": "1628418"
+    },
+    {
+      "player": "Tim Hardaway Jr.",
+      "nba_player_id": "203501"
+    },
+    {
+      "player": "Tobias Harris",
+      "nba_player_id": "202699"
+    },
+    {
+      "player": "Toumani Camara",
+      "nba_player_id": "1641739"
+    },
+    {
+      "player": "Trae Young",
+      "nba_player_id": "1629027"
+    },
+    {
+      "player": "Trayce Jackson-Davis",
+      "nba_player_id": "1631218"
+    },
+    {
+      "player": "Tre Johnson",
+      "nba_player_id": "1642848"
+    },
+    {
+      "player": "Tre Jones",
+      "nba_player_id": "1630200"
+    },
+    {
+      "player": "Trey Murphy III",
+      "nba_player_id": "1630530"
+    },
+    {
+      "player": "Ty Jerome",
+      "nba_player_id": "1629660"
+    },
+    {
+      "player": "Tyler Herro",
+      "nba_player_id": "1629639"
+    },
+    {
+      "player": "Tyrese Haliburton",
+      "nba_player_id": "1630169"
+    },
+    {
+      "player": "Tyrese Maxey",
+      "nba_player_id": "1630178"
+    },
+    {
+      "player": "Tyrese Proctor",
+      "nba_player_id": "1642878"
+    },
+    {
+      "player": "Tyus Jones",
+      "nba_player_id": "1626145"
+    },
+    {
+      "player": "VJ Edgecombe",
+      "nba_player_id": "1642845"
+    },
+    {
+      "player": "Victor Wembanyama",
+      "nba_player_id": "1641705"
+    },
+    {
+      "player": "Walker Kessler",
+      "nba_player_id": "1631117"
+    },
+    {
+      "player": "Wendell Carter Jr.",
+      "nba_player_id": "1628976"
+    },
+    {
+      "player": "Yves Missi",
+      "nba_player_id": "1642274"
+    },
+    {
+      "player": "Zach Collins",
+      "nba_player_id": "1628380"
+    },
+    {
+      "player": "Zach Edey",
+      "nba_player_id": "1641744"
+    },
+    {
+      "player": "Zach LaVine",
+      "nba_player_id": "203897"
+    },
+    {
+      "player": "Zeke Nnaji",
+      "nba_player_id": "1630192"
+    },
+    {
+      "player": "Zion Williamson",
+      "nba_player_id": "1629627"
+    }
+  ],
+  "teams": [
+    "ATL",
+    "BKN",
+    "BOS",
+    "CHA",
+    "CHI",
+    "CLE",
+    "DAL",
+    "DEN",
+    "DET",
+    "GSW",
+    "HOU",
+    "IND",
+    "LAC",
+    "LAL",
+    "MEM",
+    "MIA",
+    "MIL",
+    "MIN",
+    "NOP",
+    "NYK",
+    "OKC",
+    "ORL",
+    "PHI",
+    "PHX",
+    "POR",
+    "SAC",
+    "SAS",
+    "TOR",
+    "UTA",
+    "WAS"
+  ],
+  "existing_observation_fields": [
+    "observation_id",
+    "game_id",
+    "player_id",
+    "player",
+    "date",
+    "team",
+    "opponent",
+    "season",
+    "season_type",
+    "venue",
+    "appearance_state",
+    "pts",
+    "reb",
+    "ast",
+    "fgm",
+    "fga",
+    "tpm",
+    "tpa",
+    "ftm",
+    "fta",
+    "tov",
+    "stl",
+    "blk",
+    "oreb",
+    "dreb",
+    "fouls",
+    "minutes",
+    "minute_precision",
+    "starter",
+    "plus_minus",
+    "source_ids",
+    "nba_player_id",
+    "pts_observed",
+    "reb_observed",
+    "ast_observed"
+  ],
+  "policy": "Only existing players, teams and metric types are refreshed. Non-Knicks games update broad player/team statistics; named head-to-head samples require the actual named pairing."
+}

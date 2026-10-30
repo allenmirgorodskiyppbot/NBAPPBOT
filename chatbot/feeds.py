@@ -140,7 +140,7 @@ def parse_boxscore(summary, game):
         opponent = game['away_team'] if abbrev == game['home_team'] else game['home_team']
         for group in team.get('statistics', []):
             # labels/names change order; mapping by supplied names avoids position assumptions.
-            labels = group.get('names') or group.get('labels') or []
+            labels = group.get('labels') or group.get('names') or []
             for athlete in group.get('athletes', []):
                 person = athlete.get('athlete') or {}
                 name = person.get('displayName') or person.get('fullName')
@@ -159,7 +159,8 @@ def parse_boxscore(summary, game):
                     'starter': athlete.get('starter'),
                 }
                 for source, target in [('PTS', 'pts'), ('REB', 'reb'), ('AST', 'ast'),
-                                       ('STL', 'stl'), ('BLK', 'blk'), ('TO', 'tov')]:
+                                       ('STL', 'stl'), ('BLK', 'blk'), ('TO', 'tov'),
+                                       ('OREB','oreb'),('DREB','dreb'),('PF','fouls'),('+/-','plus_minus')]:
                     row[target] = numeric(values.get(source)) if played else None
                 for labels_options, made, attempts in [(('FG', 'FGM-A'), 'fgm', 'fga'),
                                                         (('3PT', '3PM-A', '3PTM-A'), 'tpm', 'tpa'),
@@ -295,6 +296,7 @@ class FeedWorker:
             await response
 
     def relevant_news(self, item):
+        from news_digest import material_categories
         text = (item.get('title', '') + ' ' + item.get('body', '')).lower()
         team = canonical_team(item.get('team'))
         interested_teams = set(self.interest)
@@ -311,7 +313,7 @@ class FeedWorker:
                 name = str(leg.get('player') or '').strip().lower()
                 if len(name) > 4:
                     tracked_names.append(name)
-        return bool(MATERIAL.search(text) and (team in interested_teams or
+        return bool(material_categories(item) and (team in interested_teams or
                     any(re.search(r'\b' + re.escape(TEAM_WORDS.get(t, 'no-such-team')) + r'\b', text)
                         for t in interested_teams) or
                     any(name in text for name in tracked_names) or
@@ -335,7 +337,7 @@ class FeedWorker:
         return self.poll_seconds
 
     async def save_news(self, item, alerts=True):
-        from news_digest import is_promotion
+        from news_digest import is_promotion, material_categories
         from gameday_digest import alert_mode
         item = dict(item)
         if not item.get('verification'):
@@ -343,7 +345,7 @@ class FeedWorker:
             rumor = re.search(r'\b(rumou?rs?|could|may|might|reportedly|speculat\w*|trade interest|trade target)\b', text)
             item['verification'] = 'rumor/unconfirmed' if rumor else 'publisher-reported; not independently verified'
         changed = await asyncio.to_thread(self.store.record_news, item)
-        material = bool(MATERIAL.search(item.get('title', '') + ' ' + item.get('body', '')))
+        material = bool(material_categories(item))
         league_alert = os.getenv('NEWS_ALERT_SCOPE', 'relevant') == 'league' and material
         if (alert_mode() == 'instant' and changed and alerts and self._notified_bootstrap and not is_promotion(item)
                 and (league_alert or self.relevant_news(item))):
