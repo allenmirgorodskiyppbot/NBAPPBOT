@@ -37,6 +37,7 @@ HELP = '''Knicks Research bot
 /news — recent relevant news
 /summary [injuries|news|trades] — fast summary of collected reports (default: injuries)
 /reminder — next Knicks game-day digest time and schedule health
+/usage — AI work counters and how hosting credits are charged
 /status — feed freshness and bot status
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
@@ -351,6 +352,14 @@ class TelegramBot:
             raise RuntimeError('Telegram file download failed; please try the upload again.') from None
         return bytes(payload)
 
+    async def _board_saved_reply(self, board):
+        heading=f'PrizePicks board saved: {board["id"]}\n{len(board["legs"])} uploaded lines. No placed entry recorded.'
+        if not callable(getattr(self.store,'connect',None)):
+            return heading+'\n/analyze '+board['id']
+        import analysis_engine
+        report=await asyncio.to_thread(analysis_engine.analyze_board,self.store,board['id'])
+        return heading+'\n\n'+analysis_engine.format_analysis(report)[:3200]
+
     @staticmethod
     def _ocr(payload):
         executable = shutil.which('tesseract')
@@ -412,7 +421,7 @@ class TelegramBot:
                         + self._compact(report))
             legs = parse_board_document(filename, payload)
             board = self.store.create_board(legs, source=f'telegram:{update_id}:{filename[:100]}')
-            return f'PrizePicks board saved: {board["id"]}\n{len(board["legs"])} lines. No placed entry recorded.\n/analyze {board["id"]}'
+            return await self._board_saved_reply(board)
         text = str(message.get('text', '')).strip()
         if not text:
             return 'Send a question, /help, or a PrizePicks board as text, CSV, JSON or a photo.'
@@ -489,6 +498,9 @@ class TelegramBot:
         if command == '/reminder':
             from gameday_digest import reminder_status
             return reminder_status(self.store)
+        if command == '/usage':
+            from efficient_ai import usage_status
+            return 'AI efficiency and billing:\n' + self._compact(usage_status(self.store))
         if command == '/summary':
             topic = argument.lower() or 'injuries'
             if topic not in {'injuries', 'news', 'trades'}:
@@ -530,7 +542,7 @@ class TelegramBot:
                 return 'Paste available lines with their game date:\n' + BOARD_EXAMPLE
             legs = parse_board_text(argument)
             board = self.store.create_board(legs, source=f'telegram:{update_id}')
-            return f'Board saved: {board["id"]}\n{len(board["legs"])} lines. No placed entry recorded.\n/analyze {board["id"]}'
+            return await self._board_saved_reply(board)
         if command == '/track':
             parts = argument.split()
             if len(parts) not in {3, 4}:
@@ -565,9 +577,10 @@ class TelegramBot:
             board = self.store.get_board(argument)
             if not board:
                 raise ValueError('Board not found. Use /boards to see uploaded boards.')
-            from analysis_engine import analyze_board
-            report = await asyncio.to_thread(analyze_board, self.store, argument)
-            return 'Board research — descriptive evidence, not a validated prediction of a win:\n' + self._compact(report)
+            import analysis_engine
+            report = await asyncio.to_thread(analysis_engine.analyze_board, self.store, argument)
+            formatter=getattr(analysis_engine,'format_analysis',None)
+            return formatter(report) if formatter else self._compact(report)
         if command.startswith('/'):
             return 'Unknown command. Use /help to see available commands.'
         if len(text) > 3000:

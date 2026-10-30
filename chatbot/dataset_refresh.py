@@ -69,3 +69,42 @@ def index_workbook_evidence(store,workbook):
         'named_defender_pairs':'Only actual measured named-pair evidence updates this population; unrelated games never enter it.',
         'passing_rebounding_defense_shot_profiles':'Require their own NBA tracking observations. Missing or blocked sources retain prior values with stale/unavailable status.',
         'historical_seasons':'Dated historical cohorts remain separate from current-season updates.'})
+
+
+def supplement_existing_observation_fields(store,workbook):
+    """Restore omitted existing Excel fields without replacing newer observations."""
+    import math
+    import sqlite3
+    from feeds import canonical_game
+    from workbook import quote
+    info=getattr(workbook,'sheets',{}).get('Player_Games')
+    if not info:return 0
+    fields=[f for f in ('fgm','ftm','fta','oreb','dreb','fouls','plus_minus','starter') if f in info.get('columns',[])]
+    if not fields:return 0
+    key='existing_field_supplement:'+str(store.get_checkpoint('research_evidence_revision',{}).get('revision',''))
+    if store.get_checkpoint(key):return 0
+    with workbook.connect() as source:
+        source.row_factory=sqlite3.Row
+        rows=[dict(r) for r in source.execute('SELECT * FROM '+quote(info['sql_table']))]
+    changed=0
+    with store.connect() as db:
+        for row in rows:
+            try:
+                game_id=canonical_game(str(row['date'])[:10],row['team'],row['opponent'])
+                player_id=canonical_player(row['player'])
+            except (KeyError,TypeError):continue
+            existing=db.execute('SELECT * FROM player_games WHERE game_id=? AND player_id=?',(game_id,player_id)).fetchone()
+            if not existing or not str(existing['source'] or '').startswith('workbook:'):continue
+            if any(row.get(k) is not None and existing[k] is not None and float(row[k])!=float(existing[k]) for k in ('pts','reb','ast','minutes')):continue
+            updates={}
+            for field in fields:
+                value=row.get(field)
+                if existing[field] is not None or value is None:continue
+                if field=='starter' and isinstance(value,bool):updates[field]=int(value)
+                elif type(value) in (int,float) and math.isfinite(value) and (field=='plus_minus' or value>=0):updates[field]=value
+            if updates:
+                from master import now
+                db.execute('UPDATE player_games SET '+','.join(f'{f}=?' for f in updates)+',updated_at=? WHERE game_id=? AND player_id=?',
+                           (*updates.values(),now(),game_id,player_id));changed+=1
+    store.set_checkpoint(key,{'rows_supplemented':changed,'scope':'Existing original workbook fields only; live/manual observations are never overwritten.'})
+    return changed

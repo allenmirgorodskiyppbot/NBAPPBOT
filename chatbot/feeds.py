@@ -233,10 +233,13 @@ class FeedWorker:
         if self.news_source == 'rss':
             store.feed_failure('espn_news', 'Disabled: NEWS_SOURCE=rss; see rss_* feed status.')
         if self.data_source == 'manual':
+            daily_enabled=os.getenv('DAILY_NBA_REFRESH','1')=='1'
+            collection_note=('Intraday collector disabled; automatic previous-day statistics use nba_daily_refresh.'
+                             if daily_enabled else 'Game statistics require explicit uploads.')
             for feed in store.status().get('feeds', []):
                 if feed['name'].startswith(('espn_', 'nba_cdn_')) and feed['name'] != 'espn_news':
-                    store.feed_failure(feed['name'], 'Disabled: NBA_DATA_SOURCE=manual; game statistics require explicit uploads.')
-            store.feed_failure('automatic_games', 'Disabled: manual statistics mode; automatic news monitoring remains available.')
+                    store.feed_failure(feed['name'], 'Disabled: '+collection_note)
+            store.feed_failure('automatic_games', 'Disabled: '+collection_note)
 
     def check_cooldown(self, host):
         state = self.store.get_checkpoint('feed_http_cooldown:' + host, {})
@@ -323,6 +326,21 @@ class FeedWorker:
     def next_delay(self):
         now = self.now()
         today = now.astimezone(EASTERN).date().isoformat()
+        if self.data_source=='manual' and callable(getattr(self.store,'connect',None)):
+            with self.store.connect() as db:
+                rows=[dict(row) for row in db.execute("SELECT start_time,status FROM season_schedule WHERE date=? AND (home_team='NYK' OR away_team='NYK')",(today,))]
+            if rows:
+                from news_digest import _aware
+                for row in rows:
+                    tip=_aware(row.get('start_time'))
+                    if row.get('status')=='live' or tip and 0<=(tip-now).total_seconds()<=5400:
+                        return self.fast_poll_seconds
+                    if tip and 0<=(tip-now).total_seconds()<=21600:
+                        return self.poll_seconds
+                return max(900,self.poll_seconds)
+            from season_calendar import current_season
+            if self.store.get_checkpoint('season_calendar:'+current_season(now)):
+                return max(900,self.poll_seconds)
         for game in self.store.games(today):
             if game.get('status') == 'live':
                 return self.fast_poll_seconds

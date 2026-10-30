@@ -39,6 +39,27 @@ class MatchupTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
+    def test_dated_section_ignores_blank_headers_from_wider_legacy_table(self):
+        import json
+        root = Path(self.directory.name)
+        path = root / 'fixture.xlsx'
+        book = openpyxl.load_workbook(path)
+        # The real workbook's older aggregate section is wider than its later
+        # dated table. Raw-row padding must not become a None dictionary key.
+        book['Pair_Tracking'].cell(row=7, column=16, value='legacy_extra_column')
+        book['Pair_Tracking'].cell(row=8, column=16, value='legacy-only value')
+        book.save(path)
+        book.close()
+        wide = WorkbookStore(str(path), str(root / 'wide.sqlite'))
+        records = _records(wide)
+        self.assertEqual(len(records), 4)
+        self.assertTrue(all(all(isinstance(key, str) and key for key in row) for row in records))
+        # Evidence indexing sorts keys when fingerprinting these records.
+        json.dumps(records, sort_keys=True)
+        answer = answer_matchup_question(wide, 'What FG% does Maxey shoot when Brunson guards him?')['answer']
+        self.assertIn('80.0%', answer)
+        self.assertIn('row(s) 11', answer)
+
     def test_current_dated_rows_are_not_combined_with_overlapping_history(self):
         answer = answer_matchup_question(self.store,
             'What FG% does Maxey shoot when Brunson guards him?')['answer']

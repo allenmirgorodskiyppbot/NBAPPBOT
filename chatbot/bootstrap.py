@@ -36,7 +36,9 @@ def main():
                  'feeds.py', 'seed_master.py', 'analysis_engine.py', 'telegram_bot.py',
                  'nba_cdn.py', 'feed_diagnostics.py', 'manual_import.py', 'news_digest.py', 'self_check.py',
                  'player_stats.py', 'matchup_queries.py', 'gameday_digest.py', 'basketball_research.py',
-                 'release_checks.py']:
+                 'release_checks.py', 'season_calendar.py', 'season_schedule_2026_27.json', 'efficient_ai.py',
+                 'nba_daily_export.py', 'nightly_data.py', 'dataset_refresh.py', 'refresh_scope_2026_27.json',
+                 'contextual_projection.py', 'advanced_refresh.py', 'matchup_refresh_scope.json', 'mirror_sources.py']:
         print('Downloading ' + name, flush=True)
         download(f'https://raw.githubusercontent.com/{REPOSITORY}/{ref}/chatbot/{name}', root / name)
     data = Path(os.getenv('DATA_DIR', '/data'))

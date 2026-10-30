@@ -1,0 +1,388 @@
+{
+  "scope": "Actual downloaded SportsDataverse public data; original uploaded workbook; isolated temporary master. No Akash live records/messages changed.",
+  "generated_at": "2026-10-30T03:56:15.012508+00:00",
+  "original_seed": {
+    "counts": {
+      "games": 3758,
+      "player_games": 6350,
+      "news": 0,
+      "boards": 0,
+      "entries": 0
+    },
+    "sheets": 53,
+    "original_sha256": "02fba50eeda757f140fc7c4fb4a500ca6d565f6646c45481436d2b78db22ba04",
+    "existing_scope_players": 269,
+    "existing_scope_teams": 30,
+    "supplemented_original_fields": 5944,
+    "published_calendar_games": 80,
+    "calendar_tbd_games": 2
+  },
+  "actual_daily_imports": [
+    {
+      "date": "2026-10-22",
+      "complete": true,
+      "games": 2,
+      "expected_games": 2,
+      "player_rows": 34,
+      "changed_player_rows": 34,
+      "source": "espn",
+      "publisher_retrieved_at": "2026-10-29T11:29:40+00:00",
+      "imported_at": "2026-10-30T03:56:26.487065+00:00",
+      "sha256": "15998552b33343861e51e1c64146c49c621c6a6dac2f506869c51513373ce951"
+    },
+    {
+      "date": "2026-10-23",
+      "complete": true,
+      "games": 12,
+      "expected_games": 12,
+      "player_rows": 189,
+      "changed_player_rows": 189,
+      "source": "espn",
+      "publisher_retrieved_at": "2026-10-29T11:29:40+00:00",
+      "imported_at": "2026-10-30T03:56:26.487065+00:00",
+      "sha256": "5955adcf1292a9c42c85f79a01b567b78828b0992c7f1998b8b0395dca822c5b"
+    },
+    {
+      "date": "2026-10-24",
+      "complete": true,
+      "games": 8,
+      "expected_games": 8,
+      "player_rows": 122,
+      "changed_player_rows": 122,
+      "source": "espn",
+      "publisher_retrieved_at": "2026-10-29T11:29:40+00:00",
+      "imported_at": "2026-10-30T03:56:26.487065+00:00",
+      "sha256": "ebc5f87d9eff02a3dcedf99f80a77030ec9012642264d4eb76052347deef5f3b"
+    },
+    {
+      "date": "2026-10-25",
+      "complete": true,
+      "games": 7,
+      "expected_games": 7,
+      "player_rows": 108,
+      "changed_player_rows": 108,
+      "source": "espn",
+      "publisher_retrieved_at": "2026-10-29T11:29:40+00:00",
+      "imported_at": "2026-10-30T03:56:26.487065+00:00",
+      "sha256": "3f505c2c299aeba5eaf39f6f689c4ead1e8a2f5e9d5a54a5c2ee1081687c8094"
+    },
+    {
+      "date": "2026-10-26",
+      "complete": true,
+      "games": 9,
+      "expected_games": 9,
+      "player_rows": 137,
+      "changed_player_rows": 137,
+      "source": "espn",
+      "publisher_retrieved_at": "2026-10-29T11:29:40+00:00",
+      "imported_at": "2026-10-30T03:56:26.487065+00:00",
+      "sha256": "375ef55576ca11d0ece0627a5820c691d27c80353b06598227a7dc6f5f36237a"
+    },
+    {
+      "date": "2026-10-27",
+      "complete": true,
+      "games": 4,
+      "expected_games": 4,
+      "player_rows": 61,
+      "changed_player_rows": 60,
+      "source": "espn",
+      "publisher_retrieved_at": "2026-10-29T11:29:40+00:00",
+      "imported_at": "2026-10-30T03:56:26.487065+00:00",
+      "sha256": "190064ad1afc8e2dae5f9b863663368d7ea6f3a49a3ae04efa447eb41e963370"
+    },
+    {
+      "date": "2026-10-28",
+      "complete": true,
+      "games": 12,
+      "expected_games": 12,
+      "player_rows": 177,
+      "changed_player_rows": 177,
+      "source": "espn",
+      "publisher_retrieved_at": "2026-10-29T11:29:40+00:00",
+      "imported_at": "2026-10-30T03:56:26.487065+00:00",
+      "sha256": "ec526fbf48f02022b555b0d291aeb6d3b5cdd9f52128349c995ff8ed021caf62"
+    }
+  ],
+  "actual_tracking_import": {
+    "records": 1277,
+    "coverage": [
+      {
+        "category": "Player totals",
+        "records": 244,
+        "source_data_through_date": "2026-10-28",
+        "source_published_at": "2026-10-29T14:18:20+00:00",
+        "status": "collected"
+      },
+      {
+        "category": "Team totals",
+        "records": 30,
+        "source_data_through_date": "2026-10-28",
+        "source_published_at": "2026-10-29T14:18:58+00:00",
+        "status": "collected"
+      },
+      {
+        "category": "Team defense",
+        "records": 30,
+        "source_data_through_date": "2026-10-28",
+        "source_published_at": "2026-10-29T14:19:06+00:00",
+        "status": "collected"
+      },
+      {
+        "category": "Passing",
+        "records": 244,
+        "source_data_through_date": "2026-10-28",
+        "source_published_at": "2026-10-29T14:18:41+00:00",
+        "status": "collected"
+      },
+      {
+        "category": "Rebounding",
+        "records": 241,
+        "source_data_through_date": "2026-10-28",
+        "source_published_at": "2026-10-29T14:18:49+00:00",
+        "status": "collected"
+      },
+      {
+        "category": "Possessions",
+        "records": 244,
+        "source_data_through_date": "2026-10-28",
+        "source_published_at": "2026-10-29T14:18:43+00:00",
+        "status": "collected"
+      },
+      {
+        "category": "Rim",
+        "records": 244,
+        "source_data_through_date": "2026-10-28",
+        "source_published_at": "2026-10-29T14:18:31+00:00",
+        "status": "collected"
+      },
+      {
+        "category": "Overall",
+        "reason": "No current-season extract in this publication.",
+        "status": "unavailable"
+      },
+      {
+        "category": "Named pair",
+        "reason": "No current-season extract in this publication.",
+        "status": "unavailable"
+      }
+    ],
+    "source_data_through_date": "2026-10-28"
+  },
+  "population_checks": {
+    "existing_player_set_unchanged": true,
+    "distinct_existing_players": 269,
+    "dated_measured_pair_count": 446,
+    "dated_measured_pair_sha256": "e6c132c2c75a20677f1f50c0552f51d69dc4036a0bef39fd436610e35bfffdbc",
+    "named_pairs_unchanged": true,
+    "versus_knicks_before": {
+      "Tyrese Maxey": {
+        "n": 1,
+        "ppg": 28.0,
+        "last_date": "2026-10-20"
+      },
+      "James Harden": {
+        "n": 0,
+        "ppg": null,
+        "last_date": null
+      }
+    },
+    "versus_knicks_after": {
+      "Tyrese Maxey": {
+        "n": 1,
+        "ppg": 28.0,
+        "last_date": "2026-10-20"
+      },
+      "James Harden": {
+        "n": 0,
+        "ppg": null,
+        "last_date": null
+      }
+    }
+  },
+  "player_averages": {
+    "before": {
+      "Tyrese Maxey": [
+        {
+          "player_id": "name:tyresemaxey",
+          "player": "Tyrese Maxey",
+          "season": "2026-27",
+          "season_type": "Regular Season",
+          "actual_teams": "PHI",
+          "games_played": 4,
+          "ppg": 28.75,
+          "points_observed": 4,
+          "rpg": 4.0,
+          "rebounds_observed": 4,
+          "apg": 4.75,
+          "assists_observed": 4,
+          "minutes_per_game": 37.75833333333333,
+          "threes_per_game": 2.25,
+          "steals_per_game": 2.0,
+          "blocks_per_game": 1.0,
+          "turnovers_per_game": 2.0,
+          "fg_pct": 0.4659090909090909,
+          "three_pct": 0.3,
+          "ft_pct": 0.8571428571428571,
+          "through_date": "2026-10-25"
+        }
+      ],
+      "James Harden": [
+        {
+          "player_id": "name:jamesharden",
+          "player": "James Harden",
+          "season": "2026-27",
+          "season_type": "Regular Season",
+          "actual_teams": "CLE",
+          "games_played": 3,
+          "ppg": 15.666666666666666,
+          "points_observed": 3,
+          "rpg": 5.333333333333333,
+          "rebounds_observed": 3,
+          "apg": 7.0,
+          "assists_observed": 3,
+          "minutes_per_game": 35.28888888888889,
+          "threes_per_game": 2.3333333333333335,
+          "steals_per_game": 1.0,
+          "blocks_per_game": 0.6666666666666666,
+          "turnovers_per_game": 4.333333333333333,
+          "fg_pct": 0.35135135135135137,
+          "three_pct": 0.3333333333333333,
+          "ft_pct": 0.8235294117647058,
+          "through_date": "2026-10-26"
+        }
+      ]
+    },
+    "after": {
+      "Tyrese Maxey": [
+        {
+          "player_id": "name:tyresemaxey",
+          "player": "Tyrese Maxey",
+          "season": "2026-27",
+          "season_type": "Regular Season",
+          "actual_teams": "published all-team aggregate",
+          "games_played": 5,
+          "ppg": 28.4,
+          "points_observed": 5,
+          "rpg": 4.2,
+          "rebounds_observed": 5,
+          "apg": 4.6,
+          "assists_observed": 5,
+          "minutes_per_game": 37.50233333333333,
+          "threes_per_game": 2.4,
+          "steals_per_game": 1.8,
+          "blocks_per_game": 0.8,
+          "turnovers_per_game": 2.4,
+          "fg_pct": 0.46226415094339623,
+          "three_pct": 0.32432432432432434,
+          "ft_pct": 0.8648648648648649,
+          "through_date": "2026-10-28"
+        }
+      ],
+      "James Harden": [
+        {
+          "player_id": "name:jamesharden",
+          "player": "James Harden",
+          "season": "2026-27",
+          "season_type": "Regular Season",
+          "actual_teams": "published all-team aggregate",
+          "games_played": 4,
+          "ppg": 15.75,
+          "points_observed": 4,
+          "rpg": 4.5,
+          "rebounds_observed": 4,
+          "apg": 6.75,
+          "assists_observed": 4,
+          "minutes_per_game": 34.891666666666666,
+          "threes_per_game": 2.25,
+          "steals_per_game": 1.0,
+          "blocks_per_game": 0.5,
+          "turnovers_per_game": 3.75,
+          "fg_pct": 0.32727272727272727,
+          "three_pct": 0.2903225806451613,
+          "ft_pct": 0.8571428571428571,
+          "through_date": "2026-10-28"
+        }
+      ]
+    }
+  },
+  "natural_answers": {
+    "Tyrese Maxey": "Tyrese Maxey \u2014 published 2026-27 regular-season averages, all actual opponents.\npts: 28.40 per game\nPublished games played: 5. Covered game date: 2026-10-28.\nSource publication: 2026-10-29T14:18:20+00:00.\nSource: https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_stats_base_2027.parquet\nSeason totals are used once; named-opponent and defender samples remain separate. These aggregates do not provide individual game logs.",
+    "James Harden": "James Harden \u2014 published 2026-27 regular-season averages, all actual opponents.\npts: 15.75 per game\nPublished games played: 4. Covered game date: 2026-10-28.\nSource publication: 2026-10-29T14:18:20+00:00.\nSource: https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_stats_base_2027.parquet\nSeason totals are used once; named-opponent and defender samples remain separate. These aggregates do not provide individual game logs."
+  },
+  "named_pair_answer": "Tyrese Maxey shot 80.0% with Jalen Brunson recorded as defender in the stored measured matchup rows: 4 makes / 5 attempts across 1 game(s).\nScope: 2026-27 Regular Season; 2026-10-20 through 2026-10-20. This is FG% allowed in that tracked sample, not an overall defensive rating.\nSource: Pair_Tracking, Excel row(s) 2816; source ID(s): NBA_0022600002_matchups.\nSmall tracked samples do not establish defensive ability or predict the next matchup.",
+  "duplicate_import": {
+    "no_statistical_duplication": true,
+    "all_daily_imports_unchanged": true
+  },
+  "seed_reopen_safety": {
+    "original_seed_not_reapplied_over_fresh_data": true
+  },
+  "final_counts": {
+    "games": 3770,
+    "player_games": 6527,
+    "news": 0,
+    "boards": 0,
+    "entries": 0
+  },
+  "integrity": "ok",
+  "max_imported_game_date": "2026-10-28",
+  "source_categories": [
+    {
+      "category": "Passing",
+      "n": 244
+    },
+    {
+      "category": "Player totals",
+      "n": 244
+    },
+    {
+      "category": "Possessions",
+      "n": 244
+    },
+    {
+      "category": "Rebounding",
+      "n": 241
+    },
+    {
+      "category": "Rim",
+      "n": 244
+    },
+    {
+      "category": "Team defense",
+      "n": 30
+    },
+    {
+      "category": "Team totals",
+      "n": 30
+    }
+  ],
+  "excel_export": {
+    "path": "/workspace/output/NBA_Master_Refreshed_2026_10_29.xlsx",
+    "sheets": [
+      "games",
+      "player_games",
+      "news",
+      "feed_status",
+      "boards",
+      "entries",
+      "grade_events",
+      "season_schedule",
+      "season_averages",
+      "refreshed_tracking"
+    ],
+    "season_schedule_rows": 80,
+    "refreshed_tracking_rows": 1277
+  },
+  "backup_restore": {
+    "path": "/workspace/output/NBA_Master_Refreshed_2026_10_29.sqlite",
+    "integrity": "ok",
+    "averages_and_named_pair_records_preserved": true
+  },
+  "original_workbook_unchanged": true,
+  "limits": [
+    "Public source rows cover games through 2026-10-28. The finished 2026-10-29 CLE@ATL game is not falsely marked imported.",
+    "Overall individual defended FG% and current-season named-pair extracts are unavailable in this publication; original dated pair records are preserved.",
+    "Rim defense is a separate population and is not substituted for overall or named-defender percentages."
+  ],
+  "status": "PASS"
+}

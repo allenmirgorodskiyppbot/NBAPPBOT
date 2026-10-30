@@ -161,15 +161,18 @@ def authenticate(x_chat_password: str = Header(default='')):
 def master_context(master):
     result = master.status()
     result['today_eastern'] = dt.datetime.now(ZoneInfo('America/New_York')).date().isoformat()
-    result['scope'] = ('Workbook embedded history plus all NBA games collected since deployment. '
+    result['scope'] = ('Existing workbook players, teams and metric definitions, refreshed from their relevant completed games. '
                        'Not the full companion ZIP. Public feeds are best effort, not a licensed SLA.')
-    result['active_sources'] = {'games': os.getenv('NBA_DATA_SOURCE', 'espn'),
+    nightly=os.getenv('DAILY_NBA_REFRESH','1')=='1'
+    result['active_sources'] = {'games': 'nightly_existing_scope' if nightly else os.getenv('NBA_DATA_SOURCE', 'espn'),
                                 'news': os.getenv('NEWS_SOURCE', 'espn')}
-    result['collection_mode'] = ('Game statistics require manual uploads; public news is polled automatically.'
-                                 if os.getenv('NBA_DATA_SOURCE') == 'manual' else 'Automatic games/news; inspect feed freshness.')
+    result['collection_mode'] = ('Existing statistics refresh at 11:30 AM Eastern for the previous day, with hourly publication retries; public news is automatic; PrizePicks lines are uploaded.'
+                                 if nightly else 'Inspect configured feeds; manual uploads remain available.')
+    from efficient_ai import usage_status
+    result['runtime_usage'] = usage_status(master)
     result['schemas'] = {}
     with master.connect() as db:
-        for table in ['games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events']:
+        for table in ['games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events', 'season_schedule', 'season_averages', 'refreshed_tracking']:
             result['schemas'][table] = [row[1] for row in db.execute(f'PRAGMA table_info({table})')]
     return result
 
@@ -190,7 +193,7 @@ async def telegram_answer(text, history=None):
         return direct['answer']
     if state.store is not None:
         from matchup_queries import answer_matchup_question
-        matchup = await asyncio.to_thread(answer_matchup_question, state.store, text, history or [])
+        matchup = await asyncio.to_thread(answer_matchup_question, state.store, text, history or [], state.master)
         if matchup is not None:
             return matchup['answer']
     if state.phase != 'ready':
@@ -230,7 +233,7 @@ def export_master(master, directory):
     import openpyxl
     workbook = openpyxl.Workbook(write_only=True)
     with master.connect() as db:
-        for table in ['games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events']:
+        for table in ['games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events', 'season_schedule', 'season_averages', 'refreshed_tracking']:
             sheet = workbook.create_sheet(table)
             cursor = db.execute(f'SELECT * FROM {table}')
             sheet.append([c[0] for c in cursor.description])
@@ -316,6 +319,9 @@ async def initialize(application):
             state.digest = GamedayDigest(state.master, state.worker, state.telegram.notify)
             state.service_tasks.append(asyncio.create_task(state.worker.run(), name='nba-feeds'))
             state.service_tasks.append(asyncio.create_task(state.digest.run(), name='knicks-gameday-digest'))
+            from nightly_data import NightlyNBARefresh
+            state.nightly = NightlyNBARefresh(state.master, state.worker,exporter=export_master,data_dir=DATA_DIR)
+            state.service_tasks.append(asyncio.create_task(state.nightly.run(), name='nightly-nba-refresh'))
             state.service_tasks.append(asyncio.create_task(maintenance(application), name='grading-backups'))
             state.service_tasks.append(asyncio.create_task(state.telegram.run(), name='telegram'))
             log.info('Data collection, entry grading and backups started; Telegram configured=%s', state.telegram.enabled)
@@ -327,6 +333,10 @@ async def initialize(application):
         log.info('Workbook ready: %s worksheets', len(state.store.sheets))
         state.detail = 'Importing the historical workbook into the master database'
         state.seed_result = await asyncio.to_thread(seed_workbook, state.master, WORKBOOK_PATH)
+        from dataset_refresh import initialize_scope, index_workbook_evidence, supplement_existing_observation_fields
+        await asyncio.to_thread(initialize_scope, state.master)
+        await asyncio.to_thread(index_workbook_evidence, state.master, state.store)
+        await asyncio.to_thread(supplement_existing_observation_fields, state.master, state.store)
         state.data_ready = True
         if state.release_check_task is None:
             from release_checks import automatic_release_checks
@@ -393,6 +403,8 @@ async def lifespan(application):
     state.data_ready = True
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     state.master = MasterStore(str(DATA_DIR / 'master.sqlite'))
+    from season_calendar import seed_calendar
+    await asyncio.to_thread(seed_calendar, state.master)
     state.service_tasks = []
     state.chat_lock = asyncio.Lock()
     state.self_test_lock = asyncio.Lock()
@@ -471,8 +483,12 @@ The historical workbook is a static snapshot through 27 Oct 2026, containing 53 
 only its embedded rows. The full companion ZIP has not been loaded. A separate persistent
 master database is seeded from the workbook and updated by NBA collectors. Use master_status
 to check active_sources: when games='manual', statistics change only through explicit uploads.
-News polling can continue independently in manual statistics mode. You have no general web
-browser; only configured accessible feeds are collected. Preserve rumor/unconfirmed labels.
+News polling can continue independently in manual statistics mode.
+The separate nightly_existing_scope source refreshes existing observations at 11:30 AM Eastern for the previous day.
+Prefer current_player_statistics/current_tracking from the master over older workbook summaries.
+Only actual games against a named opponent update that opponent split; all games update broad player averages.
+If tracking coverage is unavailable or stale, preserve the source date and disclose it; game totals cannot replace measured defensive tracking.
+You have no general web browser; only configured accessible feeds are collected. Preserve rumor/unconfirmed labels.
 Use master_status
 and query_master for current information; state the active source, actual timestamp and coverage.
 Never claim feeds are current if they have errors, are disabled, or stale. ESPN injuries are
@@ -583,13 +599,13 @@ async def answer_news_question(request, progress, master, topic):
                     'maximum_reports': max_items, 'schema': schema, 'collected_evidence': context}, ensure_ascii=False))}]
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=15)) as client:
-            response = await client.post(OLLAMA_URL + '/api/chat', json={
+            from efficient_ai import efficient_chat
+            body = await efficient_chat(client, {
                 'model': MODEL, 'messages': messages, 'format': schema, 'stream': False,
                 'think': False, 'keep_alive': '30m',
                 'options': {'temperature': 0, 'num_ctx': 4096, 'num_predict': 96,
-                            'num_thread': int(os.getenv('MODEL_THREADS', '4'))}})
-            response.raise_for_status()
-            message = model_message(response.json())
+                            'num_thread': int(os.getenv('MODEL_THREADS', '4'))}}, master, OLLAMA_URL)
+            message = model_message(body)
             content = message.get('content')
             if not isinstance(content, str) or not content.strip() or message.get('tool_calls'):
                 raise ModelReplyError('empty_model_answer' if not content else 'invalid_model_response')
@@ -621,7 +637,7 @@ async def answer_question(store, request, progress, master=None):
     request = ChatRequest(message=resolved['question'][:3000], history=normalized_history)
     from matchup_queries import answer_matchup_question
     matchup = await asyncio.to_thread(answer_matchup_question, store, request.message,
-                                      [message.model_dump() for message in request.history])
+                                      [message.model_dump() for message in request.history],master)
     if matchup is not None:
         return matchup
     if master is not None:
@@ -658,9 +674,9 @@ async def answer_question(store, request, progress, master=None):
             else:
                 messages.append({'role': 'user', 'content': 'Give your answer now using only the '
                                  'evidence retrieved so far. Disclose any unanswered part.'})
-            response = await client.post(OLLAMA_URL + '/api/chat', json=payload)
-            response.raise_for_status()
-            message = model_message(response.json())
+            from efficient_ai import efficient_chat
+            body = await efficient_chat(client, payload, master, OLLAMA_URL)
+            message = model_message(body)
             calls = message.get('tool_calls') or []
             if not calls:
                 content = message.get('content')

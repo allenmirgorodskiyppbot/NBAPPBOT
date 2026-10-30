@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import json
 import os
 import re
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from nba_cdn import SCHEDULE_URL, parse_game
-from news_digest import _aware, _categories, _clean, _metadata, _publication_label, _url, is_promotion
+from news_digest import _aware, _clean, _metadata, _publication_label, _url, is_promotion, material_categories
 
 EASTERN = ZoneInfo('America/New_York')
 UTC = dt.timezone.utc
@@ -52,6 +53,8 @@ def parse_schedule(document, today, source):
             if 'NYK' not in teams:
                 continue
             game = parse_game(payload, source=source, fallback_date=day.get('gameDate'), season=season)
+            if game.get('nba_season_type')!='Regular Season':
+                continue
             if game['provider_game_id'] in seen:
                 raise ValueError('Schedule has duplicate Knicks game identities.')
             seen.add(game['provider_game_id'])
@@ -89,7 +92,7 @@ def relevant_reports(store, opponent, now):
         if is_promotion(item):
             continue
         title, body = _clean(item.get('title'), 220), _clean(item.get('body'), 4000)
-        if not _categories(title, body):
+        if not material_categories(item):
             continue
         metadata = _metadata(item)
         text = title + ' ' + body
@@ -128,6 +131,15 @@ def render_digest(store, game, now, schedule_checked, refresh_ok):
     lines = [f"Knicks game-day injury / roster update — {tip.strftime('%b %d')}",
              f"NYK vs {opponent} · tipoff {tip.strftime('%I:%M %p').lstrip('0')} Eastern",
              f"Reports checked: {now.astimezone(EASTERN).strftime('%I:%M %p').lstrip('0')} Eastern"]
+    if game.get('using_saved_calendar'):
+        lines.append('Using the saved published season calendar; live schedule recheck failed or is unavailable. Tipoff changes may be missed.')
+    with store.connect() as db:
+        boards = db.execute('SELECT id,legs_json FROM boards ORDER BY created_at DESC LIMIT 30').fetchall()
+    saved = next((board['id'] for board in boards if any(
+        leg.get('date') == tip.date().isoformat() and leg.get('team') == 'NYK'
+        for leg in json.loads(board['legs_json']))), None)
+    lines.append(('PrizePicks: today’s lines are saved as board ' + saved + '. Resend them if they change.' if saved else
+                  'PrizePicks reminder: send today’s player lines or a screenshot. I’ll compare the uploaded lines with the saved matchup and workload evidence.'))
     feeds = store.status()['feeds']
     news_feeds = [f for f in feeds if f['name'].startswith('rss_') or f['name'] in {'espn_news', 'injuries_configured'}]
     fresh = [f for f in news_feeds if not f.get('error') and _aware(f.get('last_success'))
@@ -147,7 +159,7 @@ def render_digest(store, game, now, schedule_checked, refresh_ok):
         if url:
             block += '\n' + url
         # Leave room for provenance and coverage while keeping one Telegram chunk.
-        if len('\n\n'.join(lines)) + len(block) > 2600 or count == 7:
+        if len('\n\n'.join(lines)) + len(block) > 2400 or count == 7:
             break
         lines.append(block)
         count += 1
@@ -173,9 +185,23 @@ class GamedayDigest:
             raise ValueError('KNICKS_SCHEDULE_URL must be HTTPS without URL credentials.')
         self.lead = max(15, min(180, int(os.getenv('KNICKS_DIGEST_MINUTES_BEFORE', '60'))))
         self._lock = asyncio.Lock()
+        self._using_saved = False
+
+    def _fallback(self, snapshot, current):
+        checked = _aware(snapshot.get('checked_at'))
+        if snapshot.get('url') == self.url and checked and 0 <= (current-checked).total_seconds() < 1200:
+            return snapshot
+        from season_calendar import saved_schedule
+        saved = saved_schedule(self.store, current)
+        if saved:
+            saved['using_saved_calendar'] = True
+            self.store.set_checkpoint(SCHEDULE_KEY, saved)
+            return saved
+        return {}
 
     def _status(self, state, **values):
         report = {'mode': alert_mode(), 'state': state, 'minutes_before_tipoff': self.lead,
+                  'schedule_mode': 'saved_calendar' if self._using_saved else 'live_checked',
                   'timezone': 'America/New_York', 'checked_at': self.now().isoformat(), **values}
         self.store.set_checkpoint(STATUS_KEY, report)
         return report
@@ -184,18 +210,27 @@ class GamedayDigest:
         current = self.now()
         snapshot = self.store.get_checkpoint(SCHEDULE_KEY, {})
         checked = _aware(snapshot.get('checked_at'))
+        near_game = any(_aware(game.get('start_time')) and
+                       0 < (_aware(game['start_time'])-current).total_seconds() <= 4*3600
+                       for game in snapshot.get('games', []))
+        interval = 900 if near_game else 21600
         # A regular 15-minute refresh also checks changed times/cancellations.
         if (snapshot.get('url') == self.url and checked and
-                0 <= (current - checked).total_seconds() < 900):
+                0 <= (current - checked).total_seconds() < interval):
             return snapshot
         attempt = _aware(self.store.get_checkpoint('knicks_schedule_attempt'))
-        if attempt and 0 <= (current - attempt).total_seconds() < 900:
-            return snapshot if snapshot.get('url') == self.url else {}
+        if attempt and 0 <= (current - attempt).total_seconds() < interval:
+            return self._fallback(snapshot, current)
         self.store.set_checkpoint('knicks_schedule_attempt', current.isoformat())
         try:
             document = await self.worker.request(self.url)
             games = parse_schedule(document, current.astimezone(EASTERN).date(), self.url)
             snapshot = {'games': games, 'checked_at': current.isoformat(), 'url': self.url}
+            from season_calendar import import_calendar, current_season
+            metadata=import_calendar(self.store, {'season':current_season(current),'covered_teams':['NYK'],
+                'games':games,'source':self.url,'retrieved_at':current.isoformat(),
+                'regular_season_total':82,'unassigned_games':max(0,82-len(games))}, source_kind='live_schedule')
+            snapshot['metadata']=metadata
             self.store.set_checkpoint(SCHEDULE_KEY, snapshot)
             self.store.feed_success('knicks_schedule', 'Independent Knicks game-day timing; NBA season schedule; no game statistics imported.')
         except asyncio.CancelledError:
@@ -204,8 +239,8 @@ class GamedayDigest:
             # Never include a configured URL/query or arbitrary exception message.
             code = getattr(getattr(error, 'response', None), 'status_code', None)
             self.store.feed_failure('knicks_schedule', type(error).__name__ + (f': HTTP {code}' if code else '')
-                                    + '; automatic digest timing unavailable without a current reachable schedule.')
-        return snapshot if snapshot.get('url') == self.url else {}
+                                    + '; live schedule recheck unavailable; a saved published season calendar may still supply reminder timing.')
+        return self._fallback(snapshot, current)
 
     async def tick(self):
         async with self._lock:
@@ -214,8 +249,9 @@ class GamedayDigest:
                 return self._status('disabled')
             snapshot = await self.refresh_schedule()
             current = self.now()
+            self._using_saved = bool(snapshot.get('using_saved_calendar'))
             checked = _aware(snapshot.get('checked_at'))
-            if not checked or not 0 <= (current - checked).total_seconds() < 1200:
+            if not checked or (not self._using_saved and not 0 <= (current - checked).total_seconds() < 21600):
                 return self._status('schedule_unavailable', detail='No fresh verified schedule; no game time or off day assumed. See /status or /reminder.')
             today = current.astimezone(EASTERN).date().isoformat()
             games = [g for g in snapshot.get('games', []) if g['date'] == today]
@@ -229,6 +265,12 @@ class GamedayDigest:
                           'send_at': (_aware(next_game['start_time']) - dt.timedelta(minutes=self.lead)).isoformat()}
                          if next_game else {})
             if not games:
+                metadata=snapshot.get('metadata',{})
+                if any(window['start'] <= today <= window['end'] for window in metadata.get('unassigned_windows', [])):
+                    return self._status('cup_schedule_unassigned', detail='An additional NBA Cup-dependent game may be scheduled in this window; no date is invented.', **next_info)
+                if (metadata.get('complete_for_published_games') is False or metadata.get('unassigned_coverage_unknown')
+                        or (metadata.get('unassigned_games',0) and not metadata.get('unassigned_windows'))):
+                    return self._status('schedule_coverage_unknown', detail='Published dates do not cover all remaining games; this date is not confirmed as an off day.', **next_info)
                 return self._status('off_day', **next_info)
             game = next((g for g in games if g['status'] == 'scheduled' and _aware(g.get('start_time'))), None)
             if not game:
@@ -256,6 +298,7 @@ class GamedayDigest:
             current = self.now()
             if current >= tip:
                 return self._status('game_started', **next_info)
+            game = {**game, 'using_saved_calendar': self._using_saved}
             message = await asyncio.to_thread(render_digest, self.store, game, current,
                                               snapshot['checked_at'], refreshed)
             accepted = await self.notify(message, event_key=key, expires_at=tip.timestamp())
@@ -280,13 +323,19 @@ def reminder_status(store):
     if not report:
         report = {'mode': alert_mode(), 'state': 'starting', 'detail': 'Schedule has not been checked yet.'}
     state = report.get('state')
-    lines = ['Knicks injury reminders: ' + report.get('mode', alert_mode())]
+    lines = ['Knicks injury / PrizePicks reminders: ' + report.get('mode', alert_mode())]
+    if report.get('schedule_mode') == 'saved_calendar':
+        lines.append('Timing uses the saved published season calendar; live schedule changes are not currently verified.')
     if state == 'schedule_unavailable':
         lines.append('Automatic timing is blocked: the current schedule could not be verified. '
                      'No off day or tipoff is assumed. /status shows the knicks_schedule error; '
                      '/diagnose tests the public schedule connection.')
     elif state == 'off_day':
         lines.append('No Knicks game today. No automatic injury message today.')
+    elif state == 'cup_schedule_unassigned':
+        lines.append('This date is in the NBA Cup-dependent schedule window. Additional games remain unassigned; no tipoff is guessed.')
+    elif state == 'schedule_coverage_unknown':
+        lines.append('Schedule coverage is incomplete and missing-game dates are unknown. This date is not confirmed as an off day.')
     elif state in {'queued', 'already_queued_today'}:
         lines.append('Today’s one game-day digest has been queued. Telegram retries delivery until tipoff.')
     elif state in {'game_started', 'no_upcoming_tipoff_today'}:

@@ -283,7 +283,21 @@ def research_context(store, master, resolved):
     context = {'resolved_players': resolved['players'], 'resolved_teams': resolved['teams'],
                'name_resolution_is_not_roster_verification': True,
                'assignment_projections': assignments_for(store, resolved['players'], _opponent(resolved, master)),
-               'player_sheets': [], 'news': []}
+               'player_sheets': [], 'news': [], 'current_player_statistics': [], 'current_tracking': []}
+    if master is not None and callable(getattr(master,'connect',None)):
+        current=dt.datetime.now(EASTERN);year=current.year-(current.month<7);season=f'{year}-{str(year+1)[-2:]}'
+        with master.connect() as db:
+            for player in resolved['players'][:2]:
+                context['current_player_statistics'].extend(dict(row) for row in db.execute(
+                    "SELECT * FROM season_averages WHERE player=? AND season=? AND season_type='Regular Season'",(player,season)))
+                if db.execute("SELECT 1 FROM sqlite_master WHERE name='refreshed_tracking'").fetchone():
+                    context['current_tracking'].extend(json.loads(row[0]) for row in db.execute(
+                        'SELECT payload_json FROM refreshed_tracking WHERE entity=? AND season=? LIMIT 3',(player,season)))
+            for team in resolved['teams'][:2]:
+                if db.execute("SELECT 1 FROM sqlite_master WHERE name='refreshed_tracking'").fetchone():
+                    context['current_tracking'].extend(json.loads(row[0]) for row in db.execute(
+                        "SELECT payload_json FROM refreshed_tracking WHERE entity=? AND season=? AND category IN ('Team totals','Team defense')",(team,season)))
+        context['freshness_priority']='Current master summaries take precedence over the dated workbook snapshot. Tracking records retain their own source timestamps.'
     for player in resolved['players'][:2]:
         if player in getattr(store, 'sheets', {}):
             context['player_sheets'].append(store.read(player, 7, 4))
@@ -304,6 +318,8 @@ def research_context(store, master, resolved):
             context['news'].pop()
         elif context['assignment_projections']:
             context['assignment_projections'].pop()
+        elif context['current_tracking']:
+            context['current_tracking'].pop()
         else:
             break
     return context

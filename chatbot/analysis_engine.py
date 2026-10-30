@@ -1,4 +1,4 @@
-"""Versioned, descriptive research against immutable uploaded PrizePicks lines.
+"""Versioned contextual research against immutable uploaded PrizePicks lines.
 
 Historical fractions are observations, not calibrated future win probabilities.
 No actual entry is placed, created, or settled by this analysis module.
@@ -181,7 +181,9 @@ def _suggest_entries(candidates):
         pairs.append((first, second))
     # A weaker-leg historical support ranking is descriptive. It is deliberately
     # not an estimate of combined win probability, payout or expected return.
-    pairs.sort(key=lambda pair: (min(item['historical_selected_side_fraction'] for item in pair),
+    pairs.sort(key=lambda pair: (min(item.get('projection',{}).get('standardized_margin')
+                                    if item.get('projection',{}).get('standardized_margin') is not None else -999 for item in pair),
+                                 min(item['historical_selected_side_fraction'] for item in pair),
                                  min(item['n'] for item in pair)), reverse=True)
     suggestions = []
     for number, pair in enumerate(pairs[:3], 1):
@@ -191,7 +193,9 @@ def _suggest_entries(candidates):
             'historical_support': [{key: item[key] for key in (
                 'n', 'historical_selected_side_fraction', 'sample_first_date', 'sample_last_date')}
                 for item in pair],
-            'ranking_basis': 'Weaker-leg historical support, then smaller sample size; not a forecast.',
+            'ranking_basis': ('Weaker experimental projection margin, then descriptive support; not a calibrated probability.'
+                              if all(item.get('projection',{}).get('available') for item in pair) else
+                              'Weaker-leg historical support; minutes/context insufficient for a projection.'),
             'combined_win_probability': None,
             'correlation_warning': 'These selections may be correlated, particularly in the same game. '
                                    'No independence assumption or multiplied leg probability is used.',
@@ -224,23 +228,59 @@ def analyze_board(store, board_id, as_of=None):
         now = dt.datetime.fromisoformat(now.replace('Z', '+00:00'))
     if now.tzinfo is None:
         now = now.replace(tzinfo=dt.timezone.utc)
+    from efficient_ai import data_revision
+    import hashlib
+    from season_calendar import calendar_context
+    from news_digest import _aware
+    stages=[]
+    for leg in board['legs']:
+        cal=calendar_context(store,leg['date'],leg['team']) if leg.get('date') and leg.get('team') else {}
+        tip=_aware(cal.get('tipoff'));stages.append(bool(tip and now>=tip))
+    revision=hashlib.sha256(json.dumps({'engine':'contextual-v2','data':data_revision(store),'event_started':stages,
+        'board':board,'date':now.astimezone(ZoneInfo('America/New_York')).date().isoformat(),
+        'fresh':_feed_health(store.status(),now)['fresh_feeds']},sort_keys=True,default=str).encode()).hexdigest()
+    _report_tables(store)
+    with store.connect() as db:
+        prior=db.execute('SELECT report_json FROM analysis_reports WHERE board_id=? ORDER BY generated_at DESC LIMIT 1',(board_id,)).fetchone()
+    if prior:
+        cached=json.loads(prior[0])
+        if cached.get('input_revision')==revision:
+            return {**cached,'cache_hit':True}
     results = [_analyze_leg(store, leg, now) for leg in board['legs']]
+    from contextual_projection import projection_for_leg
+    from season_calendar import calendar_context
+    for item in results:
+        leg=item['leg']
+        item['projection']=projection_for_leg(store,leg,now)
+        calendar=calendar_context(store,str(leg.get('date',''))[:10],leg.get('team')) if leg.get('date') and leg.get('team') else {}
+        from news_digest import _aware
+        tip=_aware(calendar.get('tipoff'))
+        if tip and now>=tip:
+            item['eligible_for_ranking']=False
+            item.setdefault('eligibility_blocks',[]).append('The published calendar tipoff has passed; this line needs a fresh game-status check.')
     candidates = [r for r in results if r['eligible_for_ranking']]
-    candidates.sort(key=lambda r: (r['historical_selected_side_fraction'], r['n']), reverse=True)
+    candidates.sort(key=lambda r: (r['projection'].get('standardized_margin')
+                     if r['projection'].get('standardized_margin') is not None else -999,
+                     r['historical_selected_side_fraction'],r['n']),reverse=True)
     for rank, item in enumerate(candidates, 1):
         item['descriptive_rank'] = rank
     suggested_entries, lineup_note = _suggest_entries(candidates)
+    aggressive=[r for r in candidates if r['projection'].get('aggressive_research_candidate')]
+    aggressive_entries,aggressive_note=_suggest_entries(aggressive)
+    for option in aggressive_entries:
+        option['ranking_basis']='Positive experimental projection margin with documented opponent/rest support; higher-variance research, not a validated advantage.'
     freshness = _feed_health(store.status(), now)
     report = {
         'id': uuid.uuid4().hex, 'board_id': board_id, 'generated_at': now.isoformat(),
-        'engine_version': 'descriptive-v1', 'research_only': True,
+        'engine_version': 'contextual-v2', 'research_only': True,'input_revision':revision,'cache_hit':False,
         'board_created_at': board.get('created_at'), 'board_source': board.get('source'),
         'original_legs': board['legs'], 'legs': results, 'candidates': candidates,
         'suggested_entries': suggested_entries, 'lineup_note': lineup_note,
+        'aggressive_candidates':aggressive,'aggressive_entries':aggressive_entries,'aggressive_note':aggressive_note,
         'freshness': freshness,
         'recent_news': store.recent_news(10),
         'limitations': [
-            'This starter ranks historical support; it does not estimate calibrated future probabilities or expected return.',
+            'Experimental workload and matchup scenarios rank research alternatives; they do not estimate calibrated win probabilities or expected return.',
             'No parlay probability is calculated by multiplying leg hit rates; same-game and same-player legs may be dependent.',
             'These are manually uploaded line snapshots. Current PrizePicks availability and payout rules must be checked.',
             'The historical seed is only the embedded workbook subset; it is not the full companion ZIP.',
@@ -262,3 +302,34 @@ def analysis_history(store, board_id, limit=10):
                           'ORDER BY generated_at DESC,id DESC LIMIT ?',
                           (board_id, max(1, min(30, int(limit)))))
         return [json.loads(row[0]) for row in rows]
+
+
+def format_analysis(report):
+    lines=['Matchup and workload research — '+report.get('engine_version','unknown'),
+           'Experimental projections and scenarios; these are not validated win probabilities.']
+    candidates=report.get('candidates',[])
+    if not candidates:
+        lines.append('No eligible research candidates: '+str(report.get('lineup_note','Inspect missing data, availability and event status.')))
+    for item in candidates[:3]:
+        leg=item['leg'];projection=item.get('projection',{})
+        block=f"{leg['player']} · {leg['side']} {leg['line']:g} {leg['stat']}"
+        if projection.get('available'):
+            spread=projection['empirical_scenario_range']
+            block+=(f"\nExperimental reference {projection['reference_projection']:g}; observed scenario spread "
+                    f"{spread['p10']:g}–{spread['p90']:g}; projected workload {projection['projected_minutes']:g} min."
+                    f"\nEvidence: {projection['n']} games, {projection['first_date']}–{projection['last_date']}; {projection['confidence']} confidence.")
+            reasons=projection.get('supporting_reasons',[])
+            if reasons:block+='\nWhy: '+reasons[min(2,len(reasons)-1)]
+            block+='\nRisk: '+projection.get('risk_note','Availability and workload can change.')
+        else:
+            block+=f"\nStored descriptive support: {item['n']} games; projection unavailable: {projection.get('reason','missing inputs')}."
+        lines.append(block)
+    aggressive=report.get('aggressive_candidates',[])
+    if aggressive:
+        lines.append('Higher-variance research: '+', '.join(item['leg']['player'] for item in aggressive[:3])+
+                     '. Supported by: '+', '.join(sorted({signal for item in aggressive[:3] for signal in item['projection'].get('aggressive_signals',[])}))+'.')
+    else:
+        lines.append('No aggressive option currently meets the evidence rules. I won’t manufacture a riskier play from a simple average.')
+    lines.append('Current PrizePicks lines, availability and payout terms still need checking. No placed entry was created.')
+    lines.append('Report '+str(report.get('id',''))+(' · reused unchanged analysis' if report.get('cache_hit') else ''))
+    return '\n\n'.join(lines)[:3450]

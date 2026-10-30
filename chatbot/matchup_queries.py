@@ -27,7 +27,8 @@ def _records(store):
                 headers = values
                 continue
             if headers and values and values[0] is not None:
-                record = dict(zip(headers, values))
+                record = {key: value for key, value in zip(headers, values)
+                          if isinstance(key, str) and key.strip()}
                 if record.get('offense_player') and record.get('defense_player') and record.get('game_id'):
                     try:
                         dt.date.fromisoformat(str(record.get('date'))[:10])
@@ -57,7 +58,7 @@ def _names(text, players):
     return [player for _, player in sorted(found)]
 
 
-def answer_matchup_question(store, question, history=None):
+def answer_matchup_question(store, question, history=None, master=None):
     text = str(question).strip()
     history = history or []
     last_assistant = next((turn['content'] for turn in reversed(history) if turn['role'] == 'assistant'), '')
@@ -110,6 +111,17 @@ def answer_matchup_question(store, question, history=None):
         year = current.year if current.month >= 7 else current.year - 1
         season = f'{year}-{(year + 1) % 100:02d}'
     phase = 'Playoffs' if 'playoff' in text.casefold() else 'Regular Season'
+    if master is not None and phase=='Regular Season':
+        import json
+        current=dt.datetime.now(ZoneInfo('America/New_York'));year=current.year-(current.month<7)
+        selected_season=season or f'{year}-{str(year+1)[-2:]}'
+        with master.connect() as db:
+            fresh=db.execute("SELECT payload_json FROM refreshed_tracking WHERE category='Named pair' AND entity=? AND season=?",(offense+' | '+defender,selected_season)).fetchone()
+        if fresh:
+            record=json.loads(fresh[0]);fields=record.get('fields',{});made=fields.get('fgm');attempts=fields.get('fga')
+            if made is not None and attempts and 0<=made<=attempts:
+                return result(f"{offense} shot {made/attempts*100:.1f}% with {defender} recorded as defender in the published {selected_season} regular-season measured-pair totals: {made:g}/{attempts:g} FG, {record.get('gp',0):g} covered games.\n"
+                              f"Source: {record.get('source')}; checked {record.get('published_at')}. This cumulative tracked sample is separate from whole-game PPG and is not an overall defensive rating. Unrelated opponents’ games do not enter this pair.")
     today = dt.datetime.now(ZoneInfo('America/New_York')).date().isoformat()
     pair = [row for row in records if row['offense_player'] == offense and row['defense_player'] == defender
             and str(row.get('date', ''))[:10] <= today and str(row.get('season_type', '')).casefold() == phase.casefold()]

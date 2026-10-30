@@ -42,8 +42,9 @@ def _resolve(db, text, exact=False):
         # A full name must not silently hide a second player named by surname.
         if not exact and len({normalized_name(row['player']) for row in full}) == 1:
             last = full[0]['player'].split()[-1].casefold()
+            remainder = re.sub(r'\b' + re.escape(full[0]['player']) + r'\b', ' ', text, flags=re.I)
             others = [row for row in names if row['player'].split()[-1].casefold() != last
-                      and re.search(r'\b' + re.escape(row['player'].split()[-1]) + r'\b', text, re.I)]
+                      and re.search(r'\b' + re.escape(row['player'].split()[-1]) + r'\b', remainder, re.I)]
             if others:
                 return None
         candidates = full
@@ -112,8 +113,9 @@ def player_log(store, player, stats=('pts',), limit=5, season=None, phase='Regul
                  max(str(row['date'])[:10] for row in rows) + '.')
     lines.append('Latest stored completed player game in this scope: ' + str(newest) + '.')
     mode = os.getenv('NBA_DATA_SOURCE', 'espn')
-    lines.append('Statistics mode: ' + mode + ('; updates require uploads.' if mode == 'manual' else
-                 '; check /status for feed freshness.'))
+    lines.append('Statistics mode: ' + ('morning existing-dataset refresh at 11:30 AM Eastern; manual uploads also supported; check /status for covered dates.'
+                 if os.getenv('DAILY_NBA_REFRESH','1')=='1' else mode +
+                 ('; updates require uploads.' if mode=='manual' else '; check /status for feed freshness.')))
     sources = sorted({str(row.get('source') or 'source not supplied') for row in rows})
     groups = {}
     for source in sources:
@@ -190,8 +192,39 @@ def answer_player_question(store, question, history=None):
                         break
     if player is None:
         return None
+    if aggregate and phase=='Regular Season':
+        published=published_average(store,player['player'],stats,season)
+        if published is not None:
+            return published
     return player_log(store, player['player'], stats=stats, limit=limit, season=season, phase=phase,
                       all_games=aggregate)
+
+
+def published_average(store,player,stats,season):
+    """Use an authoritative season total once, rather than averaging partial samples."""
+    import json
+    with _open(store) as db:
+        row=db.execute("SELECT payload_json FROM refreshed_tracking WHERE category='Player totals' AND entity=? AND season=?",(player,season)).fetchone()
+        observed=db.execute("SELECT games_played,through_date FROM observed_season_averages WHERE player=? AND season=? AND season_type='Regular Season'",(player,season)).fetchone()
+    if not row:return None
+    record=json.loads(row[0]);gp=record.get('gp');fields=record.get('fields',{})
+    if not gp or gp<=0:return None
+    if observed and (observed['games_played']>gp or observed['through_date']>str(record.get('data_through_date') or record.get('published_at','')[:10])):
+        return None
+    averages={}
+    for stat in stats:
+        components=STAT_COMPONENTS.get(stat)
+        if not components or any(fields.get(key) is None for key in components):return None
+        averages[stat]=sum(fields[key] for key in components)/gp
+    answer=(f'{player} — published {season} regular-season averages, all actual opponents.\n'+
+            '\n'.join(f'{stat}: {value:.2f} per game' for stat,value in averages.items())+
+            f"\nPublished games played: {gp:g}. Covered game date: {record.get('data_through_date') or 'unknown'}.\n"+
+            f"Source publication: {record.get('published_at','unknown')}.\n"+
+            'Source: '+str(record.get('source','unavailable'))+
+            '\nSeason totals are used once; named-opponent and defender samples remain separate. These aggregates do not provide individual game logs.')
+    return {'answer':answer,'ai_used':False,'sources':[{'tool':'published_player_totals','arguments':{'player':player,'season':season}}],
+            'data':{'player':player,'averages':averages,'games_played':gp,'scope':'Published all-opponent season totals',
+                    'through_date':record.get('data_through_date'),'source_published_at':record.get('published_at'),'games':[]}}
 
 
 def player_log_command(store, argument):

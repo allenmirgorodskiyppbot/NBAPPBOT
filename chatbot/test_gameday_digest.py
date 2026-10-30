@@ -22,7 +22,7 @@ URL = 'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json'
 def calendar(tip='2026-10-30T23:00:00Z'):
     first = dt.datetime.fromisoformat(tip.replace('Z', '+00:00'))
     dates = []
-    for number in range(70):
+    for number in range(82):
         start = first + dt.timedelta(days=number * 2)
         dates.append({'gameDate': start.date().isoformat(), 'games': [{
             'gameId': f'00226{number:05d}', 'gameTimeUTC': start.isoformat(),

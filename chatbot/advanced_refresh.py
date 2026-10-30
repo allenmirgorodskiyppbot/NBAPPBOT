@@ -16,6 +16,7 @@ MAPS={
  'Player totals':{'PTS':'pts','REB':'reb','AST':'ast','MIN':'minutes','FGM':'fgm','FGA':'fga','FG3M':'tpm','FG3A':'tpa',
                   'FTM':'ftm','FTA':'fta','STL':'stl','BLK':'blk','TOV':'tov','OREB':'oreb','DREB':'dreb','PF':'fouls'},
  'Team totals':{'PTS':'pts','REB':'reb','AST':'ast','FGM':'fgm','FGA':'fga','FG3M':'tpm','FG3A':'tpa','FTM':'ftm','FTA':'fta','TOV':'tov'},
+ 'Team defense':{'OPP_FGM':'defended_fgm','OPP_FGA':'defended_fga','OPP_PTS':'points_allowed'},
  'Passing':{'POTENTIAL_AST':'potential_assists','PASSES_MADE':'passes','AST':'assists'},
  'Rebounding':{'REB_CHANCES':'rebound_chances','REB':'rebounds'},
  'Possessions':{'TOUCHES':'touches','TIME_OF_POSS':'possession_minutes'},
@@ -47,7 +48,7 @@ def normalize_records(rows,category,scope,season,pairs=None,team_ids=None):
     allowed={(p['offense_player'],p['defense_player']) for p in pairs or []}
     result=[]
     for row in rows:
-        if category=='Team totals':
+        if category in {'Team totals','Team defense'}:
             entity=(team_ids or {}).get(str(row.get('TEAM_ID')))
             if entity not in scope['teams']:continue
         elif category=='Named pair':
@@ -65,15 +66,16 @@ def normalize_records(rows,category,scope,season,pairs=None,team_ids=None):
             if type(value) in (int,float) and math.isfinite(value) and value>=0:fields[target]=value
         if category=='Player totals' and not {'pts','reb','ast','minutes'}<=set(fields):
             continue
-        made,attempts=('fgm','fga') if category=='Named pair' else ('defended_fgm','defended_fga') if category=='Overall' else ('rim_defended_fgm','rim_defended_fga')
+        made,attempts=('fgm','fga') if category=='Named pair' else ('defended_fgm','defended_fga') if category in {'Overall','Team defense'} else ('rim_defended_fgm','rim_defended_fga')
         if not fields:continue
-        if category in {'Named pair','Overall','Less Than 6Ft','Rim'}:
+        if category in {'Named pair','Overall','Less Than 6Ft','Rim','Team defense'}:
             if made in fields and attempts in fields:
                 if fields[made]>fields[attempts]:raise ValueError('Tracking makes exceed attempts.')
                 fields['fg_pct_allowed' if category!='Named pair' else 'fg_pct']=fields[made]/fields[attempts] if fields[attempts]>0 else None
         from feeds import canonical_player
         result.append({'entity':entity,'player_id':canonical_player(entity) if category=='Player totals' else None,
                        'category':category,'season':season,'season_type':'Regular Season',
+                       'team':row.get('TEAM_ABBREVIATION') or row.get('PLAYER_LAST_TEAM_ABBREVIATION'),
                        'gp':gp,'fields':fields,'population':'Actual measured named pair' if category=='Named pair' else 'All actual opponents'})
     return result
 
@@ -142,8 +144,8 @@ def import_tracking(store,document,now):
         category=record.get('category');entity=record.get('entity');stamp=_aware(record.get('published_at'))
         if category not in MAPS or not stamp or stamp>now+dt.timedelta(minutes=5):raise ValueError('Invalid tracking record.')
         if ((category=='Named pair' and tuple(entity.split(' | ')) not in pairs) or
-            (category=='Team totals' and entity not in scope.get('teams',[])) or
-            (category not in {'Named pair','Team totals'} and entity not in names)):
+            (category in {'Team totals','Team defense'} and entity not in scope.get('teams',[])) or
+            (category not in {'Named pair','Team totals','Team defense'} and entity not in names)):
             raise ValueError('Unrequested tracking entity.')
         fields=record.get('fields',{})
         gp=record.get('gp')
@@ -165,13 +167,19 @@ def import_tracking(store,document,now):
         for record in rows:
             prior=db.execute('SELECT payload_json FROM refreshed_tracking WHERE season=? AND entity=? AND category=?',
                 (record['season'],record['entity'],record['category'])).fetchone()
-            if prior and _aware(json.loads(prior[0]).get('published_at'))>_aware(record['published_at']):
-                continue
+            if prior:
+                previous=json.loads(prior[0])
+                if _aware(previous.get('published_at'))>_aware(record['published_at']):
+                    continue
+                if (previous.get('data_through_date') and record.get('data_through_date') and
+                    record['data_through_date']<previous['data_through_date']):
+                    continue
             db.execute('INSERT INTO refreshed_tracking VALUES (?,?,?,?) ON CONFLICT(season,entity,category) '
                        'DO UPDATE SET payload_json=excluded.payload_json',
                        (record['season'],record['entity'],record['category'],json.dumps(record)))
     store.set_checkpoint('tracking_refresh_status',{'last_attempt':document.get('last_attempt'),
                          'coverage':document.get('coverage',[]),'existing_records':len(rows),
+                         'source_data_through_date':document.get('source_data_through_date'),
                          'note':'Prior values keep original timestamps when a tracking source is unavailable.'})
     if any(item.get('status')=='collected' for item in document.get('coverage',[])):
         store.feed_success('existing_tracking_refresh','Existing scoped metrics imported; source publication and covered-date fields retain upstream lag.')

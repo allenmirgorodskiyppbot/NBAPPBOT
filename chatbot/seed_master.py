@@ -17,7 +17,7 @@ import openpyxl
 from feeds import canonical_game, canonical_player, canonical_team
 from master import GAME_FIELDS, PLAYER_FIELDS
 
-STAT_FIELDS = ('pts', 'reb', 'ast', 'tpm', 'fga', 'tpa', 'minutes', 'stl', 'blk', 'tov')
+STAT_FIELDS = ('pts', 'reb', 'ast', 'tpm', 'fga', 'tpa', 'minutes', 'stl', 'blk', 'tov', 'fgm','ftm','fta','oreb','dreb','fouls')
 
 
 def _date(value):

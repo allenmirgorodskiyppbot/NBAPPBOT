@@ -101,7 +101,7 @@ class PublishedNBAData:
         import pyarrow.parquet as pq
         from advanced_refresh import normalize_records
         pair_scope=json.loads(Path(__file__).with_name('matchup_refresh_scope.json').read_text())
-        assets=[('Player totals','player_stats_base'),('Team totals','team_stats_base'),
+        assets=[('Player totals','player_stats_base'),('Team totals','team_stats_base'),('Team defense','team_stats_opponent'),
                 ('Passing','player_tracking_passing'),('Rebounding','player_tracking_rebounding'),
                 ('Possessions','player_tracking_possessions'),('Rim','player_tracking_defense')]
         records=[];coverage=[];published=[]

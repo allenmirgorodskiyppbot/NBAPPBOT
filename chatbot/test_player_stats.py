@@ -42,7 +42,7 @@ class PlayerStatsTests(unittest.IsolatedAsyncioTestCase):
             'pts': pts, 'reb': 5, 'ast': 7, 'source': 'FIXTURE SOURCE'})
 
     def test_exact_failed_question_uses_sql_and_reports_missingness_dates_and_sources(self):
-        with patch.dict('os.environ', {'NBA_DATA_SOURCE': 'manual'}):
+        with patch.dict('os.environ', {'NBA_DATA_SOURCE': 'manual','DAILY_NBA_REFRESH':'0'}):
             result = answer_player_question(self.store, QUESTION)
         self.assertIsNotNone(result)
         self.assertFalse(result['ai_used'])
@@ -89,6 +89,25 @@ class PlayerStatsTests(unittest.IsolatedAsyncioTestCase):
         self.add(11, player='Jabari Smith')
         self.assertIn('ambiguous', player_log_command(self.store, 'Smith | points | 5'))
         self.assertIn('Jalen Smith', player_log_command(self.store, 'Jalen Smith | points | 5'))
+
+    def test_full_name_first_name_is_not_mistaken_for_another_players_surname(self):
+        self.add(10, player='James Harden', pts=24)
+        self.add(11, player='LeBron James', pts=99)
+        result = answer_player_question(self.store, 'What is James Harden averaging in 2025-26?')
+        self.assertIsNotNone(result)
+        self.assertFalse(result['ai_used'])
+        self.assertEqual(result['data']['averages']['pts'], 24)
+        self.assertIn('James Harden', result['answer'])
+        self.assertNotIn('LeBron James', result['answer'])
+
+    def test_distinct_named_players_and_comparison_modifiers_still_require_general_query(self):
+        self.add(10, player='James Harden', pts=24)
+        self.add(11, player='LeBron James', pts=99)
+        for question in ['What is James Harden averaging vs LeBron James in 2025-26?',
+                         'What are James Harden and LeBron James averaging in 2025-26?',
+                         'What are James Harden and James averaging in 2025-26?']:
+            with self.subTest(question=question):
+                self.assertIsNone(answer_player_question(self.store, question))
 
     def test_user_text_is_never_interpolated_into_sql(self):
         before = self.store.status()['counts']

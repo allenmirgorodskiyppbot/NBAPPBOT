@@ -59,7 +59,8 @@ STAT_ALIASES = {
 }
 PLAYER_FIELDS = ['game_id', 'player_id', 'player', 'team', 'opponent', 'date',
                  'season', 'season_type', 'appearance_state', 'pts', 'reb', 'ast',
-                 'tpm', 'fga', 'tpa', 'minutes', 'stl', 'blk', 'tov', 'source']
+                 'tpm', 'fga', 'tpa', 'minutes', 'stl', 'blk', 'tov', 'source',
+                 'fgm','ftm','fta','oreb','dreb','fouls','plus_minus','starter']
 GAME_FIELDS = ['id', 'date', 'status', 'home_team', 'away_team', 'home_score',
                'away_score', 'source', 'start_time', 'provider_game_id']
 
@@ -78,6 +79,11 @@ class MasterStore:
                   home_score REAL, away_score REAL, source TEXT, start_time TEXT,
                   provider_game_id TEXT, updated_at TEXT NOT NULL);
                 CREATE INDEX IF NOT EXISTS games_date ON games(date);
+                CREATE TABLE IF NOT EXISTS season_schedule (
+                  id TEXT PRIMARY KEY,season TEXT NOT NULL,date TEXT NOT NULL,
+                  home_team TEXT NOT NULL,away_team TEXT NOT NULL,start_time TEXT,status TEXT,
+                  source TEXT,source_asof TEXT,source_kind TEXT,checked_at TEXT,payload_json TEXT);
+                CREATE INDEX IF NOT EXISTS season_schedule_date ON season_schedule(date);
                 CREATE TABLE IF NOT EXISTS player_games (
                   game_id TEXT NOT NULL, player_id TEXT NOT NULL, player TEXT, team TEXT,
                   opponent TEXT, date TEXT, season TEXT, season_type TEXT, appearance_state TEXT,
@@ -86,6 +92,18 @@ class MasterStore:
                   PRIMARY KEY(game_id,player_id));
                 CREATE INDEX IF NOT EXISTS player_games_date ON player_games(date);
                 CREATE INDEX IF NOT EXISTS player_games_name ON player_games(player);
+                CREATE TABLE IF NOT EXISTS refreshed_tracking (
+                  season TEXT,entity TEXT,category TEXT,payload_json TEXT,
+                  PRIMARY KEY(season,entity,category));
+                CREATE VIEW IF NOT EXISTS season_averages AS
+                SELECT p.player_id,p.player,p.team,p.season,p.season_type,COUNT(*) AS games_played,
+                  AVG(p.pts) AS ppg,COUNT(p.pts) AS points_observed,
+                  AVG(p.reb) AS rpg,COUNT(p.reb) AS rebounds_observed,
+                  AVG(p.ast) AS apg,COUNT(p.ast) AS assists_observed,
+                  AVG(p.minutes) AS minutes_per_game,MAX(p.date) AS through_date
+                FROM player_games p JOIN games g ON g.id=p.game_id
+                WHERE g.status='final' AND LOWER(p.appearance_state)='played'
+                GROUP BY p.player_id,p.player,p.team,p.season,p.season_type;
                 CREATE TABLE IF NOT EXISTS news (
                   id TEXT PRIMARY KEY, title TEXT NOT NULL, url TEXT, published_at TEXT,
                   source TEXT, body TEXT, team TEXT, metadata_json TEXT, updated_at TEXT NOT NULL);
@@ -114,6 +132,55 @@ class MasterStore:
             for field in ['start_time', 'provider_game_id']:
                 if field not in game_columns:
                     db.execute(f'ALTER TABLE games ADD COLUMN {field} TEXT')
+            columns = {row['name'] for row in db.execute('PRAGMA table_info(player_games)')}
+            for field in ['fgm','ftm','fta','oreb','dreb','fouls','plus_minus','starter']:
+                if field not in columns:
+                    db.execute(f'ALTER TABLE player_games ADD COLUMN {field} REAL')
+            db.executescript('''DROP VIEW IF EXISTS season_averages;
+                DROP VIEW IF EXISTS observed_season_averages;
+                CREATE VIEW observed_season_averages AS SELECT p.player_id,p.player,p.season,p.season_type,
+                  GROUP_CONCAT(DISTINCT p.team) AS actual_teams,COUNT(*) AS games_played,
+                  AVG(p.pts) AS ppg,COUNT(p.pts) AS points_observed,
+                  AVG(p.reb) AS rpg,COUNT(p.reb) AS rebounds_observed,
+                  AVG(p.ast) AS apg,COUNT(p.ast) AS assists_observed,
+                  AVG(p.minutes) AS minutes_per_game,AVG(p.tpm) AS threes_per_game,
+                  AVG(p.stl) AS steals_per_game,AVG(p.blk) AS blocks_per_game,AVG(p.tov) AS turnovers_per_game,
+                  1.0*SUM(CASE WHEN p.fgm IS NOT NULL AND p.fga IS NOT NULL THEN p.fgm END)/
+                    NULLIF(SUM(CASE WHEN p.fgm IS NOT NULL AND p.fga IS NOT NULL THEN p.fga END),0) AS fg_pct,
+                  1.0*SUM(CASE WHEN p.tpm IS NOT NULL AND p.tpa IS NOT NULL THEN p.tpm END)/
+                    NULLIF(SUM(CASE WHEN p.tpm IS NOT NULL AND p.tpa IS NOT NULL THEN p.tpa END),0) AS three_pct,
+                  1.0*SUM(CASE WHEN p.ftm IS NOT NULL AND p.fta IS NOT NULL THEN p.ftm END)/
+                    NULLIF(SUM(CASE WHEN p.ftm IS NOT NULL AND p.fta IS NOT NULL THEN p.fta END),0) AS ft_pct,
+                  MAX(p.date) AS through_date
+                FROM player_games p JOIN games g ON g.id=p.game_id
+                WHERE g.status='final' AND LOWER(p.appearance_state)='played'
+                GROUP BY p.player_id,p.player,p.season,p.season_type;
+                CREATE VIEW season_averages AS
+                SELECT o.* FROM observed_season_averages o WHERE NOT EXISTS (
+                  SELECT 1 FROM refreshed_tracking r WHERE r.entity=o.player AND r.season=o.season
+                  AND r.category='Player totals' AND o.season_type='Regular Season'
+                  AND COALESCE(json_extract(r.payload_json,'$.data_through_date'),substr(json_extract(r.payload_json,'$.published_at'),1,10))>=o.through_date
+                  AND json_extract(r.payload_json,'$.gp')>=o.games_played)
+                UNION ALL SELECT
+                  json_extract(payload_json,'$.player_id'),entity,season,'Regular Season','published all-team aggregate',
+                  json_extract(payload_json,'$.gp'),
+                  json_extract(payload_json,'$.fields.pts')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),json_extract(payload_json,'$.gp'),
+                  json_extract(payload_json,'$.fields.reb')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),json_extract(payload_json,'$.gp'),
+                  json_extract(payload_json,'$.fields.ast')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),json_extract(payload_json,'$.gp'),
+                  json_extract(payload_json,'$.fields.minutes')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),
+                  json_extract(payload_json,'$.fields.tpm')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),
+                  json_extract(payload_json,'$.fields.stl')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),
+                  json_extract(payload_json,'$.fields.blk')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),
+                  json_extract(payload_json,'$.fields.tov')/NULLIF(json_extract(payload_json,'$.gp')*1.0,0),
+                  json_extract(payload_json,'$.fields.fgm')/NULLIF(json_extract(payload_json,'$.fields.fga')*1.0,0),
+                  json_extract(payload_json,'$.fields.tpm')/NULLIF(json_extract(payload_json,'$.fields.tpa')*1.0,0),
+                  json_extract(payload_json,'$.fields.ftm')/NULLIF(json_extract(payload_json,'$.fields.fta')*1.0,0),
+                  COALESCE(json_extract(payload_json,'$.data_through_date'),substr(json_extract(payload_json,'$.published_at'),1,10))
+                FROM refreshed_tracking r WHERE category='Player totals'
+                  AND NOT EXISTS (SELECT 1 FROM observed_season_averages o WHERE o.player=r.entity AND o.season=r.season
+                    AND o.season_type='Regular Season' AND
+                    (o.through_date>COALESCE(json_extract(r.payload_json,'$.data_through_date'),substr(json_extract(r.payload_json,'$.published_at'),1,10))
+                     OR o.games_played>json_extract(r.payload_json,'$.gp')));''')
             db.execute("UPDATE metadata SET value='2' WHERE key='schema_version'")
 
     @contextmanager
@@ -168,9 +235,11 @@ class MasterStore:
         stat = dict(stat)
         if not stat.get('player_id') and stat.get('player'):
             stat['player_id'] = 'name:' + normalized_name(stat['player'])
-        for field in set(PLAYER_FIELDS) & set(STAT_COMPONENTS):
+        for field in (set(PLAYER_FIELDS) & set(STAT_COMPONENTS)) | {'fgm','ftm','fta','oreb','dreb','fouls'}:
             if field in stat and stat[field] is not None:
                 stat[field] = finite_number(stat[field], field, 0)
+        if stat.get('plus_minus') is not None:
+            stat['plus_minus'] = finite_number(stat['plus_minus'], 'plus_minus')
         return self._upsert('player_games', PLAYER_FIELDS, ['game_id', 'player_id'], stat, db=db)
 
     def upsert_game_bundle(self, game, rows):
@@ -246,10 +315,15 @@ class MasterStore:
                        'DO UPDATE SET value_json=excluded.value_json', (name, encoded(value)))
 
     def status(self):
+        from season_calendar import current_season
+        checks = self.get_checkpoint('release_checks', {})
         with self.connect() as db:
             return {'schema_version': 2,
                     'knicks_digest': self.get_checkpoint('knicks_digest_status', {}),
-                    'release_checks': self.get_checkpoint('release_checks', {}),
+                    'release_checks': {key: checks[key] for key in ['phase','passed','failed','warnings','checked_at'] if key in checks},
+                    'nightly_nba_refresh': self.get_checkpoint('nightly_nba_refresh', {}),
+                    'tracking_refresh': self.get_checkpoint('tracking_refresh_status', {}),
+                    'season_calendar': self.get_checkpoint('season_calendar:' + current_season(dt.datetime.now(dt.timezone.utc)), {}),
                     'counts': {table: db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
                                for table in ['games', 'player_games', 'news', 'boards', 'entries']},
                     'feeds': [dict(row) for row in db.execute('SELECT * FROM feed_status ORDER BY name')]}
@@ -273,7 +347,7 @@ class MasterStore:
         db = sqlite3.connect(Path(self.path).as_uri() + '?mode=ro', uri=True, timeout=15)
         allowed_actions = {sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ,
                            sqlite3.SQLITE_FUNCTION, sqlite3.SQLITE_RECURSIVE}
-        allowed_tables = {'games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events'}
+        allowed_tables = {'games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events', 'season_schedule', 'season_averages', 'observed_season_averages', 'refreshed_tracking'}
         blocked = {'load_extension', 'readfile', 'writefile', 'randomblob', 'zeroblob', 'printf', 'format'}
         deadline = time.monotonic() + 2
 
