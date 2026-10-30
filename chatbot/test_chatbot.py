@@ -81,26 +81,37 @@ class WorkbookTests(unittest.TestCase):
         def model(request):
             payload = json.loads(request.content)
             seen.append(payload)
-            if len(seen) == 1:
+            if 'format' in payload:
+                context = json.loads(payload['messages'][-1]['content'])
+                query_cards = [card for card in context['evidence'] if card['kind']=='query_result']
+                return httpx.Response(200,json={'message':{'content':json.dumps({
+                    'evidence_ids':[card['id'] for card in query_cards],
+                    'analysis':'The result uses the returned observed sample.' if query_cards else '',
+                    'needs_more_data':not bool(query_cards)})}})
+            if len(seen) == 2:
                 return httpx.Response(200, json={'message': {'role': 'assistant', 'content': '',
                     'tool_calls': [{'function': {'name': 'query_workbook', 'arguments': {
                         'sql': 'SELECT AVG(pts) AS ppg,COUNT(pts) AS n FROM "Player_Games"'}}}]}})
             tool_result = json.loads(payload['messages'][-1]['content'])
             self.assertEqual(tool_result['rows'], [[22.0, 2]])
             return httpx.Response(200, json={'message': {'role': 'assistant',
-                'content': 'Brunson averaged 22 points over 2 observed games. [Player_Games, rows 8–10]'}})
+                'content': 'Brunson averaged 99 points against the Hornets.'}})
 
         real_client = httpx.AsyncClient
         transport = httpx.MockTransport(model)
         with patch.object(app.httpx, 'AsyncClient', side_effect=lambda **kwargs: real_client(transport=transport, **kwargs)):
             result = asyncio.run(app.answer_question(self.store, app.ChatRequest(message='Brunson PPG?'), {}))
-        self.assertIn('22 points', result['answer'])
-        self.assertEqual(result['sources'][0]['tool'], 'query_workbook')
+        self.assertIn('"ppg": 22.0', result['answer'])
+        self.assertIn('"n": 2', result['answer'])
+        self.assertNotIn('99 points',result['answer'])
+        self.assertIn('filters and calculation need review',result['answer'])
+        self.assertEqual(result['sources'][0]['source'], 'query_workbook')
         self.assertFalse(seen[0]['think'])
         self.assertLessEqual(seen[0]['options']['num_predict'], 256)
         self.assertLessEqual(seen[0]['options']['num_ctx'], 8192)
         self.assertNotIn('Fixture snapshot', seen[0]['messages'][0]['content'])
-        self.assertEqual(seen[1]['messages'][-1]['role'], 'tool')
+        self.assertEqual(len(seen),4)
+        self.assertEqual(seen[2]['messages'][-1]['role'], 'tool')
 
     def test_http_password_and_readiness(self):
         async def fake_initialize(application):

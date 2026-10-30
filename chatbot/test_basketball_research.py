@@ -141,22 +141,27 @@ class ResearchTests(unittest.TestCase):
             answer = asyncio.run(app.telegram_answer("Who's OG and Abby's matchup against the Hornets?"))
         self.assertIn('Royce', answer)
 
-    def test_generic_explanation_is_preloaded_with_assignment_and_profile_evidence(self):
+    def test_generic_explanation_uses_scoped_source_facts_and_generated_interpretation(self):
         seen = []
         def reply(request):
             payload = json.loads(request.content)
             seen.append(payload)
-            system = payload['messages'][0]['content']
-            self.assertIn('Royce O', system)
-            self.assertIn('assignment_asof', system)
-            self.assertIn('2026-10-22', system)
-            self.assertIn('16.25', system)
-            return httpx.Response(200,json={'message':{'content':'The workbook pairing is tentative, dated October 22. [Matchup_Assignments, row 8]'}})
+            context = json.loads(payload['messages'][-1]['content'])
+            card = next(c for c in context['evidence'] if c['kind']=='tentative_assignment')
+            self.assertIn('Royce O', card['text'])
+            self.assertIn('2026-10-22', card['text'])
+            self.assertIn('direction unconfirmed', card['text'])
+            self.assertNotIn('tools',payload)
+            return httpx.Response(200,json={'message':{'content':json.dumps({
+                'evidence_ids':[card['id']], 'analysis':'The assignment alone cannot justify changing his scoring projection.',
+                'needs_more_data':False})}})
         real = httpx.AsyncClient
         with patch.object(app.httpx, 'AsyncClient', side_effect=lambda **kw: real(transport=httpx.MockTransport(reply), **kw)):
             answer = asyncio.run(app.answer_question(self.workbook,
                 app.ChatRequest(message='Explain OG’s projected matchup against the Hornets'), {}, self.master))
-        self.assertIn('tentative', answer['answer'])
+        self.assertIn('tentative', answer['answer'].lower())
+        self.assertIn('cannot justify', answer['answer'])
+        self.assertNotIn('ai_failure_category',answer)
         self.assertEqual(len(seen), 1)
 
     def test_player_specific_news_request_passes_only_matching_evidence_to_model(self):

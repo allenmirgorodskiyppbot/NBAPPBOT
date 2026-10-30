@@ -93,6 +93,25 @@ one-per-game injury digest.
 
 ## Research and projections
 
+Generated explanations receive explicitly labeled evidence: all-opponent season
+averages, player-versus-team samples, team production, team defense and tentative
+assignments. Coverage dates, source publication dates and assignment dates remain
+separate. A newer season average never substitutes for an older measured matchup.
+
+The model selects relevant source records and writes its own qualitative
+interpretation. The application renders numerical facts and their scope directly
+from those records, and rejects unverified numerical prose or invalid citations.
+This is a general evidence format, not a table of answers for individual players
+or questions. Qualitative interpretation can still be wrong and requires review.
+Model-written query filters/calculations are explicitly marked for review.
+
+When the needed evidence is available, one compact model request supplies the
+explanation. Simple conversation is also model-generated, with a small prompt;
+there are no canned greeting or thank-you responses. Questions needing additional
+data retain the retrieval tools and use the same final source contract. Invalid
+explanations return labeled saved evidence instead of unchecked numerical claims.
+CPU response time still needs testing on the deployed provider.
+
 Ordinary questions can use player names, unique surnames, supported nicknames,
 team cities/names/codes and common name variations. Recent private conversation
 context supports follow-ups such as “what about Boston?” Direct averages, supported

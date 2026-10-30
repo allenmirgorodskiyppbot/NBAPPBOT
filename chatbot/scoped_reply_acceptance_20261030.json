@@ -1,0 +1,122 @@
+{
+  "scope": "Actual original workbook and previously verified public-source master, read-only. Model result is mocked; no live Akash AI latency or answer quality is established.",
+  "generated_at": "2026-10-30T04:40:00.089751+00:00",
+  "question": "In under 100 words, explain how OG Anunoby’s stored matchup against the Hornets could affect his scoring. Include the source date and clearly label what is uncertain.",
+  "context_chars": 5179,
+  "source_card_checks": "PASS: all-opponent vs opponent sample, source coverage vs publication, assignment date/direction",
+  "cards": [
+    {
+      "id": "E1",
+      "kind": "tentative_assignment",
+      "text": "OG Anunoby–CHA pairing: Royce O'Neale; alternate Grant Williams. Tentative as of 2026-10-22; guarding direction unconfirmed. Source: Matchup_Assignments row 227.",
+      "source": "Matchup_Assignments",
+      "data_through_date": null,
+      "published_at": null,
+      "entity": "OG Anunoby",
+      "opponent": "CHA",
+      "matches_resolved_matchup": true
+    },
+    {
+      "id": "E2",
+      "kind": "player_opponent_sample",
+      "text": "OG Anunoby versus CHA, 2026-27 Regular Season: no matching completed appearances in the stored sample; coverage is incomplete.",
+      "source": "master player games",
+      "data_through_date": null,
+      "published_at": null
+    },
+    {
+      "id": "E3",
+      "kind": "player_all_opponent_averages",
+      "text": "OG Anunoby: 17.6 PPG; 5 games, 2026-27 Regular Season, all opponents. Coverage through 2026-10-28; published 2026-10-29. Source: published NBA Stats extract.",
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_stats_base_2027.parquet",
+      "data_through_date": "2026-10-28",
+      "published_at": "2026-10-29T14:18:20+00:00"
+    },
+    {
+      "id": "E4",
+      "kind": "tracking_Team defense",
+      "text": "CHA team defense: 108.2 points allowed/game, 46.45% opponent FG; 5 games, 2026-27, all opponents. Coverage through 2026-10-28; published 2026-10-29. Source: published NBA Stats extract.",
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/team_stats_opponent_2027.parquet",
+      "data_through_date": "2026-10-28",
+      "published_at": "2026-10-29T14:19:06+00:00"
+    },
+    {
+      "id": "E5",
+      "kind": "tracking_Passing",
+      "text": "OG Anunoby passing: 13 assists total, 185 passes total, 25 potential assists total; 5 games, 2026-27, all opponents. Coverage through 2026-10-28; published 2026-10-29. Source: published NBA Stats extract.",
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_tracking_passing_2027.parquet",
+      "data_through_date": "2026-10-28",
+      "published_at": "2026-10-29T14:18:41+00:00"
+    },
+    {
+      "id": "E6",
+      "kind": "tracking_Possessions",
+      "text": "OG Anunoby possessions: 8.6 possession minutes total, 226 touches total; 5 games, 2026-27, all opponents. Coverage through 2026-10-28; published 2026-10-29. Source: published NBA Stats extract.",
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_tracking_possessions_2027.parquet",
+      "data_through_date": "2026-10-28",
+      "published_at": "2026-10-29T14:18:43+00:00"
+    },
+    {
+      "id": "E7",
+      "kind": "tracking_Rebounding",
+      "text": "OG Anunoby rebounding: 57 rebound chances total, 31 rebounds total; 5 games, 2026-27, all opponents. Coverage through 2026-10-28; published 2026-10-29. Source: published NBA Stats extract.",
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_tracking_rebounding_2027.parquet",
+      "data_through_date": "2026-10-28",
+      "published_at": "2026-10-29T14:18:49+00:00"
+    },
+    {
+      "id": "E8",
+      "kind": "tracking_Rim",
+      "text": "OG Anunoby rim: 15 rim FGA defended total, 11 rim FGM allowed total; 5 games, 2026-27, all opponents. Coverage through 2026-10-28; published 2026-10-29. Source: published NBA Stats extract.",
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_tracking_defense_2027.parquet",
+      "data_through_date": "2026-10-28",
+      "published_at": "2026-10-29T14:18:31+00:00"
+    }
+  ],
+  "mock_model_document": {
+    "evidence_ids": [
+      "E1",
+      "E2",
+      "E3"
+    ],
+    "analysis": "The pairing is tentative. Actual lineup and workload could affect scoring, but this evidence does not quantify that effect.",
+    "needs_more_data": false
+  },
+  "rendered_mock_reply": {
+    "answer": "OG Anunoby–CHA pairing: Royce O'Neale; alternate Grant Williams. Tentative as of 2026-10-22; guarding direction unconfirmed. Source: Matchup_Assignments row 227.\n\nOG Anunoby versus CHA, 2026-27 Regular Season: no matching completed appearances in the stored sample; coverage is incomplete.\n\nOG Anunoby: 17.6 PPG; 5 games, 2026-27 Regular Season, all opponents. Coverage through 2026-10-28; published 2026-10-29. Source: published NBA Stats extract.\n\nThe pairing is tentative. Actual lineup and workload could affect scoring, but this evidence does not quantify that effect.",
+    "sources": [
+      {
+        "tool": "scoped_evidence",
+        "evidence_id": "E1",
+        "population_kind": "tentative_assignment",
+        "source": "Matchup_Assignments",
+        "data_through_date": null,
+        "published_at": null
+      },
+      {
+        "tool": "scoped_evidence",
+        "evidence_id": "E2",
+        "population_kind": "player_opponent_sample",
+        "source": "master player games",
+        "data_through_date": null,
+        "published_at": null
+      },
+      {
+        "tool": "scoped_evidence",
+        "evidence_id": "E3",
+        "population_kind": "player_all_opponent_averages",
+        "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/player_stats_base_2027.parquet",
+        "data_through_date": "2026-10-28",
+        "published_at": "2026-10-29T14:18:20+00:00"
+      }
+    ],
+    "grounding": "Source-selected factual text; AI-generated qualitative interpretation."
+  },
+  "comparison": {
+    "method": "Character lengths, not tokens or measured latency. Old planner envelope is reconstructed with the same current evidence for a controlled comparison.",
+    "old_general_messages_and_tools_chars": 16996,
+    "new_messages_and_schema_chars": 5808,
+    "new_tool_catalog_included": false,
+    "model_calls": 1
+  }
+}

@@ -277,49 +277,158 @@ class ScopedNewsStore:
         return selected[:max(1, min(limit, 100))]
 
 
+def _requested_population(resolved):
+    text = str(resolved.get('original_question') or resolved.get('question') or '')
+    seasons = []
+    for start, end in re.findall(r'\b(20\d{2})[-–](20\d{2}|\d{2})(?![-\d])', text):
+        if (int(start) + 1 == int(end) if len(end) == 4 else (int(start) + 1) % 100 == int(end)):
+            seasons.append(start + '-' + end[-2:])
+    current = dt.datetime.now(EASTERN)
+    year = current.year - (current.month < 7)
+    return {'seasons': list(dict.fromkeys(seasons))[:2] or [f'{year}-{str(year+1)[-2:]}'],
+            'season_type': 'Playoffs' if re.search(r'\bplayoffs?\b', text, re.I) else
+                           'Preseason' if re.search(r'\bpreseason\b', text, re.I) else 'Regular Season',
+            'season_basis': 'explicit request' if seasons else 'current season'}
+
+
+def _context_assignments(store, players, opponent, population):
+    rows = []
+    for row in assignment_rows(store):
+        if row['selected_player'] not in players or opponent and row['opponent_team'] != opponent:
+            continue
+        stamp = str(row.get('assignment_asof') or '')
+        try:
+            date = dt.date.fromisoformat(stamp[:10])
+        except ValueError:
+            continue
+        year = date.year - (date.month < 7)
+        season = f'{year}-{str(year+1)[-2:]}'
+        if season not in population['seasons']:
+            continue
+        # Undeclared phase cannot establish an explicitly requested playoff sample.
+        if population['season_type'] != 'Regular Season' and row.get('season_type') != population['season_type']:
+            continue
+        rows.append({**row, 'season': season, 'population': 'tentative_assignment',
+                     'assignment_date': stamp[:10], 'assignment_direction': 'unspecified',
+                     'season_type': row.get('season_type') or 'Unknown',
+                     'verified_game_day_assignment': False, 'source_sheet': 'Matchup_Assignments'})
+    selected = []
+    for key in dict.fromkeys((r['selected_player'], r['opponent_team'], r['season']) for r in rows):
+        group = [r for r in rows if (r['selected_player'], r['opponent_team'], r['season']) == key]
+        latest = max(str(r['assignment_asof']) for r in group)
+        selected.extend(r for r in group if str(r['assignment_asof']) == latest)
+    return selected[:8]
+
+
+def _player_sample(db, player, season, phase, opponent=None):
+    fields = ('pts', 'reb', 'ast', 'minutes', 'tpm')
+    filters = ["p.player=?", "p.season=?", "p.season_type=?", "g.status='final'",
+               "LOWER(p.appearance_state)='played'", 'p.date<=?']
+    args = [player, season, phase, dt.datetime.now(EASTERN).date().isoformat()]
+    if opponent:
+        filters.append('p.opponent=?'); args.append(opponent)
+    rows = [dict(row) for row in db.execute('SELECT p.* FROM player_games p JOIN games g ON g.id=p.game_id WHERE '
+             + ' AND '.join(filters) + ' ORDER BY p.date DESC,p.game_id DESC', args)]
+    values = {field: [r[field] for r in rows if r.get(field) is not None] for field in fields}
+    return {'entity': player, 'player': player, 'opponent': opponent,
+            'population': 'player_vs_team_whole_games' if opponent else 'all_opponents',
+            'season': season, 'season_type': phase, 'n': len(rows),
+            'observed_counts': {field: len(v) for field, v in values.items()},
+            'averages': {field: sum(v)/len(v) if v else None for field, v in values.items()},
+            'first_date': min((r['date'] for r in rows), default=None),
+            'data_through_date': max((r['date'] for r in rows), default=None),
+            'source_records': [{k: r.get(k) for k in ('game_id', 'date', 'source')} for r in rows[:2]],
+            'source_records_truncated': len(rows) > 2,
+            'coverage_note': 'Stored observations may be incomplete; no matching rows does not prove no such games occurred. Whole-game samples are not measured defender matchups.'}
+
+
+def _summary_scope(db, row, published):
+    value = dict(row)
+    is_published = (value.get('actual_teams') == 'published all-team aggregate' and published
+                    and published.get('season_type') == value['season_type'])
+    value.update(entity=value['player'], population='all_opponents', games=value['games_played'],
+                 population_note='Season averages across all actual opponents, not a named-opponent or named-defender sample.',
+                 data_through_date=value.get('through_date'), published_at=None)
+    if is_published:
+        value.update(published_at=published.get('published_at'), source=published.get('source'),
+                     source_kind='published season totals')
+    else:
+        sample = _player_sample(db, value['player'], value['season'], value['season_type'])
+        value.update(source_kind='stored completed observations', source_records=sample['source_records'],
+                     source_records_truncated=sample['source_records_truncated'])
+    return value
+
+
+def _tracking_context(record):
+    category = record.get('category')
+    population = ('team_points_and_field_goals_allowed_all_opponents' if category == 'Team defense' else
+                  'team_production_all_opponents' if category == 'Team totals' else
+                  'measured_named_pair' if category == 'Named pair' else 'player_tracking_all_opponents')
+    return {**{key: record.get(key) for key in ('entity', 'category', 'season', 'season_type', 'gp', 'fields',
+                                               'data_through_date', 'published_at', 'source')},
+            'population': population}
+
+
 def research_context(store, master, resolved):
-    """Preload relevant evidence so ordinary questions need fewer model tool rounds."""
+    """Retrieve explicitly scoped evidence; dates and populations never substitute."""
     from news_digest import is_promotion
+    population = _requested_population(resolved)
+    opponent = _opponent(resolved, master)
     context = {'resolved_players': resolved['players'], 'resolved_teams': resolved['teams'],
-               'name_resolution_is_not_roster_verification': True,
-               'assignment_projections': assignments_for(store, resolved['players'], _opponent(resolved, master)),
-               'player_sheets': [], 'news': [], 'current_player_statistics': [], 'current_tracking': []}
-    if master is not None and callable(getattr(master,'connect',None)):
-        current=dt.datetime.now(EASTERN);year=current.year-(current.month<7);season=f'{year}-{str(year+1)[-2:]}'
+               'requested_population': population, 'name_resolution_is_not_roster_verification': True,
+               'assignment_projections': _context_assignments(store, resolved['players'], opponent, population),
+               'player_sheets': [], 'news': [], 'current_player_statistics': [],
+               'opponent_player_statistics': [], 'current_tracking': [],
+               'freshness_priority': 'Prefer newer evidence only for the same entity, metric, population, season and phase. Broad season totals never replace opponent samples or tentative assignments. Covered game dates, publication dates and assignment dates are distinct.'}
+    if master is not None and callable(getattr(master, 'connect', None)):
         with master.connect() as db:
-            for player in resolved['players'][:2]:
-                context['current_player_statistics'].extend(dict(row) for row in db.execute(
-                    "SELECT * FROM season_averages WHERE player=? AND season=? AND season_type='Regular Season'",(player,season)))
-                if db.execute("SELECT 1 FROM sqlite_master WHERE name='refreshed_tracking'").fetchone():
-                    context['current_tracking'].extend(json.loads(row[0]) for row in db.execute(
-                        'SELECT payload_json FROM refreshed_tracking WHERE entity=? AND season=? LIMIT 3',(player,season)))
-            for team in resolved['teams'][:2]:
-                if db.execute("SELECT 1 FROM sqlite_master WHERE name='refreshed_tracking'").fetchone():
-                    context['current_tracking'].extend(json.loads(row[0]) for row in db.execute(
-                        "SELECT payload_json FROM refreshed_tracking WHERE entity=? AND season=? AND category IN ('Team totals','Team defense')",(team,season)))
-        context['freshness_priority']='Current master summaries take precedence over the dated workbook snapshot. Tracking records retain their own source timestamps.'
-    for player in resolved['players'][:2]:
-        if player in getattr(store, 'sheets', {}):
-            context['player_sheets'].append(store.read(player, 7, 4))
-    if master is not None and (resolved['players'] or resolved['teams']):
-        for item in ScopedNewsStore(master, resolved).recent_news(limit=10):
-            if is_promotion(item):
-                continue
-            context['news'].append({key: str(item.get(key) or '')[:(180 if key == 'body' else 800 if key == 'url' else 350)]
-                                   for key in ('title', 'body', 'published_at', 'updated_at', 'source', 'url')})
-            if len(context['news']) == 3:
-                break
-    # Original field names, worksheet coordinates and dates remain available.
-    # Drop whole evidence blocks to meet the context bound; never cut JSON midway.
+            tracking_exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='refreshed_tracking'").fetchone()
+            for season in population['seasons']:
+                phase = population['season_type']
+                for player in resolved['players'][:2]:
+                    tracking = ([json.loads(r[0]) for r in db.execute(
+                        'SELECT payload_json FROM refreshed_tracking WHERE entity=? AND season=? ORDER BY category',
+                        (player, season))] if tracking_exists else [])
+                    tracking = [r for r in tracking if r.get('season_type') == phase]
+                    published = next((r for r in tracking if r.get('category') == 'Player totals'), None)
+                    summaries = [dict(r) for r in db.execute(
+                        'SELECT * FROM season_averages WHERE player=? AND season=? AND season_type=?', (player, season, phase))]
+                    context['current_player_statistics'].extend(_summary_scope(db, r, published) for r in summaries)
+                    # Totals already represented by the scoped summary are not repeated.
+                    context['current_tracking'].extend(_tracking_context(r) for r in tracking
+                        if r.get('category') != 'Player totals' or not summaries)
+                    if opponent:
+                        context['opponent_player_statistics'].append(_player_sample(db, player, season, phase, opponent))
+                if tracking_exists:
+                    for team in resolved['teams'][:2]:
+                        context['current_tracking'].extend(_tracking_context(value) for r in db.execute(
+                            "SELECT payload_json FROM refreshed_tracking WHERE entity=? AND season=? AND category IN ('Team totals','Team defense') ORDER BY category", (team, season))
+                            if (value := json.loads(r[0])).get('season_type') == phase)
+    # Raw profile rows are a dated reference; they must not supply a different
+    # requested season/phase merely because the first few sheet rows contain it.
+    if population['season_basis'] == 'current season' and population['season_type'] == 'Regular Season':
+        for player in resolved['players'][:2]:
+            if player in getattr(store, 'sheets', {}):
+                context['player_sheets'].append(store.read(player, 7, 4))
+        if master is not None and (resolved['players'] or resolved['teams']):
+            for item in ScopedNewsStore(master, resolved).recent_news(limit=10):
+                if is_promotion(item):
+                    continue
+                context['news'].append({key: str(item.get(key) or '')[:(180 if key == 'body' else 800 if key == 'url' else 350)]
+                                       for key in ('title', 'body', 'published_at', 'updated_at', 'source', 'url')})
+                if len(context['news']) == 3:
+                    break
+    # Opponent defense supplies more directly relevant matchup context than
+    # optional broad player tracking; keep it earlier when trimming from the end.
+    context['current_tracking'].sort(key=lambda item: item.get('category') != 'Team defense')
+    # Preserve the requested assignment and explicit opponent sample before
+    # optional profiles, news and broad tracking. Whole omitted blocks are marked.
     while len(json.dumps(context, default=str)) > 5500:
-        if context['player_sheets']:
-            context['player_sheets'].pop()
-        elif context['news']:
-            context['news'].pop()
-        elif context['assignment_projections']:
-            context['assignment_projections'].pop()
-        elif context['current_tracking']:
-            context['current_tracking'].pop()
-        else:
+        key = next((key for key in ('player_sheets', 'news', 'current_tracking',
+                   'current_player_statistics', 'opponent_player_statistics', 'assignment_projections') if context[key]), None)
+        if key is None:
             break
+        context[key].pop()
+        omitted = context.setdefault('omitted_evidence', {})
+        omitted[key] = omitted.get(key, 0) + 1
     return context
