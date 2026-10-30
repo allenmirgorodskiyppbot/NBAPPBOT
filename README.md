@@ -4,6 +4,42 @@ This version runs NBA collectors, a durable master dataset, manual PrizePicks li
 analysis, entry grading, private Telegram chat and a local Qwen2.5 3B model on Akash.
 News/statistics services do not depend on the AI model finishing an answer. No OpenAI key is used.
 
+## Consolidated conversational research release
+
+One `SOURCE_REF` update installs the entire current application: the earlier model,
+news, statistics, entry-ledger, conversation-memory and game-day-digest changes are
+included. The bootstrap fetches every required module, preserves `/data`, reuses the
+approved workbook seed and applies additive database migrations. Existing private
+Telegram credentials, chat password and allowlist remain deployment settings.
+
+Shared basketball entity resolution now recognizes stored player names, unique first
+names/surnames, selected common nicknames (OG, KAT and Deuce), team cities/names/codes,
+and strongly matched surname typos. For example, “who is OG and Abby’s matchup against
+the Hornets?” resolves OG Anunoby/Charlotte. Ambiguous names are not silently guessed.
+Short follow-ups can retain the player and change the opponent. This layer is shared
+by matchup, statistical, news and general research paths rather than an OG-only command.
+
+Ordinary assignment questions retrieve the dated `Matchup_Assignments` record directly,
+with the primary/alternate pairing, original Excel row and projection date. The workbook
+does not specify assignment direction, so the answer does not claim who actually guards
+whom. A dated pairing is not a verified current lineup. “Why”/explanation questions use
+the general local model with bounded preloaded assignment, player-profile and relevant
+news evidence, retaining read-only tools for other research. Player-specific news questions
+filter unrelated reports before summarization. Common direct lookups work while the model
+is loading; broader AI answers still depend on CPU inference and source coverage.
+
+After startup the application automatically runs temporary-fixture business checks and
+read-only live database, workbook, backup, RSS, schedule and connection checks. It records
+the results under `release_checks` in `/status` and logs `RELEASE CHECKS`; no manual
+`/selftest` invocation or extra Telegram notification is required. A blocked schedule is a
+visible warning, not a pass. Model readiness is checked, but generated-answer speed/quality
+and actual PrizePicks lines are not claimed tested by these checks.
+
+This release does not restore blocked automatic game statistics, establish complete
+official injury coverage, connect a PrizePicks account, or provide off-provider backups.
+The selected free/manual workflow remains: upload game statistics and PrizePicks lines,
+record entries actually placed, and reconcile the final credited payout.
+
 ## Knicks game-day injury digest
 
 Automatic news delivery now defaults to `NEWS_ALERT_MODE=knicks_gameday`. The bot
