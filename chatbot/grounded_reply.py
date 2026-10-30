@@ -109,7 +109,7 @@ def evidence_cards(context, question=''):
         if not n:
             text+='no matching completed appearances in the stored sample; coverage is incomplete.'
         else:
-            text+=(f"{metric_text(row,metrics,opponent_sample=True)}; {n} stored appearances, "
+            text+=(f"{metric_text(row,metrics,opponent_sample=True)}; {n} stored {'appearance' if n==1 else 'appearances'}, "
                    f"{date(row.get('first_date'))}–{date(row.get('data_through_date'))}; incomplete sample. Source: master player games.")
         add('player_opponent_sample',text,row,'master player games')
     for row in context.get('current_player_statistics',[])[:2]:
@@ -157,6 +157,69 @@ def required_evidence(question,cards):
     return []
 
 
+def prompt_evidence(cards):
+    """Send factual text once; retain full records outside the model prompt.
+
+    Population, source and timestamp labels are already in each card's text.
+    Other metadata remains on the original card for validation and citations.
+    """
+    return [{key: card[key] for key in ('id', 'kind', 'text')} for card in cards]
+
+
+def compact_evidence(cards, question, max_chars=2600):
+    """Choose whole relevant cards for a bounded CPU inference prompt.
+
+    This selects evidence, not an answer. IDs, labels and values are unchanged;
+    callers disclose how many records were omitted and retain the full set for
+    later retrieval. A record that cannot fit is omitted rather than shortened.
+    """
+    if max_chars < 2:
+        return []
+    metrics = set(requested_metrics(question))
+    required = set(required_evidence(question, cards))
+    shooting = bool(metrics & {'pts', 'tpm', 'fg_pct', 'three_pct', 'ft_pct'})
+    defense = bool(re.search(r'\b(?:defen\w*|guard\w*|match\s*ups?)\b', question, re.I))
+
+    def priority(card):
+        kind = card.get('kind', '')
+        if card.get('id') in required:
+            return 0
+        if kind in {'query_result', 'workbook_excerpt', 'experimental_analysis'}:
+            return 1
+        if kind in {'player_opponent_sample', 'player_all_opponent_averages'}:
+            return 2
+        if kind == 'tentative_assignment':
+            return 3
+        if kind == 'tracking_Team defense':
+            return 4 if shooting or defense else None
+        if kind == 'tracking_Passing':
+            return 5 if 'ast' in metrics or re.search(r'\bpass(?:es|ing)?\b', question, re.I) else None
+        if kind == 'tracking_Rebounding':
+            return 5 if 'reb' in metrics else None
+        if kind == 'tracking_Possessions':
+            return 5 if metrics & {'pts', 'minutes', 'tov'} or re.search(r'\b(?:touches|possessions?)\b', question, re.I) else None
+        if kind == 'tracking_Rim':
+            # Rim-only defense must not stand in for overall defended shooting.
+            return 5 if re.search(r'\b(?:rim|paint|interior)\b', question, re.I) else None
+        if kind == 'tracking_Team totals':
+            return 7 if re.search(r'\b(?:team|offen\w*|pace)\b', question, re.I) else None
+        if kind == 'publisher_report':
+            return 4 if re.search(r'\b(?:news|injur\w*|available|availability|lineup|trade\w*)\b', question, re.I) else 6
+        if kind == 'collection_status':
+            return 1 if re.search(r'\b(?:updat\w*|fresh\w*|dataset|status)\b', question, re.I) else 6
+        return 7
+
+    ranked = [(priority(card), index, card) for index, card in enumerate(cards)]
+    ranked = sorted((item for item in ranked if item[0] is not None), key=lambda item: item[:2])
+    selected = []
+    for _, _, card in ranked:
+        candidate = selected + [card]
+        size = len(json.dumps(prompt_evidence(candidate), ensure_ascii=False, separators=(',', ':')))
+        if size <= max_chars:
+            selected.append(card)
+    return selected
+
+
 def reply_schema(cards):
     items={'type':'string'}
     if cards:items['enum']=[c['id'] for c in cards]
@@ -198,10 +261,10 @@ def render_reply(document,cards,required=()):
             'grounding':'Source-selected factual text; AI-generated qualitative interpretation.'}
 
 
-def unverified_reply(cards,required=()):
+def unverified_reply(cards,required=(),failure_message=None):
     selected=[c for c in cards if c['id'] in required]
     selected.extend(c for c in cards if c not in selected)
     selected=selected[:2]
-    return {'answer':'I could not verify the AI explanation.'+(' Here is the saved evidence:\n\n'+'\n\n'.join(c['text'] for c in selected) if selected else ''),
+    return {'answer':(failure_message or 'I could not verify the AI explanation.')+(' Here is the saved evidence:\n\n'+'\n\n'.join(c['text'] for c in selected) if selected else ''),
             'sources':[{'tool':'scoped_evidence','source':c.get('source')} for c in selected],
             'ai_used':False,'ai_failure_category':'grounding_error'}

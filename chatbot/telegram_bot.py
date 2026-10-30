@@ -31,6 +31,38 @@ logging.getLogger('httpcore').setLevel(logging.WARNING)
 log = logging.getLogger('knicks.telegram')
 
 MAX_UPLOAD = 8 * 1024 * 1024
+
+
+def safe_ai_request_details(value):
+    """Expose request performance metadata without model text or private URLs."""
+    if not isinstance(value, dict):
+        return {}
+    safe = {}
+    for key in ('elapsed_seconds', 'model_load_seconds', 'prompt_eval_seconds', 'generation_seconds'):
+        item = value.get(key)
+        if type(item) in (int, float) and math.isfinite(item) and item >= 0:
+            safe[key] = round(item, 3)
+    for key in ('prompt_chars', 'evidence_count', 'omitted_evidence_count', 'prompt_tokens', 'generated_tokens'):
+        item = value.get(key)
+        if type(item) is int and item >= 0:
+            safe[key] = item
+    if type(value.get('cache_hit')) is bool:
+        safe['cache_hit'] = value['cache_hit']
+    enums = {
+        'phase': {'evidence_reply'},
+        'status': {'running', 'needs_retrieval', 'completed', 'cancelled', 'failed'},
+        'finish_reason': {'stop', 'length', 'load'},
+        'failure_category': {'timeout', 'connection_error', 'model_error', 'invalid_model_response',
+                             'empty_model_answer', 'output_limit', 'tool_limit', 'grounding_error', 'internal_error'},
+    }
+    for key, allowed in enums.items():
+        item = value.get(key)
+        if isinstance(item, str) and (item in allowed or
+                key == 'failure_category' and re.fullmatch(r'model_http_[1-5]\d{2}', item)):
+            safe[key] = item
+    return safe
+
+
 BOARD_EXAMPLE = '/board YYYY-MM-DD\nJalen Brunson | points | more | 24.5\nJosh Hart | rebounds | less | 8.5'
 HELP = '''Knicks Research bot
 /today — today’s NBA games
@@ -479,6 +511,8 @@ class TelegramBot:
                 if isinstance(failure, dict):
                     safe['last_failure'] = {key: str(failure[key])[:160] if failure[key] is not None else None
                                             for key in ('category', 'time', 'at') if key in failure}
+                if isinstance(report.get('last_request'), dict):
+                    safe['last_request'] = safe_ai_request_details(report['last_request'])
                 return 'Local AI status:\n' + self._compact(safe)
             except asyncio.CancelledError:
                 raise

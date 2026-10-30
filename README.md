@@ -110,7 +110,13 @@ explanation. Simple conversation is also model-generated, with a small prompt;
 there are no canned greeting or thank-you responses. Questions needing additional
 data retain the retrieval tools and use the same final source contract. Invalid
 explanations return labeled saved evidence instead of unchecked numerical claims.
-CPU response time still needs testing on the deployed provider.
+Timeouts and model-server failures state the actual failure before showing saved
+evidence. Compact prompts carry each selected fact once, with full source metadata
+retained for rendering. Short explanations have a smaller output budget and a
+180-second total request limit, with no automatic retry after a timeout.
+`/ai_status` includes request duration and, when the model returns them, model-load,
+prompt-evaluation and generation timings. CPU response time still needs testing
+on the deployed provider; offline transport tests do not establish live speed.
 
 Ordinary questions can use player names, unique surnames, supported nicknames,
 team cities/names/codes and common name variations. Recent private conversation
@@ -152,6 +158,9 @@ Unchanged analysis can be reused; identical AI requests use a bounded short-live
 cache that invalidates when their relevant data changes. Model prompts, output and
 tool rounds are bounded. `/usage` reports inference requests, cache hits, elapsed
 work and available token counters without exposing credentials.
+Startup loads the model with the same context size used for compact answers before
+reporting ready. Requests keep it resident between conversations while the model
+service remains running, using already-reserved RAM without periodic AI calls.
 
 **Akash credits fund the reserved running lease, not individual Telegram messages
 or local-model tokens.** Reducing unnecessary inference improves response time and

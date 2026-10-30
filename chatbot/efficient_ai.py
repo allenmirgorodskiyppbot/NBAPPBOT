@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import asyncio
 import datetime as dt
 import hashlib
 import json
@@ -63,14 +64,18 @@ def usage_status(store):
                       'These counters measure inference work, not ACT cost. Code efficiency alone does not change the lease price.'}
 
 
-async def efficient_chat(client, payload, store=None, url=None):
+async def efficient_chat(client, payload, store=None, url=None, diagnostics=None):
     # Database identity prevents identical fixture/user contexts from sharing results.
     actual=_store(store)
     identity=str(getattr(actual,'path',getattr(actual,'database_path','no-master')))
     key=hashlib.sha256(json.dumps([identity,data_revision(store),payload],sort_keys=True,default=str).encode()).hexdigest()
     current=time.monotonic()
     cached=_CACHE.get(key)
+    if diagnostics is not None:
+        diagnostics['cache_hit'] = False
     if cached and current-cached[0] < CACHE_SECONDS:
+        if diagnostics is not None:
+            diagnostics['cache_hit'] = True
         _CACHE.move_to_end(key)
         record_usage(store,'cache_hit')
         return json.loads(cached[1])
@@ -79,6 +84,9 @@ async def efficient_chat(client, payload, store=None, url=None):
         response=await client.post((url or os.getenv('OLLAMA_URL','http://model:11434')).rstrip('/')+'/api/chat',json=payload)
         response.raise_for_status()
         body=response.json()
+    except asyncio.CancelledError:
+        record_usage(store,'cancelled_request',time.monotonic()-started)
+        raise
     except Exception:
         record_usage(store,'failed_request',time.monotonic()-started)
         raise
