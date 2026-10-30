@@ -128,18 +128,21 @@ def relevant_reports(store, opponent, now):
 def render_digest(store, game, now, schedule_checked, refresh_ok):
     opponent = game['away_team'] if game['home_team'] == 'NYK' else game['home_team']
     tip = _aware(game['start_time']).astimezone(EASTERN)
-    lines = [f"Knicks game-day injury / roster update — {tip.strftime('%b %d')}",
+    lines = [f"Knicks game-day projections / injury update — {tip.strftime('%b %d')}",
              f"NYK vs {opponent} · tipoff {tip.strftime('%I:%M %p').lstrip('0')} Eastern",
              f"Reports checked: {now.astimezone(EASTERN).strftime('%I:%M %p').lstrip('0')} Eastern"]
     if game.get('using_saved_calendar'):
         lines.append('Using the saved published season calendar; live schedule recheck failed or is unavailable. Tipoff changes may be missed.')
-    with store.connect() as db:
-        boards = db.execute('SELECT id,legs_json FROM boards ORDER BY created_at DESC LIMIT 30').fetchall()
-    saved = next((board['id'] for board in boards if any(
-        leg.get('date') == tip.date().isoformat() and leg.get('team') == 'NYK'
-        for leg in json.loads(board['legs_json']))), None)
-    lines.append(('PrizePicks: today’s lines are saved as board ' + saved + '. Resend them if they change.' if saved else
-                  'PrizePicks reminder: send today’s player lines or a screenshot. I’ll compare the uploaded lines with the saved matchup and workload evidence.'))
+    lines.append('PrizePicks reminder: compare these model targets with the actual offers afterward. '
+                 'No upload is needed to get projections.')
+    try:
+        from independent_picks import build_independent_picks, format_independent_picks
+        projection_report = build_independent_picks(store, date=tip.date().isoformat(), count=4, team='NYK', now=now)
+        projection_text = format_independent_picks(projection_report, compact=True)
+    except Exception:
+        # A research error must not suppress the one scheduled injury briefing.
+        projection_text = 'Independent projections are temporarily unavailable. /picks can retry; no picks were invented.'
+    lines.append(projection_text)
     feeds = store.status()['feeds']
     news_feeds = [f for f in feeds if f['name'].startswith('rss_') or f['name'] in {'espn_news', 'injuries_configured'}]
     fresh = [f for f in news_feeds if not f.get('error') and _aware(f.get('last_success'))
@@ -150,6 +153,13 @@ def render_digest(store, game, now, schedule_checked, refresh_ok):
     elif failures:
         lines.append('Some configured news feeds failed their latest check; coverage is partial. See /status.')
     candidates = relevant_reports(store, opponent, now)
+    source = urlsplit(game.get('source') or SCHEDULE_URL)
+    public_source = source._replace(query='', fragment='').geturl()
+    footer = ['Publisher reports/manual notes; not independently verified or a complete official injury report. '
+              'Roster name matching also uses stored game history. Later changes may occur; /summary remains available on request.',
+              'Schedule checked: ' + str(schedule_checked) + '\nSource: ' + public_source[:250]]
+    # Reserve source/coverage text and a complete projection block before news.
+    news_budget = 3450 - len('\n\n'.join(footer)) - 170
     count = 0
     for item in candidates:
         block = (f"• {_clean(item['title'], 220)}\n"
@@ -159,19 +169,15 @@ def render_digest(store, game, now, schedule_checked, refresh_ok):
         if url:
             block += '\n' + url
         # Leave room for provenance and coverage while keeping one Telegram chunk.
-        if len('\n\n'.join(lines)) + len(block) > 2400 or count == 7:
+        if len('\n\n'.join(lines)) + len(block) > news_budget or count == 5:
             break
         lines.append(block)
         count += 1
-    if not count:
+    if not count and not candidates:
         lines.append('No recent matching Knicks/opponent reports were found in the collected feeds. This does not mean everyone is available.')
     elif len(candidates) > count:
         lines.append(f'{count} of {len(candidates)} matching reports shown; /news has the archive.')
-    lines.append('Publisher reports/manual notes; not independently verified or a complete official injury report. '
-                 'Roster name matching also uses stored game history. Later changes may occur; /summary remains available on request.')
-    source = urlsplit(game.get('source') or SCHEDULE_URL)
-    public_source = source._replace(query='', fragment='').geturl()
-    lines.append('Schedule checked: ' + str(schedule_checked) + '\nSource: ' + public_source[:250])
+    lines.extend(footer)
     return '\n\n'.join(lines)[:3450]
 
 
@@ -349,6 +355,7 @@ def reminder_status(store):
         lines.extend([f"Next game: NYK vs {report.get('opponent', '?')} — " + tip.astimezone(EASTERN).strftime('%b %d, %I:%M %p Eastern'),
                       'Digest time: ' + due.astimezone(EASTERN).strftime('%b %d, %I:%M %p Eastern')])
     if report.get('mode') == 'knicks_gameday':
-        lines.append(f"One digest per Knicks game day, {report.get('minutes_before_tipoff', 60)} minutes before tipoff. "
-                     'News collection continues quietly; /summary is available whenever you ask.')
+        lines.append(f"One digest per Knicks game day, {report.get('minutes_before_tipoff', 60)} minutes before tipoff, "
+                     'with independent projections and collected injury news. Compare target lines with PrizePicks afterward. '
+                     'News collection continues quietly; /picks and /summary are available whenever you ask.')
     return '\n\n'.join(lines)

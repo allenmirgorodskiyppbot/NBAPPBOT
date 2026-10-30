@@ -57,6 +57,20 @@ def _key(leg):
             str(leg.get('stat', '')))
 
 
+def _variant(leg):
+    value = str(leg.get('offer_variant') or 'unknown').strip().lower()
+    return value if value in {'standard', 'goblin', 'demon', 'unknown'} else 'unknown'
+
+
+def _offer_key(leg):
+    return (*_key(leg), _number(leg.get('line')), str(leg.get('side', '')).lower())
+
+
+def _offer_label(value):
+    return {'standard': 'standard offer', 'goblin': 'Goblin offer',
+            'demon': 'Demon offer', 'unknown': 'offer type unverified'}.get(value, 'offer type unverified')
+
+
 def _subject_text(item, player):
     """A name mentioned in another player's report is not its injury subject."""
     title = _clean(item.get('title'), 400)
@@ -100,7 +114,13 @@ def player_availability(news, player, date, now):
         if not explicit_date and re.search(r'\bnext\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
                                            text, re.I):
             continue
-        weekdays = re.findall(r'\b(?:for|on)\s+(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b', text, re.I)
+        day_names = r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)'
+        # Short player headlines commonly say "Out Friday". Prefer the
+        # subject's own headline date; an unrelated weekday in the article body
+        # must not override it. Body-only dates need an explicit game phrase.
+        weekdays = re.findall(r'\b' + day_names + r'\b', status_text, re.I)
+        if not weekdays:
+            weekdays = re.findall(r'\b' + day_names + r"(?:['’]s)?\s+(?:game|matchup)\b", text, re.I)
         if weekdays and any(_DAYS[day.casefold()] != target.weekday() for day in weekdays):
             continue
         publication_day = stamp.astimezone(EASTERN).date() if stamp else wall_date
@@ -315,13 +335,16 @@ def enrich_shortlist(store, report, now=None):
     original = list(report.get('original_legs') or [item.get('leg', {}) for item in report.get('legs', [])])
     news = store.recent_news(200)
     thresholds = defaultdict(set)
+    variants = defaultdict(set)
     for leg in original:
         number = _number(leg.get('line'))
         if number is not None:
             thresholds[_key(leg)].add(number)
+            variants[_offer_key(leg)].add(_variant(leg))
     skipped, usable = [], []
     for item in report.get('legs', report.get('candidates', [])):
         leg = dict(item.get('leg', {}))
+        leg['offer_variant'] = _variant(leg)
         projection = item.get('projection') or {}
         reason = None
         context, event_issue = _event(store, leg, now)
@@ -329,6 +352,8 @@ def enrich_shortlist(store, report, now=None):
             leg['date'] = context['date']
         if event_issue:
             reason = event_issue
+        elif len(variants[_offer_key(item.get('leg', {}))]) > 1:
+            reason = 'Conflicting offer variants for this exact selection; verify the current card.'
         elif len(thresholds[_key(item.get('leg', {}))]) > 1:
             reason = 'Multiple thresholds for this market; confirm the active offer and its terms.'
         elif not item.get('eligible_for_ranking'):
@@ -356,7 +381,8 @@ def enrich_shortlist(store, report, now=None):
                 reason = availability['note']
         if reason:
             skipped.append({'player': leg.get('player'), 'stat': leg.get('stat'),
-                            'side': leg.get('side'), 'line': leg.get('line'), 'reason': _clean(reason, 250)})
+                            'side': leg.get('side'), 'line': leg.get('line'),
+                            'offer_variant': leg['offer_variant'], 'reason': _clean(reason, 250)})
             continue
         standardized = _number(projection.get('standardized_margin'))
         margin = float(projection['selected_side_margin'])
@@ -379,16 +405,20 @@ def enrich_shortlist(store, report, now=None):
     unique_skipped = []
     seen_skips = set()
     for item in skipped:
-        key = (item['player'], item['stat'], item['reason'])
+        key = (item['player'], item['stat'], item['reason'], item['offer_variant'])
         if key not in seen_skips:
             seen_skips.add(key)
             unique_skipped.append(item)
+    adjusted_offers = any(_variant(leg) in {'goblin', 'demon'} for leg in original)
     return {'board_id': report.get('board_id'), 'report_id': report.get('id'),
             'generated_at': now.isoformat(), 'source_report_generated_at': report.get('generated_at'),
             'research_only': True, 'shortlist': selected, 'skipped': unique_skipped,
             'watchlist': _watchlist(store, original, news, now),
+            'has_adjusted_offers': adjusted_offers,
             'notes': ['Experimental comparisons, not validated win probabilities.',
-                      'Current availability and offer/payout terms still need checking; no entry was placed.']}
+                      'Current availability and offer/payout terms still need checking; no entry was placed.'] +
+                     (['Goblin/Demon payouts depend on the actual offer; no universal multiplier is assumed.']
+                      if adjusted_offers else [])}
 
 
 def format_shortlist(data):
@@ -398,14 +428,16 @@ def format_shortlist(data):
     for number, item in enumerate(picks, 1):
         leg = item['leg']
         block = (f"{number}. {_clean(leg['player'], 70)} — {leg['side'].title()} {float(leg['line']):g} "
-                 f"{MARKET_NAMES.get(leg['stat'], leg['stat'])}\nWhy: {_clean(item['reason'], 350)}")
+                 f"{MARKET_NAMES.get(leg['stat'], leg['stat'])} ({_offer_label(_variant(leg))})"
+                 f"\nWhy: {_clean(item['reason'], 350)}")
         if item.get('caution'):
             block += '\nWatch: ' + _clean(item['caution'], 200)
         lines.append(block)
     skipped = [item for item in data.get('skipped', [])
                if item['reason'] != 'The experimental reference does not support this side.']
     for item in skipped[:2 if picks else 3]:
-        lines.append(f"Hold: {_clean(item.get('player'), 70)} {MARKET_NAMES.get(item.get('stat'), item.get('stat', ''))} — "
+        lines.append(f"Hold: {_clean(item.get('player'), 70)} {MARKET_NAMES.get(item.get('stat'), item.get('stat', ''))} "
+                     f"({_offer_label(_variant(item))}) — "
                      + _clean(item['reason'], 180))
     if not picks and not skipped:
         lines.append('No uploaded side has a supported positive projection margin.')
@@ -420,6 +452,8 @@ def format_shortlist(data):
             lines.append(block)
         lines.append('Send those actual offers before I choose More/Less for them.')
     lines.append('Experimental research. Verify availability and offer/payout terms. No entry placed.')
+    if data.get('has_adjusted_offers'):
+        lines.append('Goblin/Demon payouts depend on the actual offer; no universal multiplier is assumed.')
     if data.get('board_id'):
         lines.append('/analyze ' + _clean(data['board_id'], 64))
     text = '\n\n'.join(lines)

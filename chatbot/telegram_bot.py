@@ -78,6 +78,7 @@ HELP = '''Knicks Research bot
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
+/picks [YYYY-MM-DD] [2-6] — own projections and target lines; no upload needed
 /clear — clear this chat's recent conversation context
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
@@ -93,7 +94,9 @@ HELP = '''Knicks Research bot
 /results — results and confirmed profit/loss
 /settle ENTRY_ID PAYOUT [note] — confirm the actual total return shown by PrizePicks
 
-You can also send a question, a CSV/JSON board file, or screenshots. Readable full-game cards are combined into a research shortlist; unclear cards stay out. Both visible More/Less choices are compared. The upload's Eastern date is used unless you caption the image YYYY-MM-DD; it must match a saved game. Send images as files for original quality. Check every displayed line. Available lines are separate from entries actually placed.
+Ask for picks or use /picks to get the bot's own projections and conditional target lines before checking PrizePicks. With no date, it uses the next unstarted saved Knicks game; "tonight" or an explicit date stays on that day. It can return fewer candidates when evidence is insufficient. These are model targets, not observed PrizePicks offers or placed entries.
+
+You can also send a question, a CSV/JSON board file, or screenshots for optional line comparison. Readable full-game cards are combined into a research shortlist; unclear cards stay out. Both visible More/Less choices are compared. The upload's Eastern date is used unless you caption the image YYYY-MM-DD; it must match a saved game. Send images as files for original quality. Check every displayed line. Available lines are separate from entries actually placed.
 
 For the manual-stats fallback, attach a CSV/JSON file with the caption /importstats. A file without that caption is treated as a PrizePicks board. Screenshots stay OCR drafts and never import master statistics automatically. Imported stats are labeled as manual user data. Missing statistics must remain blank, not zero.
 
@@ -127,6 +130,78 @@ def chunks(text: str, size: int = 3500):
                 boundary = newline + 1
         yield text[:boundary]
         text = text[boundary:]
+
+
+def parse_picks_request(text, now=None):
+    """Route explicit research requests; questions about old picks stay in chat.
+
+    The routing only chooses a capability. All players, projections and targets
+    come from the research builder, never from question-specific canned replies.
+    """
+    value = str(text).strip()
+    lower = value.casefold().replace('’', "'")
+    command = re.match(r'^/picks(?:@[a-z0-9_]+)?(?:\s+(.*))?$', lower, re.S)
+    if value.startswith('/') and not command:
+        return None
+    if command:
+        argument = (command.group(1) or '').strip()
+    else:
+        lower = re.sub(r'\bnew york(?:\s+knicks)?\b', 'knicks', lower)
+        quantity = r'(?:[2-6]|two|three|four|five|six)'
+        request_head = (r'^(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?'
+                        r'(?:(?:give|make|generate|find|show|recommend|suggest)|'
+                        r'(?:i\s+)?(?:need|want)|i(?:\s+would|\'d)\s+like)\s+'
+                        r'(?:(?:me|us|your|some|the|a|an|best|own|good|knicks|nyk)\s+)*'
+                        r'(?:' + quantity + r'[ -]legs?\b|(?:' + quantity + r'\s+)?'
+                        r'(?:(?:knicks|nyk)\s+)?(?:picks?|projections?)\b)')
+        intent = re.match(request_head, lower) or re.match(r'^(?:(?:knicks|nyk)\s+)?(?:picks?|projections?)\b', lower)
+        noun = re.search(r'\b(?:picks?|projections?)\b|\b(?:[2-6]|two|three|four|five|six)[ -]leg\b', lower)
+        old = re.search(r'\b(?:why|explain|explanation|previous|last|placed|submitted|won|lost|'
+                        r'winning|losing|settled|results?|these|those|my picks|existing)\b', lower)
+        if not intent or not noun or old:
+            return None
+        # Player-specific questions keep the ordinary research path. This check
+        # concerns request grammar, not a hard-coded list of player names.
+        if re.search(r'\b(?:about|against|versus)\b|\bfor\s+'
+                     r'(?!tonight\b|today\b|tomorrow\b|next\b|the\b|this\b|knicks\b|nyk\b|\d{4}-)[a-z]', lower):
+            return None
+        generic_words = set(('please can could would you give make generate find show recommend suggest '
+            'i need want like me us your some the a an best own good picks pick projections projection '
+            'two three four five six leg legs for on today tonight tomorrow next this game games '
+            'knicks nyk nba now before checking check prizepicks pp with reasons reason brief briefly '
+            'concise and model targets using saved data dataset no uploads screenshots').split())
+        if any(word not in generic_words for word in re.findall(r"[a-z]+", lower)):
+            return None
+        argument = lower
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    today = current.astimezone(ZoneInfo('America/New_York')).date()
+    dates = set(re.findall(r'\b\d{4}-\d{2}-\d{2}\b', argument))
+    relative = set(re.findall(r'\b(?:today|tonight|tomorrow|next)\b', argument))
+    if 'today' in relative:
+        relative.discard('tonight')
+    if len(dates) > 1 or len(relative) > 1 or dates and relative:
+        raise ValueError('Use one date, today, tomorrow, or next for the requested game.')
+    date = None
+    if dates:
+        date = datetime.strptime(next(iter(dates)), '%Y-%m-%d').date().isoformat()
+    elif relative & {'today', 'tonight'}:
+        date = today.isoformat()
+    elif 'tomorrow' in relative:
+        date = (today + timedelta(days=1)).isoformat()
+    without_date = re.sub(r'\b\d{4}-\d{2}-\d{2}\b', '', argument)
+    number_words = {'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6}
+    numbers = [int(n) for n in re.findall(r'\b\d+\b', without_date)]
+    numbers.extend(number_words[n] for n in re.findall(r'\b(?:two|three|four|five|six)\b', without_date))
+    if len(set(numbers)) > 1 or numbers and not 2 <= numbers[0] <= 6:
+        raise ValueError('Request between 2 and 6 distinct-player targets; fewer may be supported.')
+    count = numbers[0] if numbers else 4
+    if command:
+        remaining = re.sub(r'\b(?:\d{4}-\d{2}-\d{2}|\d+|two|three|four|five|six|today|tonight|tomorrow|next)\b', '', argument)
+        if remaining.strip():
+            raise ValueError('Use /picks [YYYY-MM-DD|today|tomorrow|next] [2-6].')
+    return {'date': date, 'count': count, 'team': 'NYK'}
 
 
 def parse_board_document(filename: str, payload: bytes):
@@ -456,6 +531,17 @@ class TelegramBot:
         formatter = getattr(analysis_engine, 'format_analysis', None)
         return formatter(report) if formatter else self._compact(report)
 
+    async def _independent_picks_reply(self, request, chat_id):
+        from independent_picks import build_independent_picks, format_independent_picks
+        typing = asyncio.create_task(self._typing(chat_id))
+        try:
+            await self._refresh_board_news()
+            report = await asyncio.to_thread(build_independent_picks, self.store, **request)
+            return format_independent_picks(report)
+        finally:
+            typing.cancel()
+            await asyncio.gather(typing, return_exceptions=True)
+
     @staticmethod
     def _ocr(payload):
         executable = shutil.which('tesseract')
@@ -613,6 +699,8 @@ class TelegramBot:
         argument = argument.strip()
         if command in {'/start', '/help'}:
             return HELP
+        if command == '/picks':
+            return await self._independent_picks_reply(parse_picks_request(text), message['chat']['id'])
         if command == '/clear':
             with self._db() as db:
                 db.execute('DELETE FROM telegram_conversation WHERE chat_id=?', (message['chat']['id'],))
@@ -773,6 +861,12 @@ class TelegramBot:
             return await self._shortlist_reply(report)
         if command.startswith('/'):
             return 'Unknown command. Use /help to see available commands.'
+        independent_request = parse_picks_request(text)
+        if independent_request is not None:
+            response = await self._independent_picks_reply(independent_request, message['chat']['id'])
+            self._remember(message['chat']['id'], update_id, text)
+            self._remember(message['chat']['id'], update_id, text, response)
+            return response
         if len(text) > 3000:
             raise ValueError('Please keep questions under 3000 characters, or upload a CSV/JSON board.')
         chat_id = message['chat']['id']

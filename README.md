@@ -1,7 +1,8 @@
 # NBAPPBOT — Knicks research and PrizePicks tracking
 
 NBAPPBOT keeps a persistent research dataset, collects relevant NBA news, answers
-basketball questions, and analyzes user-uploaded PrizePicks lines. The chat model
+basketball questions, generates its own projections before any sportsbook upload,
+and can compare those with user-supplied PrizePicks lines. The chat model
 runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
@@ -151,6 +152,33 @@ than manufacture a risky pick from a simple average. These are experimental
 research scenarios, **not calibrated win probabilities or guaranteed advantages**.
 Leg frequencies are not multiplied into a claimed parlay win probability.
 
+## Independent projections before PrizePicks
+
+Ask for picks or use `/picks` to generate research from the existing master without
+uploading any lines. The default is up to four distinct players for the next
+unstarted saved Knicks game. `/picks YYYY-MM-DD 4` requests an explicit game date;
+an already-started date is held instead of being silently treated as pregame.
+The normal game-day digest includes a compact version of this independent research.
+
+Each item gives the bot's own statistical projection, workload/context evidence,
+sample date, and conditional thresholds: **More only at or below** one target, or
+**Less only at or above** another. These numbers are research targets, not claimed
+PrizePicks offers. The target buffer uses at least 0.5, 15% of the projection, or
+25% of the observed p10–p90 scenario spread, rounded outward to half points. This
+is an explicit heuristic, not a calibrated likelihood or a proven betting edge.
+
+The research uses saved same-team regular-season workload and production per
+minute, observed opponent/rest cohorts, freshness and collected availability
+reports. It chooses supported markets and distinct players, rather than adding a
+fourth name simply to reach the requested count. Missing opposing-team data is
+disclosed; a list supported by only one team is not a complete ordinary multi-team
+entry. No board, wager or master-stat record is created by independent research.
+
+Check the targets against the current PrizePicks card, active status and offer terms
+when available. Screenshots and `/board` remain optional ways to compare exact
+offers and record the selections actually placed. Independent research uses no
+additional language-model calls, paid provider, or larger server allocation.
+
 ## PrizePicks and the ledger
 
 PrizePicks lines and account information come from the user; there is no direct
@@ -171,6 +199,10 @@ Eastern day is explicitly disclosed and must match a saved game for the player's
 stored team. Player/market/number confidence, unsupported periods, conflicting
 alternate thresholds and unverified offer terms can prevent a recommendation.
 Verify every displayed image-read line: OCR agreement is not visual verification.
+Goblin and Demon icons are retained by side when readable; their actual payout
+terms still require checking. A special quarters-with-points market is not treated
+as ordinary full-game points. Unclear special cards do not invalidate unrelated
+readable full-game cards.
 
 The shortlist checks saved workload, opponent and schedule evidence plus recent
 collected player news. It reuses a recent news refresh rather than making another
@@ -245,6 +277,7 @@ Useful Telegram commands:
 | `/summary [injuries\|news\|trades]` | Saved sourced reports without waiting for AI |
 | `/playerlog NAME \| points \| 5` | Stored game observations and averages |
 | `/boards`, `/analyze BOARD_ID` | Saved available lines and their research report |
+| `/picks [YYYY-MM-DD] [COUNT]` | Own projections and conditional targets, without an uploaded board |
 | `/newboard` | Start a fresh screenshot set; leave saved boards/entries intact |
 | `/entries`, `/results` | Recorded entries, provisional outcomes and confirmed account results |
 | `/settle ENTRY_ID TOTAL_RETURN [note]` | Reconcile the actual credited return |
@@ -281,3 +314,13 @@ market periods, album/replay handling, alternate offers, event/availability chec
 and isolated saved-master research. Original user screenshots were not available
 in the development workspace, so these checks do not establish extraction accuracy
 on those actual images or deployment performance.
+
+
+The subsequent independent-projections release adds `/picks`, the pregame targets
+and actual-image reader corrections. **460 automated tests passed.** Its separate validation record is
+[here](docs/validation-independent-picks-2026-10-30.json). All four original
+PrizePicks screenshots were then available privately for validation: the reader
+matched all 19 supported card occurrences (17 distinct markets and 29 visible
+sides), including side-specific Standard/Goblin/Demon markers, against independent
+visual inspection. Unsupported quarters-with-points and two-point-attempt markets,
+and cut-off cards, stayed excluded. No original screenshots were published.

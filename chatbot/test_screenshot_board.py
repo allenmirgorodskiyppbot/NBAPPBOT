@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 import unittest
 
-from screenshot_board import extract_screenshot, parse_tsv, read_cards, reconcile_views
+from screenshot_board import extract_screenshot, parse_tsv, read_cards, reconcile_views, _visual_words, _offer_variant
 
 PLAYERS = [{'name': 'Jalen Brunson', 'team': 'NYK'}, {'name': 'Tyrese Maxey', 'team': 'PHI'},
            {'name': 'Karl-Anthony Towns', 'team': 'NYK'}]
@@ -71,6 +71,54 @@ class LayoutReaderTests(unittest.TestCase):
         self.assertFalse(read_cards(words, 500, 500, PLAYERS)['cards'])
         words = card('Jalen Brunson', 30, 100) + [word('Starts in 51:37', 30, 20)]
         self.assertTrue(read_cards(words, 500, 500, PLAYERS)['cards'])
+
+    def test_header_digits_cannot_combine_with_search_icon_on_another_row(self):
+        words = card('Jalen Brunson', 30, 100) + [word('4', 400, 10), word('Q', 30, 45)]
+        self.assertTrue(read_cards(words, 500, 500, PLAYERS)['cards'])
+
+    def test_visible_period_veto_survives_cropped_views_without_header(self):
+        ordinary = read_cards(card('Jalen Brunson', 30, 100), 500, 500, PLAYERS)
+        partial = read_cards(card('Jalen Brunson', 30, 100) + [word('First Half', 30, 20)], 500, 500, PLAYERS)
+        self.assertFalse(reconcile_views([ordinary, ordinary, partial])[0])
+
+    def test_ligature_corroboration_still_requires_one_clear_market_reading(self):
+        strong_words = card('Karl-Anthony Towns', 30, 60, ('1.5', '3P™'), ('More',))
+        weak_words = [dict(w) for w in strong_words]
+        next(w for w in weak_words if w['text'] == '3P™')['confidence'] = 60
+        strong = read_cards(strong_words, 550, 500, PLAYERS)
+        weak = read_cards(weak_words, 550, 500, PLAYERS)
+        self.assertFalse(reconcile_views([weak, weak])[0])
+        accepted = reconcile_views([strong, weak])[0]
+        self.assertEqual([(c['stat'], c['line']) for c in accepted], [('tpm', 1.5)])
+
+    def test_circle_pixels_required_before_removing_a_numeric_control_glyph(self):
+        from PIL import Image, ImageDraw
+        words = [word('2', 40, 62, width=12), word('19.5', 80, 55, width=50)]
+        words[0]['h'], words[1]['h'] = 12, 22
+        plain = Image.new('L', (200, 150), 245)
+        self.assertEqual(len(_visual_words(words, plain)), 2)
+        image = plain.copy(); draw = ImageDraw.Draw(image)
+        draw.ellipse((26, 48, 66, 88), fill=210)
+        draw.rectangle((42, 64, 49, 71), fill=0)
+        self.assertEqual([w['text'] for w in _visual_words(words, image)], ['19.5'])
+
+    def test_decimal_is_recovered_only_when_dot_pixels_exist(self):
+        from PIL import Image, ImageDraw
+        words = [word('17', 20, 20, width=30), word('5', 64, 20, width=15)]
+        for w in words: w['h'] = 30
+        image = Image.new('L', (150, 80), 245)
+        self.assertEqual(len(_visual_words(words, image)), 2)
+        ImageDraw.Draw(image).rectangle((55, 44, 60, 49), fill=0)
+        self.assertEqual([w['text'] for w in _visual_words(words, image)], ['17.5'])
+
+    def test_button_offer_icons_preserve_side_variant_without_inventing_payout(self):
+        from PIL import Image, ImageDraw
+        button = word('More', 10, 30, width=45); button['h'] = 20
+        for color, expected in [((230, 20, 10), 'demon'), ((10, 210, 20), 'goblin'), (None, 'standard')]:
+            image = Image.new('RGB', (200, 100), (20, 20, 30))
+            if color:
+                ImageDraw.Draw(image).rectangle((65, 28, 85, 48), fill=color)
+            self.assertEqual(_offer_variant(image, button, 180), expected)
 
     def test_unknown_player_conflicting_roster_and_missing_sides_abstain(self):
         self.assertFalse(read_cards(card('Unknown Person', 30, 60), 500, 500, PLAYERS)['cards'])

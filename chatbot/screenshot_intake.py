@@ -83,11 +83,15 @@ def resolve_cards(store, extraction, date, roster):
             continue
         opponent = game['away_team'] if player['team'] == game['home_team'] else game['home_team']
         for side in sorted(sides):
+            variants = card.get('offer_variants') or {}
+            variant = variants.get(side, 'unknown') if isinstance(variants, dict) else 'unknown'
+            if variant not in {'standard', 'goblin', 'demon', 'unknown'}:
+                variant = 'unknown'
             legs.append({'player': player['name'], 'team': player['team'], 'opponent': opponent,
                 'game_id': game['id'], 'date': date, 'stat': card['stat'], 'line': card['line'],
                 'side': side, 'period': 'full_game', 'screenshot_unconfirmed': True,
                 'roster_asof': player['roster_asof'], 'line_source': 'screenshot OCR',
-                'offer_terms': 'unverified', 'available_alternative': True})
+                'offer_terms': 'unverified', 'offer_variant': variant, 'available_alternative': True})
     # Apply the same finite-number/stat validation as manual boards, before writes.
     legs = store._legs(legs) if legs else []
     return legs, list(dict.fromkeys(unresolved))[:20]
@@ -138,12 +142,18 @@ def combined_board(store, chat_id, date, now, reset_at=None, reset_update=-1):
             'WHERE chat_id=? AND game_date=? AND created_at>=? AND update_id>? '
             'ORDER BY update_id DESC LIMIT 20', (chat_id, date, cutoff, reset_update)).fetchall()
         unique, unresolved, assumed = {}, [], False
-        for record in records:
-            payload = json.loads(record['payload_json'])
+        payloads = [json.loads(record['payload_json']) for record in records]
+        # An upgraded reader must not inherit cards inferred by an older reader.
+        # Immutable older boards remain available, but current research is built
+        # from the newest upload's reader version only.
+        version = payloads[0].get('reader_version') if payloads else None
+        payloads = [payload for payload in payloads if payload.get('reader_version') == version]
+        for payload in payloads:
             assumed |= payload.get('date_basis') == 'upload_day'
             unresolved.extend(payload.get('unresolved', []))
             for leg in payload.get('legs', []):
-                key = (leg['player'], leg['stat'], leg['line'], leg['side'], leg['date'], leg['game_id'])
+                key = (leg['player'], leg['stat'], leg['line'], leg['side'], leg['date'], leg['game_id'],
+                       leg.get('offer_variant', 'unknown'))
                 unique.setdefault(key, leg)
         legs = [unique[key] for key in sorted(unique)]
         if len(legs) > 100:
@@ -162,5 +172,5 @@ def combined_board(store, chat_id, date, now, reset_at=None, reset_update=-1):
                        (board_id, now.isoformat(), f'screenshot:{chat_id}:{revision}', json.dumps(clean)))
             db.execute('INSERT INTO telegram_screenshot_boards VALUES (?,?,?)', (chat_id, revision, board_id))
     return {'board': store.get_board(board_id), 'unresolved': list(dict.fromkeys(unresolved))[:20],
-            'date_assumed': assumed, 'date': date, 'reused': bool(prior), 'upload_count': len(records),
+            'date_assumed': assumed, 'date': date, 'reused': bool(prior), 'upload_count': len(payloads),
             'market_count': len({(l['player'], l['stat'], l['line'], l['date']) for l in legs})}

@@ -100,6 +100,17 @@ class ScreenshotSessionTests(StoreFixture, unittest.TestCase):
         self.assertEqual(len(bundle['board']['legs']), 4)
         self.assertEqual({leg['line'] for leg in bundle['board']['legs']}, {24.5, 29.5})
 
+    def test_offer_type_is_preserved_per_side_and_conflicting_cards_stay_distinct(self):
+        first = card(); first['offer_variants'] = {'more': 'goblin', 'less': 'demon'}
+        legs, _ = self.save(101, extraction(first))
+        self.assertEqual({leg['side']: leg['offer_variant'] for leg in legs}, {'more': 'goblin', 'less': 'demon'})
+        second = card(); second['offer_variants'] = {'more': 'standard', 'less': 'demon'}
+        self.save(102, extraction(second))
+        bundle = combined_board(self.store, USER, DAY, NOW)
+        self.assertEqual(len(bundle['board']['legs']), 3)
+        self.assertEqual({leg['offer_variant'] for leg in bundle['board']['legs'] if leg['side']=='more'},
+                         {'goblin', 'standard'})
+
     def test_restart_and_duplicate_receipt_reuse_the_same_immutable_board(self):
         self.save(7, extraction(card()))
         first = combined_board(self.store, USER, DAY, NOW)
@@ -109,6 +120,17 @@ class ScreenshotSessionTests(StoreFixture, unittest.TestCase):
         self.assertEqual(first['board']['id'], second['board']['id'])
         self.assertEqual(second['board']['legs'][0]['line'], 24.5)
         self.assertEqual(len(self.store.boards()), 1)
+
+    def test_new_reader_does_not_merge_old_reader_inferences(self):
+        old = extraction(card(line=29.5)); old['reader_version'] = 'old-reader'
+        self.save(200, old)
+        before = combined_board(self.store, USER, DAY, NOW)['board']
+        new = extraction(card(line=24.5)); new['reader_version'] = 'new-reader'
+        self.save(201, new)
+        bundle = combined_board(self.store, USER, DAY, NOW)
+        self.assertEqual(bundle['upload_count'], 1)
+        self.assertEqual({leg['line'] for leg in bundle['board']['legs']}, {24.5})
+        self.assertEqual({leg['line'] for leg in self.store.get_board(before['id'])['legs']}, {29.5})
 
     def test_expiry_reset_and_chat_scope_do_not_reuse_other_uploads(self):
         self.save(8, extraction(card()), now=NOW-dt.timedelta(minutes=31))

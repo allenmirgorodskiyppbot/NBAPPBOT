@@ -122,21 +122,25 @@ def projection_for_leg(store,leg,now):
                  'asof':assignment.get('assignment_asof'),'excel_row':assignment.get('_row'),
                  'status':'Tentative; direction and actual game-day defensive assignment are not confirmed.'}
         reasons.append(f"Dated tentative pairing: {pairing['primary']} / {pairing['alternate']} ({str(pairing['asof'])[:10]}). It informs a conditional research scenario, not a made-up defender adjustment.")
-    more=leg['side']=='more';line=float(leg['line']);edge=(expected-line)*(1 if more else -1)
-    standardized=edge/sd if sd else None
+    # Unpriced research uses the same workload/context model without fabricating
+    # a sportsbook line. Margins only exist after an actual offered side/line.
+    priced=leg.get('line') is not None and leg.get('side') in {'more','less'}
+    edge=(expected-float(leg['line']))*(1 if leg['side']=='more' else -1) if priced else None
+    standardized=edge/sd if sd and edge is not None else None
     volume=[r.get('fga') for r in last5 if r.get('fga') is not None]
     if len(volume)>=3 and leg['stat'] in {'pts','tpm'}:
         reasons.append(f'Recent shot volume: {statistics.fmean(volume):.1f} FGA per observed game ({len(volume)} observations).')
     sample_lag=(dt.date.fromisoformat(cutoff)-dt.date.fromisoformat(recent[0]['date'])).days
     confidence='moderate experimental' if len(recent)>=15 and sample_lag<=7 and not source_news else 'low'
-    aggressive=bool(edge>0 and standardized is not None and standardized>=.15 and signals
+    aggressive=bool(edge is not None and edge>0 and standardized is not None and standardized>=.15 and signals
                     and high-low>max(1,.15*expected) and not source_news and sample_lag<=7)
     return {'available':True,'method':'contextual-scenarios-v2','reference_projection':round(expected,2),
             'projected_minutes':round(minutes,2),'per_minute_baseline':round(baseline_rate,4),
             'minutes_scenarios':{'lower_workload':round(low,2),'reference':round(expected,2),'higher_workload':round(high,2)},
             'empirical_scenario_range':{'p10':round(_quantile(scenario_values,.1),2),'p90':round(_quantile(scenario_values,.9),2),
                 'meaning':'Spread of rescaled historical observations, not a calibrated forecast interval.'},
-            'selected_side_margin':round(edge,2),'standardized_margin':round(standardized,3) if standardized is not None else None,
+            'selected_side_margin':round(edge,2) if edge is not None else None,'standardized_margin':round(standardized,3) if standardized is not None else None,
+            'priced_offer':priced,
             'confidence':confidence,'n':len(recent),'first_date':min(r['date'] for r in recent),'last_date':recent[0]['date'],
             'actual_teams':sorted({r['team'] for r in recent}),'seasons':sorted({r['season'] for r in recent}),
             'opponent':opponent,'calendar':context,'cohorts':cohorts,'tentative_pairing':pairing,

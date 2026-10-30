@@ -84,6 +84,50 @@ class ShortlistTests(unittest.TestCase):
         self.assertIn('Multiple thresholds', result['skipped'][0]['reason'])
         self.assertEqual(len(result['skipped']), 1)
 
+    def test_offer_variant_preserved_and_displayed_without_assumed_multiplier(self):
+        for variant in ('standard', 'goblin', 'demon', 'unknown'):
+            item = candidate()
+            item['leg']['offer_variant'] = variant
+            value = enrich_shortlist(self.store, report(item), NOW)
+            self.assertEqual(len(value['shortlist']), 1, variant)
+            self.assertEqual(value['shortlist'][0]['leg']['offer_variant'], variant)
+            text = format_shortlist(value)
+            self.assertIn({'standard': 'standard offer', 'goblin': 'Goblin offer',
+                           'demon': 'Demon offer', 'unknown': 'offer type unverified'}[variant], text)
+            if variant in {'goblin', 'demon'}:
+                self.assertIn('payouts depend on the actual offer', text)
+                self.assertIn('no universal multiplier', text)
+
+    def test_conflicting_variants_for_exact_same_selection_are_held(self):
+        first, second = candidate(), candidate()
+        first['leg']['offer_variant'] = 'goblin'
+        second['leg']['offer_variant'] = 'demon'
+        value = enrich_shortlist(self.store, report(first, second), NOW)
+        self.assertEqual(value['shortlist'], [])
+        self.assertEqual({item['offer_variant'] for item in value['skipped']}, {'goblin', 'demon'})
+        self.assertTrue(all('Conflicting offer variants' in item['reason'] for item in value['skipped']))
+        text = format_shortlist(value)
+        self.assertIn('Goblin offer', text)
+        self.assertIn('Demon offer', text)
+
+    def test_opposite_sides_can_have_different_offer_variants(self):
+        more = candidate('Karl-Anthony Towns', stat='tov', line=2.5)
+        more['leg']['offer_variant'] = 'goblin'
+        less = candidate('Karl-Anthony Towns', stat='tov', line=2.5, side='less')
+        less['leg']['offer_variant'] = 'demon'
+        value = enrich_shortlist(self.store, report(more, less), NOW)
+        self.assertEqual(len(value['shortlist']), 1)
+        self.assertEqual(value['shortlist'][0]['leg']['offer_variant'], 'goblin')
+        self.assertFalse(any('Conflicting offer variants' in item['reason'] for item in value['skipped']))
+
+    def test_held_variant_remains_visible_when_game_has_started(self):
+        item = candidate()
+        item['leg']['offer_variant'] = 'demon'
+        value = enrich_shortlist(self.store, report(item), NOW + dt.timedelta(hours=2))
+        self.assertEqual(value['shortlist'], [])
+        self.assertEqual(value['skipped'][0]['offer_variant'], 'demon')
+        self.assertIn('Demon offer', format_shortlist(value))
+
     def test_started_calendar_and_stale_workload_are_held(self):
         later = NOW + dt.timedelta(hours=2)
         result = enrich_shortlist(self.store, report(candidate()), later)
@@ -139,6 +183,33 @@ class ShortlistTests(unittest.TestCase):
         self.assertTrue(value['blocked'])
         self.assertIn('unconfirmed timezone', value['note'])
         self.assertFalse(value['reports'][0]['timing_confirmed'])
+
+    def test_bare_headline_weekday_matches_only_target_game_day(self):
+        for status, blocked in (('Out Friday', True), ('Questionable Friday', False)):
+            item = self.news(status=status, published='2026-10-29T18:00:00-04:00',
+                             body="Brunson's status was reported for Friday's game against Philadelphia.")
+            friday = player_availability([item], 'Jalen Brunson', DATE, NOW)
+            self.assertEqual(friday['blocked'], blocked, status)
+            self.assertEqual(len(friday['reports']), 1, status)
+            self.assertEqual(friday['reports'][0]['state'], 'out_report' if blocked else 'uncertain')
+            monday = player_availability([item], 'Jalen Brunson', '2026-11-02', NOW)
+            self.assertEqual(monday['reports'], [], status)
+
+    def test_body_possessive_game_day_without_headline_weekday_is_recognized(self):
+        item = self.news(status='Out', published='2026-10-29T18:00:00-04:00',
+                         body="Brunson has been ruled out of Friday's game against Philadelphia.")
+        self.assertTrue(player_availability([item], 'Jalen Brunson', DATE, NOW)['blocked'])
+        self.assertEqual(player_availability([item], 'Jalen Brunson', '2026-11-02', NOW)['reports'], [])
+
+    def test_subject_weekday_is_not_replaced_by_other_body_weekday(self):
+        item = self.news(status='Out Monday', published='2026-10-29T18:00:00-04:00',
+                         body="Josh Hart may miss Friday's game; Brunson's absence is for Monday.")
+        self.assertEqual(player_availability([item], 'Jalen Brunson', DATE, NOW)['reports'], [])
+        item = self.news(status='Will miss practice Friday', published='2026-10-29T18:00:00-04:00')
+        self.assertFalse(player_availability([item], 'Jalen Brunson', DATE, NOW)['blocked'])
+        item = self.news(player='Josh Hart', status='Out Friday', published='2026-10-29T18:00:00-04:00',
+                         body='Jalen Brunson is a teammate.')
+        self.assertEqual(player_availability([item], 'Jalen Brunson', DATE, NOW)['reports'], [])
 
     def test_other_game_day_teammate_and_negation_do_not_block(self):
         cases = [self.news(status='Ruled out for Saturday'), self.news(status='Not ruled out for Friday'),

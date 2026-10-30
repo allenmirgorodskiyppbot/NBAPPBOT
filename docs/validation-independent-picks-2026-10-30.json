@@ -1,0 +1,64 @@
+{
+  "release": "Independent projections before sportsbook comparison, and verified original-image reader fixes",
+  "base_application_ref": "8fd86b28b0e3f1367b7569a9195d50a59c2edd27",
+  "checked_at": "2026-10-30T23:51:09.160286+00:00",
+  "automated_tests": {
+    "passed": 460,
+    "failed": 0,
+    "seconds": 46.393,
+    "scope": "Full unittest discovery; sandbox-only async heartbeat runner"
+  },
+  "actual_screenshot_validation": {
+    "expected_supported_occurrences": 19,
+    "matched_supported_occurrences": 19,
+    "missing_count": 0,
+    "unexpected_count": 0,
+    "side_mismatch_count": 0,
+    "offer_variant_mismatch_count": 0,
+    "duplicate_count": 0,
+    "exact_match": true,
+    "distinct_supported_markets": 17,
+    "distinct_supported_sides": 29,
+    "reader_version": "card-ocr-v2",
+    "method": "Separate manual visual inspection of all four originals, exact comparison of extracted player/team/stat/threshold/side and side-specific offer type",
+    "original_images_published": false
+  },
+  "independent_research_validation": {
+    "as_of": "2026-10-30T18:40:00-04:00",
+    "elapsed_seconds": 1.253,
+    "original_master_unchanged": true,
+    "before_game_supported_players": 4,
+    "two_team_coverage": false,
+    "known_limit": "Current saved opponent history is insufficient for the eight-observation workload gate; no opponent filler is invented.",
+    "source_data_through_date": "2026-10-28",
+    "next_game_after_tipoff": "2026-11-02",
+    "new_boards_or_entries": false
+  },
+  "deployment": {
+    "all_bootstrap_files_present": true,
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "additional_llm_calls_for_projections": 0
+  },
+  "limits": [
+    "Independent targets are a heuristic buffer around projections, not observed PrizePicks quotes or calibrated win probabilities.",
+    "Only existing dataset entities and supported metrics are considered; insufficient samples, stale sources and relevant reported absences can prevent a complete list.",
+    "Current injury coverage and schedule rechecks remain partial. Real provider timing and post-deployment message delivery require a live check.",
+    "The 17 supported screenshot markets match the supplied originals; this does not guarantee arbitrary future screen layouts.",
+    "Original screenshot and dataset tests were local/read-only or used temporary copies; no actual entry or settlement was created."
+  ],
+  "sha256": {
+    "independent_picks.py": "a015f14e1dfa47af7a79dac6679c42bf78520fab6b155ecf9276639929edb0e3",
+    "test_independent_picks.py": "80bf64c99cfd6d6dac3a5dbe062267246473e2f1115c04bfb70c6cec431b8ddd",
+    "contextual_projection.py": "d615a5d7ede6fdf7a59d1e7e071410515a2e35ac655fb271cba66227ec678c1a",
+    "telegram_bot.py": "ed0a304cdc086f72aed0de19918d29e2ab145c41fa28ded24f239e619fc4b74a",
+    "gameday_digest.py": "425b466fe19aafcba7a39bad59f953c59f86adfe1c258379f788ea855ce65795",
+    "bootstrap.py": "ed28959b02630b240598b0de6f835cfe69123250157cf3fa61100ce638be67af",
+    "test_independent_workflow.py": "8b1c114b5b8c4fe03ddda7526d571d38281fe5d2e22c57871ef00cc3c68688b9",
+    "screenshot_board.py": "1f860b6b2005f71b8d97a284f9515cfbebe516d9ddda42f15d12038da44d748b",
+    "test_screenshot_board.py": "148ffdb8a702be95b5df31f9656d89f3f4218b57a07fce21929733076a9d5804",
+    "screenshot_intake.py": "f724e1fb66898a74209b1edc478d0020d08fe314b7c407462e1cec0da5b352a1",
+    "test_screenshot_intake.py": "3b26945675a26a91d34e85c303b072782ea1c83803eaf24c85e67ac9a40982aa",
+    "board_shortlist.py": "6d55eabeab725488bbc1554fe9e7fc238d9204e6975fb08610bfb2efd35825a8",
+    "test_board_shortlist.py": "58ccec04932368affe565b0fbed6941ef188265aac3728663ac271c5ced4b7f8"
+  }
+}
