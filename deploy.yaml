@@ -19,7 +19,7 @@ services:
     env:
     - NBA_DATA_SOURCE=manual
     - NEWS_SOURCE=rss
-    - SOURCE_REF=7515d586a7abaf41a927b0fb9872cd528cc8dffe
+    - SOURCE_REF=9c0f1ba5a240e6d106d2a8e2fefe5134e5e95c9d
     - DATA_DIR=/data
     - TELEGRAM_BOT_TOKEN=
     - TELEGRAM_ALLOWED_USER_ID=
@@ -38,6 +38,9 @@ services:
     - FEED_CORRECTION_DAYS=3
     - ALERT_TEAMS=NYK
     - NEWS_ALERT_SCOPE=league
+    - NEWS_ALERT_MODE=knicks_gameday
+    - KNICKS_DIGEST_MINUTES_BEFORE=60
+    - KNICKS_SCHEDULE_URL=https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json
     expose:
     - port: 8000
       as: 80
