@@ -21,6 +21,7 @@ MAPS={
  'Possessions':{'TOUCHES':'touches','TIME_OF_POSS':'possession_minutes'},
  'Overall':{'D_FGM':'defended_fgm','D_FGA':'defended_fga'},
  'Less Than 6Ft':{'D_FGM':'rim_defended_fgm','D_FGA':'rim_defended_fga'},
+ 'Rim':{'DEF_RIM_FGM':'rim_defended_fgm','DEF_RIM_FGA':'rim_defended_fga'},
  'Named pair':{'MATCHUP_MIN':'matchup_minutes','PARTIAL_POSS':'partial_possessions','PLAYER_PTS':'player_points',
                'TEAM_PTS':'team_points','MATCHUP_FGM':'fgm','MATCHUP_FGA':'fga','MATCHUP_FG3M':'tpm','MATCHUP_FG3A':'tpa',
                'MATCHUP_FTM':'ftm','MATCHUP_FTA':'fta','MATCHUP_AST':'ast','MATCHUP_TOV':'tov','SFL':'shooting_fouls'}}
@@ -58,14 +59,15 @@ def normalize_records(rows,category,scope,season,pairs=None,team_ids=None):
             entity=ids.get(str(row.get('PLAYER_ID') or row.get('CLOSE_DEF_PERSON_ID'))) or names.get(normalized_name(row.get('PLAYER_NAME','')))
             if not entity:continue
         gp=row.get('GP');fields={}
-        if type(gp) not in (int,float) or not math.isfinite(gp) or gp<0:continue
+        if type(gp) not in (int,float) or not math.isfinite(gp) or gp<=0 or not float(gp).is_integer():continue
         for source,target in MAPS[category].items():
             value=row.get(source)
             if type(value) in (int,float) and math.isfinite(value) and value>=0:fields[target]=value
         if category=='Player totals' and not {'pts','reb','ast','minutes'}<=set(fields):
             continue
         made,attempts=('fgm','fga') if category=='Named pair' else ('defended_fgm','defended_fga') if category=='Overall' else ('rim_defended_fgm','rim_defended_fga')
-        if category in {'Named pair','Overall','Less Than 6Ft'}:
+        if not fields:continue
+        if category in {'Named pair','Overall','Less Than 6Ft','Rim'}:
             if made in fields and attempts in fields:
                 if fields[made]>fields[attempts]:raise ValueError('Tracking makes exceed attempts.')
                 fields['fg_pct_allowed' if category!='Named pair' else 'fg_pct']=fields[made]/fields[attempts] if fields[attempts]>0 else None
@@ -144,20 +146,33 @@ def import_tracking(store,document,now):
             (category not in {'Named pair','Team totals'} and entity not in names)):
             raise ValueError('Unrequested tracking entity.')
         fields=record.get('fields',{})
+        gp=record.get('gp')
+        if type(gp) not in (int,float) or not math.isfinite(gp) or gp<0 or not float(gp).is_integer():
+            raise ValueError('Games played must be finite, nonnegative and integral.')
         allowed=set(MAPS[category].values())|{'fg_pct','fg_pct_allowed'}
         if not set(fields)<=allowed:raise ValueError('Unrequested tracking metric.')
         if any(value is not None and (type(value) not in (int,float) or not math.isfinite(value) or value<0)
                for value in fields.values()):raise ValueError('Invalid tracking numeric value.')
         if record.get('season')!=document.get('season') or record.get('season_type')!='Regular Season':
             raise ValueError('Tracking season/phase does not match its declared population.')
+        for made,attempts in [('fgm','fga'),('tpm','tpa'),('ftm','fta'),('defended_fgm','defended_fga'),('rim_defended_fgm','rim_defended_fga')]:
+            if fields.get(made) is not None and fields.get(attempts) is not None and fields[made]>fields[attempts]:
+                raise ValueError('Tracking made shots exceed their attempts.')
         rows.append(record)
     with store.connect() as db:
         db.execute('CREATE TABLE IF NOT EXISTS refreshed_tracking (season TEXT,entity TEXT,category TEXT,payload_json TEXT,'
                    'PRIMARY KEY(season,entity,category))')
-        db.executemany('INSERT INTO refreshed_tracking VALUES (?,?,?,?) ON CONFLICT(season,entity,category) '
+        for record in rows:
+            prior=db.execute('SELECT payload_json FROM refreshed_tracking WHERE season=? AND entity=? AND category=?',
+                (record['season'],record['entity'],record['category'])).fetchone()
+            if prior and _aware(json.loads(prior[0]).get('published_at'))>_aware(record['published_at']):
+                continue
+            db.execute('INSERT INTO refreshed_tracking VALUES (?,?,?,?) ON CONFLICT(season,entity,category) '
                        'DO UPDATE SET payload_json=excluded.payload_json',
-                       [(r['season'],r['entity'],r['category'],json.dumps(r)) for r in rows])
+                       (record['season'],record['entity'],record['category'],json.dumps(record)))
     store.set_checkpoint('tracking_refresh_status',{'last_attempt':document.get('last_attempt'),
                          'coverage':document.get('coverage',[]),'existing_records':len(rows),
                          'note':'Prior values keep original timestamps when a tracking source is unavailable.'})
+    if any(item.get('status')=='collected' for item in document.get('coverage',[])):
+        store.feed_success('existing_tracking_refresh','Existing scoped metrics imported; source publication and covered-date fields retain upstream lag.')
     return len(rows)

@@ -150,12 +150,14 @@ class PublicCollector:
 
 
 async def main_async(args):
-    today=dt.datetime.now(EASTERN).date()
+    today=dt.datetime.now(EASTERN).date()-dt.timedelta(days=1)
     output=Path(args.output);output.mkdir(parents=True,exist_ok=True)
     failures=0
     async with httpx.AsyncClient(timeout=25,follow_redirects=True,
             headers={'User-Agent':'NBAPPBOT/3.0 personal research'}) as client:
         collector=PublicCollector(client)
+        from mirror_sources import PublishedNBAData
+        mirror=PublishedNBAData(client,collector.now)
         for offset in range(args.days-1,-1,-1):
             day=(today-dt.timedelta(days=offset)).isoformat()
             path=output/(day+'.json')
@@ -164,7 +166,15 @@ async def main_async(args):
             # stat corrections. Older complete snapshots avoid repeated requests.
             if old.get('complete') and offset>2:
                 continue
-            result=await collector.collect(day)
+            try:
+                result=await mirror.day(day)
+            except Exception as error:
+                print('Published data source:',type(error).__name__,flush=True)
+                result=None
+            if result is None:
+                # Direct endpoints were tested and are optional; do not hammer a
+                # known unavailable source just because a public mirror is late.
+                result={'source':None,'errors':[{'source':'published_extract','error_type':'NotPublishedYet'}]}
             if result['source'] is None:
                 failures+=1
                 print(day,'sources unavailable; preserving any prior successful snapshot',flush=True)
@@ -173,8 +183,7 @@ async def main_async(args):
             path.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
             print(day,result['source'],'games',len(result['games']),'players',len(result['player_games']),
                   'complete',result['complete'],flush=True)
-        from advanced_refresh import collect_tracking
-        advanced_ok=await collect_tracking(collector,output)
+        advanced_ok=await mirror.tracking(output)
         print('Existing-statistics source collected:',advanced_ok,flush=True)
     if failures:
         print('Some daily dates could not be collected; no success was fabricated.',flush=True)
