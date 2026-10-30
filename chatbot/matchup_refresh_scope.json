@@ -1,0 +1,3749 @@
+{
+  "policy": "Existing named measured pair definitions only",
+  "pairs": [
+    {
+      "offense_player": "AJ Green",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "AJ Green",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Aaron Gordon",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Aaron Nesmith",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Aaron Nesmith",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Aaron Nesmith",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Aaron Wiggins",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Aaron Wiggins",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Ace Bailey",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Adem Bona",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Adem Bona",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Ajay Mitchell",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Ajay Mitchell",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Al Horford",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Al Horford",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Alex Caruso",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Alex Caruso",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Alex Sarr",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Alex Sarr",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Alex Sarr",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Alperen Sengun",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Alperen Sengun",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Amen Thompson",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Amen Thompson",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Amen Thompson",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Adem Bona"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Al Horford"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Alex Sarr"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Alperen Sengun"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Bam Adebayo"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Bobby Portis Jr."
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Brook Lopez"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Daniel Gafford"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Day'Ron Sharpe"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Deandre Ayton"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Dereck Lively II"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Derik Queen"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Domantas Sabonis"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Donovan Clingan"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Goga Bitadze"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Isaiah Hartenstein"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Isaiah Jackson"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Isaiah Stewart"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Ivica Zubac"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jakob Poeltl"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jalen Duren"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jalen Smith"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jaren Jackson Jr."
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jarrett Allen"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jay Huff"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jaylin Williams"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Joan Beringer"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jock Landale"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Joel Embiid"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Jusuf Nurki\u0107"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Kel'el Ware"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Kevon Looney"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Khaman Maluach"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Kristaps Porzi\u0146\u0123is"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Luke Kornet"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Maxime Raynaud"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Mitchell Robinson"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Moritz Wagner"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Myles Turner"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Naz Reid"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Neemias Queta"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Nikola Joki\u0107"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Nikola Vu\u010devi\u0107"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Onyeka Okongwu"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Oso Ighodaro"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Paul Reed"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Quinten Post"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Robert Williams III"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Rudy Gobert"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Ryan Kalkbrenner"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Steven Adams"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Thomas Bryant"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Trayce Jackson-Davis"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Victor Wembanyama"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Walker Kessler"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Yves Missi"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Zach Collins"
+    },
+    {
+      "offense_player": "Andre Drummond",
+      "defense_player": "Zeke Nnaji"
+    },
+    {
+      "offense_player": "Andrew Nembhard",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Andrew Nembhard",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Andrew Wiggins",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Andrew Wiggins",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Anfernee Simons",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Anfernee Simons",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Anthony Black",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Anthony Black",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Anthony Davis",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Anthony Edwards",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Anthony Edwards",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Ausar Thompson",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Austin Reaves",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Austin Reaves",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Ayo Dosunmu",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Ayo Dosunmu",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Bam Adebayo",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Bam Adebayo",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Ben Sheppard",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Ben Sheppard",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Ben Simmons",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Ben Simmons",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Ben Simmons",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Bennedict Mathurin",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Bennedict Mathurin",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Bilal Coulibaly",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Bilal Coulibaly",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Bilal Coulibaly",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Bobby Portis Jr.",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Bobby Portis Jr.",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Bradley Beal",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Bradley Beal",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Brandin Podziemski",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Brandin Podziemski",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Brandon Ingram",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Brandon Miller",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Brook Lopez",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Brook Lopez",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Bub Carrington",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Bub Carrington",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Buddy Hield",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Buddy Hield",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "CJ McCollum",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Cade Cunningham",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Cade Cunningham",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Cade Cunningham",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Caleb Martin",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Caleb Martin",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Caleb Martin",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Cam Spencer",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Cam Spencer",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Cameron Johnson",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Cameron Johnson",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Caris LeVert",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Cason Wallace",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Cason Wallace",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Cason Wallace",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Cedric Coward",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Cedric Coward",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Chet Holmgren",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Chet Holmgren",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Christian Braun",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Christian Braun",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Christian Braun",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Coby White",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Collin Gillespie",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Collin Gillespie",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Collin Sexton",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Cooper Flagg",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Cooper Flagg",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Daniel Gafford",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Daniel Gafford",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Daniss Jenkins",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Darius Garland",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Darius Garland",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Davion Mitchell",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Davion Mitchell",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Day'Ron Sharpe",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Day'Ron Sharpe",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "De'Aaron Fox",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "De'Aaron Fox",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "De'Andre Hunter",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "De'Andre Hunter",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "De'Anthony Melton",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "De'Anthony Melton",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "DeMar DeRozan",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Deandre Ayton",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Deandre Ayton",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Dejounte Murray",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Dejounte Murray",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Dejounte Murray",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Deni Avdija",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Dennis Schr\u00f6der",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Dennis Schr\u00f6der",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Dereck Lively II",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Dereck Lively II",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Derik Queen",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Derik Queen",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Derrick Jones Jr.",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Derrick Jones Jr.",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Derrick White",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Derrick White",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Derrick White",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Desmond Bane",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Desmond Bane",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Desmond Bane",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Devin Booker",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Devin Vassell",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Devin Vassell",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Dillon Brooks",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Dillon Brooks",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Domantas Sabonis",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Domantas Sabonis",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Donovan Clingan",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Donovan Clingan",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Donovan Mitchell",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Donovan Mitchell",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Donovan Mitchell",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Donte DiVincenzo",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Donte DiVincenzo",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Donte DiVincenzo",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Donte DiVincenzo",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Dorian Finney-Smith",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Dorian Finney-Smith",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Draymond Green",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Dru Smith",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Dru Smith",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Duncan Robinson",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Dylan Harper",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Dylan Harper",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Dyson Daniels",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Dyson Daniels",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Egor D\u00ebmin",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Evan Mobley",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Evan Mobley",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Franz Wagner",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Franz Wagner",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Fred VanVleet",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Fred VanVleet",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "GG Jackson",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Gary Payton II",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Gary Payton II",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Gary Trent Jr.",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Gary Trent Jr.",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Gary Trent Jr.",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Giannis Antetokounmpo",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Goga Bitadze",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Grant Williams",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Grayson Allen",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Grayson Allen",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Harrison Barnes",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Herbert Jones",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Immanuel Quickley",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Immanuel Quickley",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Isaac Okoro",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Isaac Okoro",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Isaiah Collier",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Isaiah Collier",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Isaiah Hartenstein",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Isaiah Hartenstein",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Isaiah Jackson",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Isaiah Jackson",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Isaiah Joe",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Isaiah Joe",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Isaiah Stewart",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Isaiah Stewart",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Ivica Zubac",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Ivica Zubac",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Ja Morant",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Ja'Kobe Walter",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jabari Smith Jr.",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jaden McDaniels",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Jaden McDaniels",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jaime Jaquez Jr.",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jake LaRavia",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Jake LaRavia",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jakob Poeltl",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jakob Poeltl",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Aaron Nesmith"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Alex Caruso"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Amen Thompson"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Andrew Nembhard"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Anthony Black"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Ausar Thompson"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Ben Simmons"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Bilal Coulibaly"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Bub Carrington"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Cade Cunningham"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Caleb Martin"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Cason Wallace"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Christian Braun"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Davion Mitchell"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "De'Aaron Fox"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "De'Anthony Melton"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Dejounte Murray"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Dennis Schr\u00f6der"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Derrick Jones Jr."
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Derrick White"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Dillon Brooks"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Donovan Mitchell"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Donte DiVincenzo"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Dru Smith"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Dyson Daniels"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Gary Payton II"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Gary Trent Jr."
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Herbert Jones"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Isaac Okoro"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Jaden McDaniels"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Jalen Suggs"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Jamal Murray"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Jamal Shead"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Jordan Goodwin"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Josh Green"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Josh Okogie"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Jrue Holiday"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Kentavious Caldwell-Pope"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Keon Ellis"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Kris Dunn"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Luguentz Dort"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Marcus Smart"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Matisse Thybulle"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Max Christie"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Nique Clifford"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Paul George"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Peyton Watson"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Quentin Grimes"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Ryan Rollins"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Scottie Barnes"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Scotty Pippen Jr."
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Sion James"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Stephon Castle"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Terance Mann"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Toumani Camara"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Tre Jones"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "Ty Jerome"
+    },
+    {
+      "offense_player": "Jalen Brunson",
+      "defense_player": "VJ Edgecombe"
+    },
+    {
+      "offense_player": "Jalen Duren",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jalen Duren",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Jalen Green",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Jalen Johnson",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jalen Smith",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jalen Suggs",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Jalen Suggs",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Jalen Williams",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Jalen Williams",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jamal Murray",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Jamal Murray",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Jamal Murray",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Jamal Shead",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Jamal Shead",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Jamal Shead",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "James Harden",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Jarace Walker",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jared McCain",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jaren Jackson Jr.",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jaren Jackson Jr.",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Jaren Jackson Jr.",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jarred Vanderbilt",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jarrett Allen",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jarrett Allen",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Jase Richardson",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jay Huff",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jay Huff",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Jaylen Brown",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Jaylen Brown",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jaylen Wells",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Jaylen Wells",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jaylin Williams",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jaylon Tyson",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Jaylon Tyson",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Jaylon Tyson",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jayson Tatum",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jerami Grant",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jeremiah Fears",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Jimmy Butler III",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Jimmy Butler III",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Joan Beringer",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Joan Beringer",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Jock Landale",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jock Landale",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Joel Embiid",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Joel Embiid",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "John Collins",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jonathan Isaac",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jonathan Kuminga",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jordan Goodwin",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Jordan Goodwin",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Jordan Goodwin",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jordan Poole",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Ajay Mitchell"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Alex Caruso"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Andrew Nembhard"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Anfernee Simons"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Anthony Black"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Ayo Dosunmu"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Ben Simmons"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Bradley Beal"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Brandin Podziemski"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Bub Carrington"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "CJ McCollum"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Cade Cunningham"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Caleb Martin"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Cam Spencer"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Coby White"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Collin Gillespie"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Collin Sexton"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Daniss Jenkins"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Darius Garland"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Davion Mitchell"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Dejounte Murray"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Dennis Schr\u00f6der"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Derrick White"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Donovan Mitchell"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Donte DiVincenzo"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Dru Smith"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Dylan Harper"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Egor D\u00ebmin"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Fred VanVleet"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Gary Payton II"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Immanuel Quickley"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Isaiah Collier"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Jalen Suggs"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Jamal Murray"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Jamal Shead"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Jeremiah Fears"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Jordan Goodwin"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Josh Giddey"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Jrue Holiday"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Kasparas Jaku\u010dionis"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Keon Ellis"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Keyonte George"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Luguentz Dort"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Malik Monk"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Marcus Smart"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Max Christie"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Payton Pritchard"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Quentin Grimes"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Ryan Rollins"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Scoot Henderson"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Scotty Pippen Jr."
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Stephon Castle"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "T.J. McConnell"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Trae Young"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Tre Jones"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Tyrese Maxey"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Tyrese Proctor"
+    },
+    {
+      "offense_player": "Jose Alvarado",
+      "defense_player": "Tyus Jones"
+    },
+    {
+      "offense_player": "Josh Giddey",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Josh Giddey",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Josh Green",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Josh Green",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Josh Green",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "AJ Green"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Ajay Mitchell"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Anfernee Simons"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Ayo Dosunmu"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Ben Sheppard"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Bennedict Mathurin"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Bradley Beal"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Brandin Podziemski"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Buddy Hield"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Cam Spencer"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Collin Gillespie"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Darius Garland"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "De'Aaron Fox"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "DeMar DeRozan"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Desmond Bane"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Dorian Finney-Smith"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Duncan Robinson"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Dylan Harper"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Dyson Daniels"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Franz Wagner"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Fred VanVleet"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Grayson Allen"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Immanuel Quickley"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Isaiah Collier"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Isaiah Joe"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Ja Morant"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Jake LaRavia"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Jalen Green"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Jamal Murray"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Jamal Shead"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "James Harden"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Jaylon Tyson"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Josh Giddey"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Josh Minott"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Keyonte George"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Klay Thompson"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Kon Knueppel"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Kyrie Irving"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "LaMelo Ball"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Luka Don\u010di\u0107"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Malik Monk"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Max Christie"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Michael Porter Jr."
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Payton Pritchard"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Pelle Larsson"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Reed Sheppard"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Sam Hauser"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Scoot Henderson"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Shai Gilgeous-Alexander"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Stephen Curry"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Trae Young"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Tre Johnson"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Trey Murphy III"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Ty Jerome"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Tyler Herro"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Tyrese Haliburton"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Tyrese Maxey"
+    },
+    {
+      "offense_player": "Josh Hart",
+      "defense_player": "Zach LaVine"
+    },
+    {
+      "offense_player": "Josh Minott",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Josh Okogie",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Josh Okogie",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Jrue Holiday",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Jrue Holiday",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Jrue Holiday",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Julian Champagnie",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Julian Champagnie",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Julian Strawther",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Julius Randle",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Jusuf Nurki\u0107",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Jusuf Nurki\u0107",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Adem Bona"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Al Horford"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Alex Sarr"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Alperen Sengun"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Bam Adebayo"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Bobby Portis Jr."
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Brook Lopez"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Chet Holmgren"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Daniel Gafford"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Day'Ron Sharpe"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Deandre Ayton"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Dereck Lively II"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Derik Queen"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Domantas Sabonis"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Donovan Clingan"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Evan Mobley"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Isaiah Hartenstein"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Isaiah Jackson"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Isaiah Stewart"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Ivica Zubac"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Jakob Poeltl"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Jalen Duren"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Jaren Jackson Jr."
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Jarrett Allen"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Jay Huff"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Joan Beringer"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Jock Landale"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Joel Embiid"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Jusuf Nurki\u0107"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Kel'el Ware"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Kevon Looney"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Khaman Maluach"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Kristaps Porzi\u0146\u0123is"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Luke Kornet"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Mark Williams"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Maxime Raynaud"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Mitchell Robinson"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Moritz Wagner"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Myles Turner"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Naz Reid"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Neemias Queta"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Nic Claxton"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Nikola Joki\u0107"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Nikola Vu\u010devi\u0107"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Onyeka Okongwu"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Paul Reed"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Robert Williams III"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Rudy Gobert"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Ryan Kalkbrenner"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Steven Adams"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Trayce Jackson-Davis"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Victor Wembanyama"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Walker Kessler"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Wendell Carter Jr."
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Yves Missi"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Zach Collins"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Zach Edey"
+    },
+    {
+      "offense_player": "Karl-Anthony Towns",
+      "defense_player": "Zeke Nnaji"
+    },
+    {
+      "offense_player": "Kasparas Jaku\u010dionis",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Kawhi Leonard",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Keegan Murray",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Keegan Murray",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Kel'el Ware",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Kel'el Ware",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Kelly Oubre Jr.",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Kentavious Caldwell-Pope",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Kentavious Caldwell-Pope",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Keon Ellis",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Keon Ellis",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Keon Ellis",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Keon Ellis",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Kevin Durant",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Kevin Huerter",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Kevon Looney",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Kevon Looney",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Keyonte George",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Keyonte George",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Khaman Maluach",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Khaman Maluach",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Klay Thompson",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Klay Thompson",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Kon Knueppel",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Kris Dunn",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Kris Dunn",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Kristaps Porzi\u0146\u0123is",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Kristaps Porzi\u0146\u0123is",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Kyle Kuzma",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Kyrie Irving",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Kyshawn George",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "LaMelo Ball",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Lauri Markkanen",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "LeBron James",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Luguentz Dort",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Luguentz Dort",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Luka Don\u010di\u0107",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Luke Kornet",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Luke Kornet",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Malik Monk",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Malik Monk",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Marcus Smart",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Marcus Smart",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Mark Williams",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Matas Buzelis",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Matisse Thybulle",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Matisse Thybulle",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Max Christie",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Max Christie",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Max Christie",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Max Strus",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Max Strus",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Maxime Raynaud",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Maxime Raynaud",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Michael Porter Jr.",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Aaron Nesmith"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Aaron Wiggins"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Ace Bailey"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Amen Thompson"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Andrew Wiggins"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Anthony Edwards"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Austin Reaves"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Bilal Coulibaly"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Brandon Miller"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Cade Cunningham"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Cameron Johnson"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Caris LeVert"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Cason Wallace"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Cedric Coward"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Christian Braun"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Cooper Flagg"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "De'Andre Hunter"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Dejounte Murray"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Derrick Jones Jr."
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Derrick White"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Desmond Bane"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Devin Booker"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Devin Vassell"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Donovan Mitchell"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Donte DiVincenzo"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Franz Wagner"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Gary Trent Jr."
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Isaac Okoro"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Jalen Williams"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Jaylen Brown"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Jaylen Wells"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Jaylon Tyson"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Jimmy Butler III"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Josh Green"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Julian Champagnie"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Kawhi Leonard"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Keegan Murray"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Kelly Oubre Jr."
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Keon Ellis"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Kyshawn George"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Max Strus"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Moses Moody"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Naji Marshall"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Nickeil Alexander-Walker"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Norman Powell"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Paul George"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Pelle Larsson"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Quentin Grimes"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "RJ Barrett"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Ronald Holland II"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Royce O'Neale"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Ryan Dunn"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Shaedon Sharpe"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Tari Eason"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Terance Mann"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Toumani Camara"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "Trey Murphy III"
+    },
+    {
+      "offense_player": "Mikal Bridges",
+      "defense_player": "VJ Edgecombe"
+    },
+    {
+      "offense_player": "Miles Bridges",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "AJ Green"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Aaron Nesmith"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Aaron Wiggins"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Amen Thompson"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Anthony Edwards"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Austin Reaves"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Ben Sheppard"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Ben Simmons"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Bennedict Mathurin"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Bilal Coulibaly"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Buddy Hield"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Caleb Martin"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Cason Wallace"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Cedric Coward"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Christian Braun"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "De'Anthony Melton"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Desmond Bane"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Devin Vassell"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Donte DiVincenzo"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Gary Trent Jr."
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Grayson Allen"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Isaiah Joe"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Ja'Kobe Walter"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Jared McCain"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Jase Richardson"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Jaylen Wells"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Jaylon Tyson"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Jordan Goodwin"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Jordan Poole"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Josh Green"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Josh Okogie"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Jrue Holiday"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Julian Champagnie"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Julian Strawther"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Kentavious Caldwell-Pope"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Keon Ellis"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Kevin Huerter"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Klay Thompson"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Kris Dunn"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Matisse Thybulle"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Max Strus"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Moses Moody"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Naji Marshall"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Nickeil Alexander-Walker"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Nique Clifford"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Norman Powell"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Payton Pritchard"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "RJ Barrett"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Reed Sheppard"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Ryan Dunn"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Sam Hauser"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Sam Merrill"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Shaedon Sharpe"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Sion James"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Terance Mann"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Tim Hardaway Jr."
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "Tre Johnson"
+    },
+    {
+      "offense_player": "Miles McBride",
+      "defense_player": "VJ Edgecombe"
+    },
+    {
+      "offense_player": "Mitchell Robinson",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Mitchell Robinson",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Moritz Wagner",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Moritz Wagner",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Moses Moody",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Moses Moody",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Myles Turner",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Myles Turner",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Naji Marshall",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Naji Marshall",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Naz Reid",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Naz Reid",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Neemias Queta",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Neemias Queta",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Nic Claxton",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Nickeil Alexander-Walker",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Nickeil Alexander-Walker",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Nikola Joki\u0107",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Nikola Joki\u0107",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Nikola Vu\u010devi\u0107",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Nikola Vu\u010devi\u0107",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Nique Clifford",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Nique Clifford",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Noah Clowney",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Norman Powell",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Norman Powell",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Aaron Gordon"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Alex Sarr"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Andrew Wiggins"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Anthony Davis"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Brandon Ingram"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Cameron Johnson"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Chet Holmgren"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Cooper Flagg"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "De'Andre Hunter"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Deni Avdija"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Dillon Brooks"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Dorian Finney-Smith"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Draymond Green"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Evan Mobley"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "GG Jackson"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Giannis Antetokounmpo"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Grant Williams"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Harrison Barnes"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jabari Smith Jr."
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jaden McDaniels"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jaime Jaquez Jr."
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jake LaRavia"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jalen Johnson"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jalen Williams"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jarace Walker"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jaren Jackson Jr."
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jarred Vanderbilt"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jaylen Brown"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jayson Tatum"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jerami Grant"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jimmy Butler III"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "John Collins"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jonathan Isaac"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Jonathan Kuminga"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Julius Randle"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Keegan Murray"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Kevin Durant"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Kyle Kuzma"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Lauri Markkanen"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "LeBron James"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Matas Buzelis"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Miles Bridges"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Noah Clowney"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "P.J. Washington"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Paolo Banchero"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Pascal Siakam"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Patrick Williams"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Paul George"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Peyton Watson"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "RJ Barrett"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Royce O'Neale"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Rui Hachimura"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Saddiq Bey"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Scottie Barnes"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Taurean Prince"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Tobias Harris"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Toumani Camara"
+    },
+    {
+      "offense_player": "OG Anunoby",
+      "defense_player": "Zion Williamson"
+    },
+    {
+      "offense_player": "Onyeka Okongwu",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Onyeka Okongwu",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Oso Ighodaro",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "P.J. Washington",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Paolo Banchero",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Pascal Siakam",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Patrick Williams",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Paul George",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Paul George",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Paul George",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Paul Reed",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Paul Reed",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Payton Pritchard",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Payton Pritchard",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Payton Pritchard",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Pelle Larsson",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Pelle Larsson",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Peyton Watson",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Peyton Watson",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Quentin Grimes",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Quentin Grimes",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Quentin Grimes",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Quinten Post",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "RJ Barrett",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "RJ Barrett",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "RJ Barrett",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Reed Sheppard",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Reed Sheppard",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Robert Williams III",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Robert Williams III",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Ronald Holland II",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Royce O'Neale",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Royce O'Neale",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Rudy Gobert",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Rudy Gobert",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Rui Hachimura",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Ryan Dunn",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Ryan Dunn",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Ryan Kalkbrenner",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Ryan Kalkbrenner",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Ryan Rollins",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Ryan Rollins",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Saddiq Bey",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Sam Hauser",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Sam Hauser",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Sam Merrill",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Scoot Henderson",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Scoot Henderson",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Scottie Barnes",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Scottie Barnes",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Scotty Pippen Jr.",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Scotty Pippen Jr.",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Shaedon Sharpe",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Shaedon Sharpe",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Shai Gilgeous-Alexander",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Sion James",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Sion James",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Stephen Curry",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Stephon Castle",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Stephon Castle",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Steven Adams",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Steven Adams",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "T.J. McConnell",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Tari Eason",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Taurean Prince",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Terance Mann",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Terance Mann",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Terance Mann",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Thomas Bryant",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Tim Hardaway Jr.",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Tobias Harris",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Toumani Camara",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Toumani Camara",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Toumani Camara",
+      "defense_player": "OG Anunoby"
+    },
+    {
+      "offense_player": "Trae Young",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Trae Young",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Trayce Jackson-Davis",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Trayce Jackson-Davis",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Tre Johnson",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Tre Johnson",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Tre Jones",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Tre Jones",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Trey Murphy III",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Trey Murphy III",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "Ty Jerome",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "Ty Jerome",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Tyler Herro",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Tyrese Haliburton",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Tyrese Maxey",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Tyrese Maxey",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Tyrese Proctor",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "Tyus Jones",
+      "defense_player": "Jose Alvarado"
+    },
+    {
+      "offense_player": "VJ Edgecombe",
+      "defense_player": "Jalen Brunson"
+    },
+    {
+      "offense_player": "VJ Edgecombe",
+      "defense_player": "Mikal Bridges"
+    },
+    {
+      "offense_player": "VJ Edgecombe",
+      "defense_player": "Miles McBride"
+    },
+    {
+      "offense_player": "Victor Wembanyama",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Victor Wembanyama",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Walker Kessler",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Walker Kessler",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Wendell Carter Jr.",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Yves Missi",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Yves Missi",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Zach Collins",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Zach Collins",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Zach Edey",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Zach LaVine",
+      "defense_player": "Josh Hart"
+    },
+    {
+      "offense_player": "Zeke Nnaji",
+      "defense_player": "Andre Drummond"
+    },
+    {
+      "offense_player": "Zeke Nnaji",
+      "defense_player": "Karl-Anthony Towns"
+    },
+    {
+      "offense_player": "Zion Williamson",
+      "defense_player": "OG Anunoby"
+    }
+  ],
+  "team_ids": {
+    "1610612765": "DET",
+    "1610612750": "MIN",
+    "1610612761": "TOR",
+    "1610612747": "LAL",
+    "1610612742": "DAL",
+    "1610612756": "PHX",
+    "1610612740": "NOP",
+    "1610612739": "CLE",
+    "1610612752": "NYK",
+    "1610612755": "PHI",
+    "1610612757": "POR",
+    "1610612751": "BKN",
+    "1610612741": "CHI",
+    "1610612738": "BOS",
+    "1610612760": "OKC",
+    "1610612759": "SAS",
+    "1610612748": "MIA",
+    "1610612744": "GSW",
+    "1610612737": "ATL",
+    "1610612753": "ORL",
+    "1610612749": "MIL",
+    "1610612764": "WAS",
+    "1610612766": "CHA",
+    "1610612763": "MEM",
+    "1610612762": "UTA",
+    "1610612754": "IND",
+    "1610612745": "HOU",
+    "1610612746": "LAC",
+    "1610612758": "SAC",
+    "1610612743": "DEN"
+  }
+}

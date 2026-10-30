@@ -57,7 +57,11 @@ class PublicCollector:
             raise RuntimeError('Publisher unavailable during this collection run.')
         await asyncio.sleep(max(0,.35-(time.monotonic()-self.last_request)))
         self.last_request=time.monotonic()
-        response=await self.client.get(url)
+        try:
+            response=await self.client.get(url)
+        except httpx.TimeoutException:
+            self.refused.add(host)
+            raise
         if response.status_code in {401,403,429}:
             self.refused.add(host)
         response.raise_for_status()
@@ -138,7 +142,8 @@ class PublicCollector:
                     return result
                 failures.append({'source':name,'error_type':'IncompleteBoxScores'})
             except Exception as error:
-                failures.append({'source':name,'error_type':type(error).__name__})
+                failures.append({'source':name,'error_type':type(error).__name__,
+                                 'http_status':getattr(getattr(error,'response',None),'status_code',None)})
         return {'schema_version':1,'date':day,'published_at':self.now.isoformat(),
                 'source':None,'expected_games':None,'games':[],'player_games':[],
                 'pending_game_ids':[],'errors':failures,'complete':False}
@@ -163,13 +168,17 @@ async def main_async(args):
             if result['source'] is None:
                 failures+=1
                 print(day,'sources unavailable; preserving any prior successful snapshot',flush=True)
+                print('Source checks:',json.dumps(result.get('errors',[])),flush=True)
                 continue
             path.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
             print(day,result['source'],'games',len(result['games']),'players',len(result['player_games']),
                   'complete',result['complete'],flush=True)
+        from advanced_refresh import collect_tracking
+        advanced_ok=await collect_tracking(collector,output)
+        print('Existing-statistics source collected:',advanced_ok,flush=True)
     if failures:
         print('Some daily dates could not be collected; no success was fabricated.',flush=True)
-    return 1 if failures==args.days else 0
+    return 1 if failures==args.days and not advanced_ok else 0
 
 
 if __name__=='__main__':
