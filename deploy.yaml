@@ -1,4 +1,4 @@
-# Free news scanning + manual statistics. Preserve private credentials and existing /data volume when updating.
+# Free news and previous-day dataset refresh. Preserve credentials and the existing /data volume.
 version: '2.0'
 services:
   chatbot:
@@ -18,8 +18,9 @@ services:
       PY
     env:
     - NBA_DATA_SOURCE=manual
+    - DAILY_NBA_REFRESH=1
     - NEWS_SOURCE=rss
-    - SOURCE_REF=d278a40fcfda3f80658aa4841aebaad647d26b19
+    - SOURCE_REF=a7e6b866bb4cc2ab1a142eaaaee71ace69b22859
     - DATA_DIR=/data
     - TELEGRAM_BOT_TOKEN=
     - TELEGRAM_ALLOWED_USER_ID=
