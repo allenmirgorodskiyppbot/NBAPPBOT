@@ -97,6 +97,9 @@ class WorkbookTests(unittest.TestCase):
         self.assertIn('22 points', result['answer'])
         self.assertEqual(result['sources'][0]['tool'], 'query_workbook')
         self.assertFalse(seen[0]['think'])
+        self.assertLessEqual(seen[0]['options']['num_predict'], 256)
+        self.assertLessEqual(seen[0]['options']['num_ctx'], 8192)
+        self.assertNotIn('Fixture snapshot', seen[0]['messages'][0]['content'])
         self.assertEqual(seen[1]['messages'][-1]['role'], 'tool')
 
     def test_http_password_and_readiness(self):

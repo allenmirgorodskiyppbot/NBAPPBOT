@@ -255,6 +255,22 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
         await self.bot.process_update(update(149, '/selftest'))
         self.assertIn('not configured', self.rows('telegram_outbox')[-1]['text'])
 
+    async def test_playerlog_is_private_and_does_not_invoke_model(self):
+        calls = []
+        def player_log(store, argument):
+            calls.append((store, argument))
+            return 'Fixture direct calculation: average 24.00 points'
+        with patch.dict('sys.modules', {'player_stats': types.SimpleNamespace(player_log_command=player_log)}):
+            self.assertFalse(await self.bot.process_update(update(160, '/playerlog Brunson | pts | 5', user=999)))
+            self.assertFalse(await self.bot.process_update(update(161, '/playerlog Brunson | pts | 5',
+                                                                chat_type='group', chat_id=-100)))
+            await self.bot.process_update(update(162, '/playerlog'))
+            self.assertEqual(calls, [])
+            await self.bot.process_update(update(163, '/playerlog Brunson | pts | 5'))
+        self.assertEqual(calls, [(self.store, 'Brunson | pts | 5')])
+        self.assertEqual(self.received_questions, [])
+        self.assertIn('24.00', self.rows('telegram_outbox')[-1]['text'])
+
     async def test_ai_status_uses_only_safe_local_metadata_and_does_not_call_model(self):
         calls = []
 

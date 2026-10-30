@@ -39,6 +39,7 @@ HELP = '''Knicks Research bot
 /status — feed freshness and bot status
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
+/playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
 /stats <JSON list> — import manually supplied box-score rows
@@ -381,6 +382,11 @@ class TelegramBot:
             return HELP
         if command == '/status':
             return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
+        if command == '/playerlog':
+            if not argument:
+                return 'Use /playerlog Jalen Brunson | points | 5 (optional fourth field: 2026-27).'
+            from player_stats import player_log_command
+            return await asyncio.to_thread(player_log_command, self.store, argument)
         if command == '/selftest':
             if argument:
                 return 'Use /selftest alone. Sample imports and entries stay in temporary test databases.'

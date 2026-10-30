@@ -70,9 +70,9 @@ def run_self_checks(live_master, data_dir, exporter=None):
                 {'player': 'Cade Cunningham', 'team': 'DET', 'stat': 'pts', 'side': 'less',
                  'line': 30.5, 'date': date}]
         entry = fixture.create_entry(legs, 10, 'power', payout_multiplier=3, source='ISOLATED SELFTEST')
-        csv = ('date,player,team,opponent,game_status,appearance_state,minutes,pts\n'
-               f'{date},Jalen Brunson,NYK,DET,final,Played,35,24\n'
-               f'{date},Cade Cunningham,DET,NYK,final,Played,36,25\n').encode()
+        csv = ('date,player,team,opponent,game_status,appearance_state,minutes,pts,season_type\n'
+               f'{date},Jalen Brunson,NYK,DET,final,Played,35,24,Regular Season\n'
+               f'{date},Cade Cunningham,DET,NYK,final,Played,36,25,Regular Season\n').encode()
         rows = parse_stats_document('fixture.csv', csv)
         def import_and_grade():
             result = import_stats(fixture, rows, source='ISOLATED SELFTEST')
@@ -80,6 +80,13 @@ def run_self_checks(live_master, data_dir, exporter=None):
             _require(fixture.get_entry(entry['id'])['provisional_status'] == 'won')
             _require(fixture.get_entry(entry['id'])['actual_payout'] is None)
         check('CSV import and provisional grading', import_and_grade)
+        def player_calculations():
+            from player_stats import answer_player_question
+            report = answer_player_question(fixture, 'List Jalen Brunson last five games and average points.')
+            _require(report is not None and not report['ai_used'])
+            _require(report['data']['averages']['pts'] == 24)
+            _require(date in report['answer'] and '1/1 observed' in report['answer'])
+        check('Direct player logs and arithmetic without AI', player_calculations)
         def reject_bad_import():
             before = fixture.status()['counts']
             invalid = [dict(row) for row in rows]

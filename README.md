@@ -38,6 +38,27 @@ The [model registry](https://ollama.com/library/qwen2.5:3b) documents the model 
 
 ## Test the bot without a live PrizePicks board
 
+Player game logs have a direct read-only path that does not wait for model inference:
+
+```text
+/playerlog Jalen Brunson | points | 5
+/playerlog Jalen Brunson | pra | 10 | 2026-27
+```
+
+Ordinary questions asking for a player's last 1–20 games and averages use the same
+path when their filters are supported, including the five-game Brunson question.
+It includes only final games marked Played, defaults to Regular Season, honors an
+explicit season, and excludes future dates. Missing values remain missing and the
+average uses only observed values. Output includes each game's date, sample size,
+missing count, source, latest stored game date and collection mode. Player-name
+ambiguity is not silently merged. Opponent/date-range/team/comparison filters stay
+with the general query planner rather than being ignored. Calculations run directly
+against the master, not through model-written arithmetic, even while AI is busy.
+General questions now use a bounded workbook catalog instead of the full overview
+and multi-sheet schemas, shorter history/output, and at most three tool rounds.
+This reduces CPU work; complex AI research can still be slow or fail and must be
+verified on the deployed provider. `/playerlog` is available independently.
+
 After applying the latest `SOURCE_REF` in your existing deployment, send `/selftest`
 in your private Telegram chat. It checks imports, invalid-input rejection, final-stat
 corrections, provisional grades, confirmed win/loss accounting, duplicate handling,

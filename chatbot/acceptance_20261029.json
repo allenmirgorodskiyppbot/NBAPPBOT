@@ -7,10 +7,16 @@
     "checksum_preserved": true
   },
   "authentication_and_background_services": "PASS",
+  "direct_player_log": {
+    "status": "PASS",
+    "ai_calls": 0,
+    "elapsed_seconds": 0.0207,
+    "answer": "Jalen Brunson \u2014 last 5 of up to 5 requested stored games played.\nFilter: final games; Played; Regular Season, all stored seasons.\n2026-10-27 vs DET: pts=23\n2026-10-25 vs ORL: pts=28\n2026-10-23 vs BOS: pts=19\n2026-10-20 vs PHI: pts=21\n2026-04-10 vs TOR: pts=29\nAverage pts: 24.00; 5/5 observed, 0 missing (missing values excluded, never zero-filled).\nSample dates: 2026-04-10 through 2026-10-27.\nLatest stored completed player game in this scope: 2026-10-27.\nStatistics mode: manual; updates require uploads.\nSource: workbook:Knicks_2026_27_Completed.xlsx#sha256=02fba50eeda757f140fc7c4fb4a500ca6d565f6646c45481436d2b78db22ba04;sheet=Player_Games;row=2089\nSource: workbook:Knicks_2026_27_Completed.xlsx#sha256=02fba50eeda757f140fc7c4fb4a500ca6d565f6646c45481436d2b78db22ba04;sheet=Player_Games;row=2110\nSource: workbook:Knicks_2026_27_Completed.xlsx#sha256=02fba50eeda757f140fc7c4fb4a500ca6d565f6646c45481436d2b78db22ba04;sheet=Player_Games;row=2111\nStored coverage may be incomplete; these calculations are not a live league-wide feed."
+  },
   "structured_summary_count_dates_links": "PASS (mocked model)",
-  "owner_selftest": "Self-test: 14 passed, 0 failed, 0 warnings.\nPASS: Live database integrity (read-only)\nPASS: Recent successful rss_1\nPASS: Recent successful rss_2\nPASS: Recent successful rss_3\nPASS: Latest live backup integrity (read-only)\nPASS: CSV import and provisional grading\nPASS: Invalid statistics rejected without partial write\nPASS: Corrected final statistics update provisional results\nPASS: Confirmed wins/losses and duplicate-settlement accounting\nPASS: Cited injury digest excludes promotional offers\nPASS: Telegram allowlist, duplicate handling and durable outbox\nPASS: Saved records survive database reopen\nPASS: Backup restores records and confirmed ledger\nPASS: Master Excel export contains imported data\nSample data is confined to temporary databases. Live checks are read-only. AI generation and tomorrow's actual PrizePicks lines are separate tests.\nAI startup phase: ready; model: qwen2.5:3b\nTelegram: not connected",
+  "owner_selftest": "Self-test: 15 passed, 0 failed, 0 warnings.\nPASS: Live database integrity (read-only)\nPASS: Recent successful rss_1\nPASS: Recent successful rss_2\nPASS: Recent successful rss_3\nPASS: Latest live backup integrity (read-only)\nPASS: CSV import and provisional grading\nPASS: Direct player logs and arithmetic without AI\nPASS: Invalid statistics rejected without partial write\nPASS: Corrected final statistics update provisional results\nPASS: Confirmed wins/losses and duplicate-settlement accounting\nPASS: Cited injury digest excludes promotional offers\nPASS: Telegram allowlist, duplicate handling and durable outbox\nPASS: Saved records survive database reopen\nPASS: Backup restores records and confirmed ledger\nPASS: Master Excel export contains imported data\nSample data is confined to temporary databases. Live checks are read-only. AI generation and tomorrow's actual PrizePicks lines are separate tests.\nAI startup phase: ready; model: qwen2.5:3b\nTelegram: not connected",
   "real_master_export_and_backup_restore": "PASS",
   "restart_preserves_seed_and_collected_news": "PASS",
-  "elapsed_seconds": 16.42,
-  "generated_at": "2026-10-29T20:43:23.221861+00:00"
+  "elapsed_seconds": 18.29,
+  "generated_at": "2026-10-30T00:48:15.818892+00:00"
 }

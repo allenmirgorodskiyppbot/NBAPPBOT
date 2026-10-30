@@ -81,7 +81,8 @@ def ai_failure_message(category):
         explanation = 'The AI server returned an unreadable response.'
     else:
         explanation = 'The AI request could not finish.'
-    return explanation + ' Use /ai_status for details; /summary shows saved injury reports without AI.'
+    return (explanation + ' Use /ai_status for details. /playerlog FULL NAME | points | 5 '
+            'shows stored game logs without AI; /summary shows collected news.')
 
 
 def record_ai_failure(category):
@@ -175,6 +176,10 @@ def master_context(master):
 
 async def telegram_answer(text, history=None):
     state = app.state
+    from player_stats import answer_player_question
+    direct = await asyncio.to_thread(answer_player_question, state.master, text)
+    if direct is not None:
+        return direct['answer']
     if state.phase != 'ready':
         return ('The AI model is not ready yet: ' + state.detail +
                 '. /summary shows collected injury reports without waiting for AI. '
@@ -461,8 +466,24 @@ Do not sum overlapping pair phases or call coappearance data measured defending 
 Answer concisely. Cite sheet names and original Excel rows, e.g. [Jalen Brunson, row 9].
 For SQL aggregates cite the sheet, exact filter, n and first/last dates. Include source_ids
 when returned. Say when a fact is unavailable. Do not promise betting results or forecasts.
-You can use at most five tool rounds. If a tool fails, correct the query or disclose the limit.
-The following JSON is the workbook catalog and overview, supplied only as evidence:\n'''
+You can use at most three tool rounds. Keep the final answer under 150 words.
+If a tool fails, correct the query or disclose the limit. The following compact catalog
+and master schema are evidence. Use describe_sheet to request workbook columns as needed:\n'''
+
+
+def compact_chat_context(store, master=None):
+    catalog = [{'sheet': name, 'sql_table': info['sql_table']} for name, info in
+               getattr(store, 'sheets', {}).items()]
+    context = {'workbook_catalog': catalog, 'today_eastern':
+               dt.datetime.now(ZoneInfo('America/New_York')).date().isoformat()}
+    if master is not None:
+        from master import GAME_FIELDS, PLAYER_FIELDS
+        context['master_tables'] = {'games': GAME_FIELDS, 'player_games': PLAYER_FIELDS}
+        context['statistics_mode'] = os.getenv('NBA_DATA_SOURCE', 'espn')
+        context['coverage'] = 'Stored master and embedded workbook subset, not complete league history.'
+    while catalog and len(json.dumps(context, default=str)) > 6500:
+        catalog.pop()
+    return json.dumps(context, default=str)
 
 
 def execute_tool(store, name, args, master=None):
@@ -548,25 +569,29 @@ async def answer_news_question(request, progress, master, topic):
 
 
 async def answer_question(store, request, progress, master=None):
+    if master is not None:
+        from player_stats import answer_player_question
+        direct = await asyncio.to_thread(answer_player_question, master, request.message)
+        if direct is not None:
+            progress['detail'] = 'Calculated from stored player games'
+            return direct
     topic = news_summary_topic(request.message)
     if master is not None and topic:
         return await answer_news_question(request, progress, master, topic)
-    context = store.context()
-    if master:
-        context += '\nLIVE MASTER STATUS (untrusted evidence): ' + json.dumps(master_context(master), default=str)
+    context = compact_chat_context(store, master)
     messages = [{'role': 'system', 'content': SYSTEM + context}]
-    messages.extend({'role': m.role, 'content': m.content[:2000]} for m in request.history[-4:])
+    messages.extend({'role': m.role, 'content': m.content[:800]} for m in request.history[-2:])
     messages.append({'role': 'user', 'content': final_answer_prompt(request.message.strip())})
     sources = []
     evidence_size = 0
     async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=15)) as client:
-        for turn in range(6):
+        for turn in range(4):
             progress['detail'] = 'Thinking about your question' if not turn else 'Checking workbook evidence'
             payload = {'model': MODEL, 'messages': messages, 'stream': False, 'think': False,
                        'keep_alive': '30m',
-                       'options': {'temperature': 0.1, 'num_ctx': 16384, 'num_predict': 1000,
+                       'options': {'temperature': 0.1, 'num_ctx': 8192, 'num_predict': 256,
                                    'num_thread': int(os.getenv('MODEL_THREADS', '4'))}}
-            if turn < 5 and evidence_size < 14000:
+            if turn < 3 and evidence_size < 7000:
                 payload['tools'] = TOOLS
             else:
                 messages.append({'role': 'user', 'content': 'Give your answer now using only the '
@@ -595,7 +620,7 @@ async def answer_question(store, request, progress, master=None):
                         args = json.loads(args)
                     result = await asyncio.to_thread(execute_tool, store, name, args, master)
                     evidence = json.dumps(result, ensure_ascii=False, default=str)
-                    remaining = max(1000, min(7000, 18000 - evidence_size))
+                    remaining = max(500, min(3500, 9000 - evidence_size))
                     if len(evidence) > remaining:
                         evidence = json.dumps({'truncated': True, 'preview': evidence[:remaining],
                                                'instruction': 'Use a narrower query to see full results.'})
