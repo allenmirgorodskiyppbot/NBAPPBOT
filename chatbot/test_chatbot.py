@@ -82,7 +82,8 @@ class WorkbookTests(unittest.TestCase):
             payload = json.loads(request.content)
             seen.append(payload)
             if 'format' in payload:
-                context = json.loads(payload['messages'][-1]['content'])
+                context = next((json.loads(m['content']) for m in payload['messages']
+                    if m['content'].startswith('{"required_evidence_ids"')), {'evidence': []})
                 query_cards = [card for card in context['evidence'] if card['kind']=='query_result']
                 return httpx.Response(200,json={'message':{'content':json.dumps({
                     'evidence_ids':[card['id'] for card in query_cards],

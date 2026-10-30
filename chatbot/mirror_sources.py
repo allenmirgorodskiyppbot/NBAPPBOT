@@ -11,6 +11,7 @@ import datetime as dt
 import io
 import json
 import email.utils
+import hashlib
 from pathlib import Path
 
 import httpx
@@ -22,6 +23,35 @@ from nba_daily_export import validate_final
 REPO='sportsdataverse/sportsdataverse-data'
 CSV_TAG='espn_nba_player_boxscores'
 STATS_TAG='nba_stats_leaguedash'
+
+
+def tracking_coverage(record, previous):
+    """A different game's publication cannot date an unchanged tracking record.
+
+    These Parquet extracts report cumulative statistics and a publication time,
+    but no covered-game date. Preserve a prior date only for identical scoped
+    statistics from the same source with an explicit coverage origin. Legacy
+    dates inferred from a separate game CSV are not verified. Changed/new values retain an unknown
+    coverage date instead of borrowing the independent game feed's latest date.
+    """
+    identity = ('entity', 'category', 'season', 'season_type', 'team', 'gp', 'fields', 'source')
+    unchanged = isinstance(previous, dict) and all(record.get(k) == previous.get(k) for k in identity)
+    trusted = {'source_reported', 'verified_game_inventory'}
+    basis = previous.get('coverage_basis') if isinstance(previous, dict) else None
+    origin = previous.get('coverage_origin') if isinstance(previous, dict) else None
+    if basis in trusted:
+        origin = basis
+    proven = basis in trusted or (basis == 'prior_unchanged_source_statistics' and origin in trusted)
+    prior_date = previous.get('data_through_date') if unchanged and proven else None
+    try:
+        valid_date = dt.date.fromisoformat(prior_date).isoformat() == prior_date
+    except (ValueError, TypeError):
+        valid_date = False
+    record['data_through_date'] = prior_date if valid_date else None
+    record['coverage_basis'] = ('prior_unchanged_source_statistics' if valid_date else
+                                'not_reported_by_tracking_source')
+    record['coverage_origin'] = origin if valid_date else None
+    return record
 
 
 def existing_game_snapshots(content,scope,published_at,source):
@@ -100,12 +130,15 @@ class PublishedNBAData:
     async def tracking(self,output):
         import pyarrow.parquet as pq
         from advanced_refresh import normalize_records
+        from master import clear_unverified_tracking_coverage
         pair_scope=json.loads(Path(__file__).with_name('matchup_refresh_scope.json').read_text())
         assets=[('Player totals','player_stats_base'),('Team totals','team_stats_base'),('Team defense','team_stats_opponent'),
                 ('Passing','player_tracking_passing'),('Rebounding','player_tracking_rebounding'),
                 ('Possessions','player_tracking_possessions'),('Rim','player_tracking_defense')]
+        target=Path(output)/'existing_tracking.json'
+        old=json.loads(target.read_text()) if target.exists() else {}
+        prior={(r.get('season'),r.get('entity'),r.get('category')):r for r in old.get('records',[])}
         records=[];coverage=[];published=[]
-        through=max(self.days) if self.days else None
         for category,prefix in assets:
             try:
                 content,meta=await self.asset(STATS_TAG,f'{prefix}_{self.end_year}.parquet')
@@ -118,21 +151,27 @@ class PublishedNBAData:
                 if not normalized:raise ValueError('No existing metric values returned.')
                 for record in normalized:
                     record.update(source=meta['browser_download_url'],published_at=meta['updated_at'],
-                        data_through_date=through,publication_source='SportsDataverse published NBA Stats extract')
+                        publication_source='SportsDataverse published NBA Stats extract')
+                    tracking_coverage(record,prior.get((record['season'],record['entity'],record['category'])))
+                dates=[r.get('data_through_date') for r in normalized]
+                through=min(dates) if dates and all(dates) else None
                 records.extend(normalized);published.append(meta['updated_at'])
                 coverage.append({'category':category,'status':'collected','records':len(normalized),
-                                  'source_published_at':meta['updated_at'],'source_data_through_date':through})
+                                  'source_published_at':meta['updated_at'],'source_data_through_date':through,
+                                  'source_content_sha256':hashlib.sha256(content).hexdigest(),
+                                  'coverage_note':'Covered dates are retained only for unchanged source statistics; changed/new values have unknown covered-game dates.'})
             except Exception as error:
                 coverage.append({'category':category,'status':'unavailable','error_type':type(error).__name__})
         # The current public mirror does not supply these populations. Prior dated
         # records remain unchanged; neither box production nor rim FG substitutes.
         coverage.extend({'category':category,'status':'unavailable','reason':'No current-season extract in this publication.'}
                         for category in ('Overall','Named pair'))
-        target=Path(output)/'existing_tracking.json'
-        old=json.loads(target.read_text()) if target.exists() else {}
         successful={c['category'] for c in coverage if c['status']=='collected'}
-        records.extend(r for r in old.get('records',[]) if r.get('category') not in successful)
+        records.extend(clear_unverified_tracking_coverage(dict(r)) for r in old.get('records',[])
+                       if r.get('category') not in successful)
         if not published:return False
+        known=[c.get('source_data_through_date') for c in coverage if c['status']=='collected']
+        through=min(known) if known and all(known) else None
         document={'schema_version':1,'scope_revision':self.scope['revision'],'season':self.season,
             'last_attempt':max(published),'records':records,'coverage':coverage,
             'source_data_through_date':through,'policy':'Only existing workbook entities/metrics; source publication lag is preserved.'}

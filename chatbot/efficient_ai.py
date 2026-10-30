@@ -64,26 +64,53 @@ def usage_status(store):
                       'These counters measure inference work, not ACT cost. Code efficiency alone does not change the lease price.'}
 
 
-async def efficient_chat(client, payload, store=None, url=None, diagnostics=None):
-    # Database identity prevents identical fixture/user contexts from sharing results.
+def request_cache_key(payload, store=None):
     actual=_store(store)
     identity=str(getattr(actual,'path',getattr(actual,'database_path','no-master')))
-    key=hashlib.sha256(json.dumps([identity,data_revision(store),payload],sort_keys=True,default=str).encode()).hexdigest()
+    return hashlib.sha256(json.dumps([identity,data_revision(store),payload],sort_keys=True,default=str).encode()).hexdigest()
+
+
+def cache_validated_response(payload, body, store, validator):
+    """Reuse a repaired answer only after the original request's contract passes."""
+    validator(body)
+    if _store(store) is None:
+        return
+    key=request_cache_key(payload,store)
+    _CACHE[key]=(time.monotonic(),json.dumps(body))
+    _CACHE.move_to_end(key)
+    while len(_CACHE)>MAX_CACHE_ITEMS:
+        _CACHE.popitem(last=False)
+
+
+async def efficient_chat(client, payload, store=None, url=None, diagnostics=None, validator=None):
+    # Database identity prevents identical fixture/user contexts from sharing results.
+    actual=_store(store)
+    key=request_cache_key(payload,store)
     current=time.monotonic()
     cached=_CACHE.get(key)
     if diagnostics is not None:
         diagnostics['cache_hit'] = False
+        diagnostics['response_received'] = False
     if cached and current-cached[0] < CACHE_SECONDS:
-        if diagnostics is not None:
-            diagnostics['cache_hit'] = True
-        _CACHE.move_to_end(key)
-        record_usage(store,'cache_hit')
-        return json.loads(cached[1])
+        cached_body=json.loads(cached[1])
+        try:
+            if validator is not None:
+                validator(cached_body)
+        except (ValueError, TypeError, RuntimeError):
+            _CACHE.pop(key,None)
+        else:
+            if diagnostics is not None:
+                diagnostics['cache_hit'] = True
+            _CACHE.move_to_end(key)
+            record_usage(store,'cache_hit')
+            return cached_body
     started=time.monotonic()
     try:
         response=await client.post((url or os.getenv('OLLAMA_URL','http://model:11434')).rstrip('/')+'/api/chat',json=payload)
         response.raise_for_status()
         body=response.json()
+        if diagnostics is not None:
+            diagnostics['response_received'] = True
     except asyncio.CancelledError:
         record_usage(store,'cancelled_request',time.monotonic()-started)
         raise
@@ -91,6 +118,8 @@ async def efficient_chat(client, payload, store=None, url=None, diagnostics=None
         record_usage(store,'failed_request',time.monotonic()-started)
         raise
     record_usage(store,'model_request',time.monotonic()-started,body if isinstance(body,dict) else {})
+    if validator is not None:
+        validator(body)  # Rejected replies must never enter the response cache.
     message=body.get('message') if isinstance(body,dict) else None
     if (actual is not None and isinstance(message,dict) and not body.get('error') and body.get('done_reason')!='length'
             and (message.get('content') or message.get('tool_calls'))):

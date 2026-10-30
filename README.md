@@ -2,7 +2,7 @@
 
 NBAPPBOT keeps a persistent research dataset, collects relevant NBA news, answers
 basketball questions, and analyzes user-uploaded PrizePicks lines. The chat model
-runs on Akash through Ollama (`qwen2.5:3b`); no OpenAI API key is required. Data
+runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
 ## What refreshes
@@ -40,8 +40,11 @@ The working free source is the public
 including its
 [ESPN NBA player observations](https://github.com/sportsdataverse/sportsdataverse-data/releases/tag/espn_nba_player_boxscores)
 and [NBA Stats extracts](https://github.com/sportsdataverse/sportsdataverse-data/releases/tag/nba_stats_leaguedash).
-The release collection check verified coverage through **October 28, 2026**. This
-establishes source access, not availability of a game that finished later.
+The October 30 release check found game observations through **October 29, 2026**.
+The separate tracking extracts had October 29 publication timestamps but did not
+declare their covered game date. That coverage stays **unknown**; legacy dates
+inferred from the game feed are removed without deleting statistical values.
+An observation file's newer date cannot advance a tracking file's coverage.
 
 The repository's collection workflow converts the published extracts and retains
 only the existing dataset scope. The Akash bot imports the validated files and
@@ -98,8 +101,11 @@ averages, player-versus-team samples, team production, team defense and tentativ
 assignments. Coverage dates, source publication dates and assignment dates remain
 separate. A newer season average never substitutes for an older measured matchup.
 
-The model selects relevant source records and writes its own qualitative
-interpretation. The application renders numerical facts and their scope directly
+The model receives concise descriptions of the available evidence and its limits,
+selects relevant source records, and writes its own qualitative interpretation.
+Supported comparisons are calculated only within matching player/season scopes;
+a team total does not imply an individual defender's ability. The application
+renders numerical facts and their scope directly
 from those records, and rejects unverified numerical prose or invalid citations.
 This is a general evidence format, not a table of answers for individual players
 or questions. Qualitative interpretation can still be wrong and requires review.
@@ -109,14 +115,22 @@ When the needed evidence is available, one compact model request supplies the
 explanation. Simple conversation is also model-generated, with a small prompt;
 there are no canned greeting or thank-you responses. Questions needing additional
 data retain the retrieval tools and use the same final source contract. Invalid
-explanations return labeled saved evidence instead of unchecked numerical claims.
+explanations get one bounded repair attempt, then return labeled saved evidence
+if still invalid. Rejected replies are never reused from the cache.
 Timeouts and model-server failures state the actual failure before showing saved
 evidence. Compact prompts carry each selected fact once, with full source metadata
 retained for rendering. Short explanations have a smaller output budget and a
-180-second total request limit, with no automatic retry after a timeout.
-`/ai_status` includes request duration and, when the model returns them, model-load,
-prompt-evaluation and generation timings. CPU response time still needs testing
-on the deployed provider; offline transport tests do not establish live speed.
+180-second total request limit including any repair, with no automatic retry
+after a timeout. Telegram displays a typing indicator while generating a reply.
+Clearing chat history during a request cannot restore the deleted conversation
+when that request completes.
+`/ai_status` includes active-job elapsed time and timings for the latest compact
+reply phase, including model loading, prompt evaluation and generation when
+provided. Those phase counters do not include earlier retrieval calls; `/usage`
+counts model work across the paths. Deeper lookups use a small relevant catalog,
+the same model context, and at most two tool rounds inside a bounded deadline.
+Explicit row/cell requests read the source instead of guessing from season totals.
+Provider response time still needs a live Akash check.
 
 Ordinary questions can use player names, unique surnames, supported nicknames,
 team cities/names/codes and common name variations. Recent private conversation
@@ -159,7 +173,8 @@ cache that invalidates when their relevant data changes. Model prompts, output a
 tool rounds are bounded. `/usage` reports inference requests, cache hits, elapsed
 work and available token counters without exposing credentials.
 Startup loads the model with the same context size used for compact answers before
-reporting ready. Requests keep it resident between conversations while the model
+reporting ready. An already downloaded model is reused without a registry pull.
+Requests keep it resident between conversations while the model
 service remains running, using already-reserved RAM without periodic AI calls.
 
 **Akash credits fund the reserved running lease, not individual Telegram messages
@@ -178,7 +193,9 @@ independent backup protection is needed.
 
 1. Open the running Akash deployment, then **Update → chatbot → Vars & secrets**.
 2. Set `SOURCE_REF` to the full application commit pinned in [deploy.yaml](deploy.yaml).
-3. Retain the existing Telegram token, allowed user ID, chat password and `/data`
+3. Set `OLLAMA_MODEL` to `qwen3:4b-instruct-2507-q4_K_M`. This is the explicit
+   non-thinking instruction release; the older `qwen3:4b` tag is a different model.
+4. Retain the existing Telegram token, allowed user ID, chat password and `/data`
    storage settings, then apply the deployment update.
 
 The bootstrap installs the pinned application modules and dependencies, reuses the
@@ -210,3 +227,20 @@ Self-tests do not place entries, call a sportsbook, inject sample records into t
 live master, or establish the quality/speed of a generated AI answer. Checks with
 mocked transports are distinct from verified publisher access and actual Akash
 message delivery.
+
+## October 30 reliability validation
+
+This release passed **368 automated tests**, **14 isolated PrizePicks workflow
+checks**, and selected semantic checks for **10 real-model conversation/retrieval
+scenarios**, with targeted reruns after fixes. The scenarios include social replies,
+follow-up comparisons, scoped matchups, unavailable official injury coverage,
+potential versus actual assists, and an original workbook row checked independently.
+See the [validation record](docs/validation-2026-10-30.json) for answers, timings,
+revision hashes and limits.
+
+Real inference used official Ollama 0.40.13 in a CPU container capped at four CPUs
+and 8 GiB RAM. Successful tested replies took 5.7–37.9 seconds locally, with no OOM
+kills. The Instruct-2507 Q4_K_M GGUF came from the public DockerHub model artifact;
+byte identity with Ollama's registry artifact was not established. Provider latency,
+live Telegram delivery and today's actual PrizePicks lines still need deployment
+checks. These examples do not establish universal factual accuracy or betting performance.

@@ -43,6 +43,21 @@ def normalized_name(value):
     return re.sub(r'[^a-z0-9]', '', text)
 
 
+def clear_unverified_tracking_coverage(record):
+    """Old mirror dates came from an independent CSV, not the tracking asset."""
+    mirrored = (record.get('publication_source') == 'SportsDataverse published NBA Stats extract' or
+                str(record.get('source', '')).startswith(
+                    'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_leaguedash/'))
+    trusted = {'source_reported', 'verified_game_inventory'}
+    basis = record.get('coverage_basis')
+    verified = basis in trusted or (basis == 'prior_unchanged_source_statistics' and
+                                   record.get('coverage_origin') in trusted)
+    if mirrored and not verified:
+        record.update(data_through_date=None, coverage_basis='not_reported_by_tracking_source',
+                      coverage_origin=None)
+    return record
+
+
 STAT_COMPONENTS = {
     'pts': ('pts',), 'reb': ('reb',), 'ast': ('ast',), 'tpm': ('tpm',),
     'fga': ('fga',), 'tpa': ('tpa',), 'minutes': ('minutes',),
@@ -136,6 +151,25 @@ class MasterStore:
             for field in ['fgm','ftm','fta','oreb','dreb','fouls','plus_minus','starter']:
                 if field not in columns:
                     db.execute(f'ALTER TABLE player_games ADD COLUMN {field} REAL')
+            # Correct legacy labels even when the upstream feed is unreachable
+            # during startup. Values and their actual publication time survive.
+            corrected = False
+            for row in db.execute('SELECT season,entity,category,payload_json FROM refreshed_tracking').fetchall():
+                record = json.loads(row['payload_json'])
+                clean = clear_unverified_tracking_coverage(dict(record))
+                if clean != record:
+                    db.execute('UPDATE refreshed_tracking SET payload_json=? WHERE season=? AND entity=? AND category=?',
+                               (encoded(clean), row['season'], row['entity'], row['category']))
+                    corrected = True
+            if corrected:
+                checkpoint = db.execute("SELECT value_json FROM checkpoints WHERE name='tracking_refresh_status'").fetchone()
+                if checkpoint:
+                    status = json.loads(checkpoint['value_json'])
+                    status['source_data_through_date'] = None
+                    for item in status.get('coverage', []):
+                        item['source_data_through_date'] = None
+                    status['note'] = 'Legacy mirror coverage dates were unverified; source values and publication timestamps are preserved.'
+                    db.execute("UPDATE checkpoints SET value_json=? WHERE name='tracking_refresh_status'", (encoded(status),))
             db.executescript('''DROP VIEW IF EXISTS season_averages;
                 DROP VIEW IF EXISTS observed_season_averages;
                 CREATE VIEW observed_season_averages AS SELECT p.player_id,p.player,p.season,p.season_type,
@@ -159,7 +193,7 @@ class MasterStore:
                 SELECT o.* FROM observed_season_averages o WHERE NOT EXISTS (
                   SELECT 1 FROM refreshed_tracking r WHERE r.entity=o.player AND r.season=o.season
                   AND r.category='Player totals' AND o.season_type='Regular Season'
-                  AND COALESCE(json_extract(r.payload_json,'$.data_through_date'),substr(json_extract(r.payload_json,'$.published_at'),1,10))>=o.through_date
+                  AND json_extract(r.payload_json,'$.data_through_date')>=o.through_date
                   AND json_extract(r.payload_json,'$.gp')>=o.games_played)
                 UNION ALL SELECT
                   json_extract(payload_json,'$.player_id'),entity,season,'Regular Season','published all-team aggregate',
@@ -175,11 +209,12 @@ class MasterStore:
                   json_extract(payload_json,'$.fields.fgm')/NULLIF(json_extract(payload_json,'$.fields.fga')*1.0,0),
                   json_extract(payload_json,'$.fields.tpm')/NULLIF(json_extract(payload_json,'$.fields.tpa')*1.0,0),
                   json_extract(payload_json,'$.fields.ftm')/NULLIF(json_extract(payload_json,'$.fields.fta')*1.0,0),
-                  COALESCE(json_extract(payload_json,'$.data_through_date'),substr(json_extract(payload_json,'$.published_at'),1,10))
+                  json_extract(payload_json,'$.data_through_date')
                 FROM refreshed_tracking r WHERE category='Player totals'
                   AND NOT EXISTS (SELECT 1 FROM observed_season_averages o WHERE o.player=r.entity AND o.season=r.season
                     AND o.season_type='Regular Season' AND
-                    (o.through_date>COALESCE(json_extract(r.payload_json,'$.data_through_date'),substr(json_extract(r.payload_json,'$.published_at'),1,10))
+                    (NULLIF(json_extract(r.payload_json,'$.data_through_date'),'') IS NULL
+                     OR o.through_date>json_extract(r.payload_json,'$.data_through_date')
                      OR o.games_played>json_extract(r.payload_json,'$.gp')));''')
             db.execute("UPDATE metadata SET value='2' WHERE key='schema_version'")
 

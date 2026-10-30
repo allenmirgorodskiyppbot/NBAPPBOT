@@ -142,6 +142,12 @@ def _scan(text, names):
 def resolve_question(store, master, question, history=None):
     names = _players(store, master)
     result = _scan(question, names)
+    normalized_question = _key(result['question'])
+    pronoun = re.search(r'\b(?:he|him|his)\b', normalized_question)
+    named_position = normalized_question.find(_key(result['players'][0])) if len(result['players']) == 1 else -1
+    pronoun_comparison = bool(named_position >= 0 and pronoun
+        and (pronoun.group() != 'his' or pronoun.start() < named_position)
+        and re.search(r'\b(?:compar\w*|versus|vs|against|than|between)\b', str(question), re.I))
     # A short team follow-up ("and against Charlotte?") can retain the previous
     # player. A new explicit player replaces the topic rather than being merged.
     followup = bool(re.search(r'\b(he|his|him|they|their)\b', str(question), re.I) or
@@ -153,6 +159,19 @@ def resolve_question(store, master, question, history=None):
             if turn.get('role') != 'user':
                 continue
             previous = _scan(turn.get('content', ''), names)
+            if pronoun_comparison and previous['players']:
+                # "How does he compare to Maxey?" names a new player without
+                # replacing the unambiguous player referenced by the pronoun.
+                # Multiple previous players remain ambiguous; do not guess or
+                # reach back to an older topic to manufacture an antecedent.
+                if len(previous['players']) == 1 and previous['players'][0] not in result['players']:
+                    inherited = previous['players'][0]
+                    result['players'] = ([inherited, *result['players']] if pronoun.start() < named_position else
+                                         [*result['players'], inherited])
+                    result['inherited_player'] = True
+                # The old opponent is not automatically a shared opponent for
+                # both players. Explicit teams in this question remain intact.
+                break
             if not result['players'] and len(previous['players']) == 1:
                 result['players'] = previous['players']
                 result['inherited_player'] = True
@@ -285,13 +304,21 @@ def _requested_population(resolved):
             seasons.append(start + '-' + end[-2:])
     current = dt.datetime.now(EASTERN)
     year = current.year - (current.month < 7)
+    relative_previous = not seasons and bool(re.search(r'\b(?:last|previous|prior)\s+season\b', text, re.I))
+    if relative_previous:
+        year -= 1
     return {'seasons': list(dict.fromkeys(seasons))[:2] or [f'{year}-{str(year+1)[-2:]}'],
             'season_type': 'Playoffs' if re.search(r'\bplayoffs?\b', text, re.I) else
                            'Preseason' if re.search(r'\bpreseason\b', text, re.I) else 'Regular Season',
-            'season_basis': 'explicit request' if seasons else 'current season'}
+            'season_basis': 'explicit request' if seasons else 'previous season' if relative_previous else 'current season'}
 
 
 def _context_assignments(store, players, opponent, population):
+    # A comparison without one requested opponent has no relevant assignment
+    # pair. Arbitrary first-sheet opponents can crowd out both players' actual
+    # baselines and wrongly suggest that a prior matchup is still the topic.
+    if not opponent:
+        return []
     rows = []
     for row in assignment_rows(store):
         if row['selected_player'] not in players or opponent and row['opponent_team'] != opponent:
@@ -380,8 +407,27 @@ def research_context(store, master, resolved):
                'player_sheets': [], 'news': [], 'current_player_statistics': [],
                'opponent_player_statistics': [], 'current_tracking': [],
                'freshness_priority': 'Prefer newer evidence only for the same entity, metric, population, season and phase. Broad season totals never replace opponent samples or tentative assignments. Covered game dates, publication dates and assignment dates are distinct.'}
+    availability_question = bool(re.search(
+        r'\b(?:availab\w*|health\w*|injur\w*|questionable|ruled\s+out)\b',
+        str(resolved.get('original_question') or resolved.get('question') or ''), re.I))
+    if availability_question:
+        # Feed metadata can establish collection limitations, never that an
+        # individual player is healthy. Do not send source error bodies, URLs,
+        # or configuration values into the model context.
+        context['availability_coverage'] = {'feeds': [], 'complete_official_report_in_context': False}
     if master is not None and callable(getattr(master, 'connect', None)):
         with master.connect() as db:
+            if availability_question and db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='feed_status'").fetchone():
+                for row in db.execute("SELECT name,last_success,last_attempt,last_error FROM feed_status "
+                                      "WHERE name IN ('availability_coverage','injuries_configured') ORDER BY name"):
+                    value = {'name': row['name']}
+                    for key in ('last_success', 'last_attempt', 'last_error'):
+                        try:
+                            value[key] = dt.datetime.fromisoformat(str(row[key]).replace('Z', '+00:00')).isoformat()
+                        except (TypeError, ValueError):
+                            value[key] = None
+                    context['availability_coverage']['feeds'].append(value)
             tracking_exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='refreshed_tracking'").fetchone()
             for season in population['seasons']:
                 phase = population['season_type']
@@ -394,9 +440,12 @@ def research_context(store, master, resolved):
                     summaries = [dict(r) for r in db.execute(
                         'SELECT * FROM season_averages WHERE player=? AND season=? AND season_type=?', (player, season, phase))]
                     context['current_player_statistics'].extend(_summary_scope(db, r, published) for r in summaries)
-                    # Totals already represented by the scoped summary are not repeated.
+                    # Preserve an undated publication alongside dated partial
+                    # observations; never replace the shared observed view.
+                    represented_publication = any(r.get('actual_teams') == 'published all-team aggregate' for r in summaries)
                     context['current_tracking'].extend(_tracking_context(r) for r in tracking
-                        if r.get('category') != 'Player totals' or not summaries)
+                        if r.get('category') != 'Player totals' or not summaries
+                        or (not r.get('data_through_date') and not represented_publication))
                     if opponent:
                         context['opponent_player_statistics'].append(_player_sample(db, player, season, phase, opponent))
                 if tracking_exists:
@@ -420,7 +469,8 @@ def research_context(store, master, resolved):
                     break
     # Opponent defense supplies more directly relevant matchup context than
     # optional broad player tracking; keep it earlier when trimming from the end.
-    context['current_tracking'].sort(key=lambda item: item.get('category') != 'Team defense')
+    context['current_tracking'].sort(key=lambda item: (item.get('category') != 'Team defense',
+                                                      item.get('category') != 'Player totals'))
     # Preserve the requested assignment and explicit opponent sample before
     # optional profiles, news and broad tracking. Whole omitted blocks are marked.
     while len(json.dumps(context, default=str)) > 5500:

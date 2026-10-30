@@ -179,7 +179,8 @@ class MockedModelRuntimeTests(unittest.IsolatedAsyncioTestCase):
         payload = calls[0]
         self.assertEqual(payload['keep_alive'], -1)
         self.assertEqual(payload['options']['num_ctx'], app.model_options()['num_ctx'])
-        model_cards = json.loads(payload['messages'][-1]['content'])['evidence']
+        self.assertEqual(payload['messages'][-1]['content'], question)
+        model_cards = json.loads(payload['messages'][-2]['content'])['evidence']
         self.assertTrue(model_cards)
         self.assertTrue(all(set(c) == {'id', 'kind', 'text'} for c in model_cards))
         self.assertNotIn(source['source'], json.dumps(model_cards))

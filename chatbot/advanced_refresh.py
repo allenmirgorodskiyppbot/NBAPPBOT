@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from dataset_refresh import load_scope
-from master import normalized_name
+from master import normalized_name,clear_unverified_tracking_coverage
 
 BASE='https://stats.nba.com/stats/'
 MAPS={
@@ -140,9 +140,17 @@ def import_tracking(store,document,now):
     pair_doc=json.loads(Path(__file__).with_name('matchup_refresh_scope.json').read_text())
     pairs={(p['offense_player'],p['defense_player']) for p in pair_doc['pairs']}
     rows=[]
-    for record in document.get('records',[]):
+    for original in document.get('records',[]):
+        record=clear_unverified_tracking_coverage(dict(original))
         category=record.get('category');entity=record.get('entity');stamp=_aware(record.get('published_at'))
         if category not in MAPS or not stamp or stamp>now+dt.timedelta(minutes=5):raise ValueError('Invalid tracking record.')
+        covered=record.get('data_through_date')
+        if covered is not None:
+            try:
+                if not isinstance(covered,str) or dt.date.fromisoformat(covered).isoformat()!=covered or covered>stamp.date().isoformat():
+                    raise ValueError
+            except (ValueError,TypeError):
+                raise ValueError('Tracking coverage must be a valid covered-game date or unknown.') from None
         if ((category=='Named pair' and tuple(entity.split(' | ')) not in pairs) or
             (category in {'Team totals','Team defense'} and entity not in scope.get('teams',[])) or
             (category not in {'Named pair','Team totals','Team defense'} and entity not in names)):
@@ -177,9 +185,15 @@ def import_tracking(store,document,now):
             db.execute('INSERT INTO refreshed_tracking VALUES (?,?,?,?) ON CONFLICT(season,entity,category) '
                        'DO UPDATE SET payload_json=excluded.payload_json',
                        (record['season'],record['entity'],record['category'],json.dumps(record)))
+    coverage=[dict(item) for item in document.get('coverage',[])]
+    for item in coverage:
+        if item.get('status')=='collected':
+            dates=[r.get('data_through_date') for r in rows if r.get('category')==item.get('category')]
+            item['source_data_through_date']=min(dates) if dates and all(dates) else None
+    dates=[item.get('source_data_through_date') for item in coverage if item.get('status')=='collected']
     store.set_checkpoint('tracking_refresh_status',{'last_attempt':document.get('last_attempt'),
-                         'coverage':document.get('coverage',[]),'existing_records':len(rows),
-                         'source_data_through_date':document.get('source_data_through_date'),
+                         'coverage':coverage,'existing_records':len(rows),
+                         'source_data_through_date':min(dates) if dates and all(dates) else None,
                          'note':'Prior values keep original timestamps when a tracking source is unavailable.'})
     if any(item.get('status')=='collected' for item in document.get('coverage',[])):
         store.feed_success('existing_tracking_refresh','Existing scoped metrics imported; source publication and covered-date fields retain upstream lag.')

@@ -30,6 +30,20 @@ class DiagnosticFilteringTests(unittest.TestCase):
                           'generated_tokens': 0, 'cache_hit': False})
         self.assertEqual(safe_ai_request_details({'failure_category': 'model_http_999'}), {})
 
+    def test_repair_diagnostics_use_strict_counts_and_fixed_reason_codes(self):
+        self.assertEqual(safe_ai_request_details({
+            'model_calls': 2, 'repair_attempts': 1, 'status': 'repairing',
+            'validation_reason': 'numerical_prose', 'raw_reply': 'PRIVATE MODEL REPLY'}), {
+            'model_calls': 2, 'repair_attempts': 1, 'status': 'repairing',
+            'validation_reason': 'numerical_prose'})
+        for reason in ('invalid_json', 'invalid_schema', 'invalid_evidence', 'analysis_too_long',
+                       'retrieval_with_analysis', 'empty_reply', 'numerical_prose', 'unsupported_assignment', 'unsupported_scope'):
+            self.assertEqual(safe_ai_request_details({'validation_reason': reason}),
+                             {'validation_reason': reason})
+        self.assertEqual(safe_ai_request_details({
+            'model_calls': True, 'repair_attempts': -1, 'status': 'PRIVATE URL',
+            'validation_reason': 'invalid_json PRIVATE RESPONSE'}), {})
+
 
 class TelegramDiagnosticTests(unittest.IsolatedAsyncioTestCase):
     async def test_ai_status_delivers_safe_request_timings_without_model_calls(self):

@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/nba-daily-data.yml'
       - 'chatbot/nba_daily_export.py'
+      - 'chatbot/mirror_sources.py'
+      - 'chatbot/advanced_refresh.py'
   schedule:
     # Previous-day statistics: morning publication, then catch-up retries.
     - cron: '15 15-22 * * *'

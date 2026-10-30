@@ -139,6 +139,20 @@ def player_log(store, player, stats=('pts',), limit=5, season=None, phase='Regul
 def answer_player_question(store, question, history=None):
     text = str(question)
     lower = text.casefold()
+    # Tracking qualifiers define different metrics, not synonyms for box-score
+    # assists/rebounds/minutes. Leave them to the structured research tools.
+    if re.search(r'\b(?:potential[\s_-]+(?:assists?|ast)|secondary[\s_-]+assists?|'
+                 r'hockey[\s_-]+assists?|assist[\s_-]+chances?|screen[\s_-]+assists?|'
+                 r'passes|passing|touch(?:es)?|possessions?|usage|usg|tracking|'
+                 r'rebound(?:ing)?[\s_-]+chances?|reb[\s_-]+chances?|'
+                 r'contested|uncontested|offensive[\s_-]+rebounds?|defensive[\s_-]+rebounds?|'
+                 r'box[\s_-]*outs?|drives?|deflections?|loose[\s_-]+balls?|hustle|'
+                 r'(?:offensive|defensive|net)[\s_-]+ratings?|pace|pie|'
+                 r'percent(?:ages?|iles?)?|efficiency|true[\s_-]+shooting|'
+                 r'effective[\s_-]+field[\s_-]+goals?|efg|ts|'
+                 r'field[\s_-]+goals?|free[\s_-]+throws?|fga|fgm|fta|ftm|tpa|'
+                 r'per[\s_-]+(?:100|36|48))\b|\b(?:fg|ft|3p|3pt|usg)\s*%', lower):
+        return None
     # These modifiers need the general query planner; never silently ignore them.
     if re.search(r'\b(compare|versus|vs\.?|against|between|than|home|away|since|before|after|'
                  r'injur\w*|news|parlay|picks?|quarter|half|prediction|probability|week|month|'
@@ -193,15 +207,15 @@ def answer_player_question(store, question, history=None):
     if player is None:
         return None
     if aggregate and phase=='Regular Season':
-        published=published_average(store,player['player'],stats,season)
+        published=published_average(store,player['player'],stats,season,include_unknown_snapshot=True)
         if published is not None:
             return published
     return player_log(store, player['player'], stats=stats, limit=limit, season=season, phase=phase,
                       all_games=aggregate)
 
 
-def published_average(store,player,stats,season):
-    """Use an authoritative season total once, rather than averaging partial samples."""
+def published_average(store,player,stats,season,include_unknown_snapshot=False):
+    """Keep dated observations distinct from an undated published snapshot."""
     import json
     with _open(store) as db:
         row=db.execute("SELECT payload_json FROM refreshed_tracking WHERE category='Player totals' AND entity=? AND season=?",(player,season)).fetchone()
@@ -209,8 +223,21 @@ def published_average(store,player,stats,season):
     if not row:return None
     record=json.loads(row[0]);gp=record.get('gp');fields=record.get('fields',{})
     if not gp or gp<=0:return None
-    if observed and (observed['games_played']>gp or observed['through_date']>str(record.get('data_through_date') or record.get('published_at','')[:10])):
-        return None
+    separate_snapshot=bool(observed and not record.get('data_through_date'))
+    if observed:
+        if observed['games_played']>gp:
+            return None
+        if record.get('data_through_date') and observed['through_date']>record['data_through_date']:
+            return None
+        if separate_snapshot:
+            # Unknown coverage may supply useful broader context, but never
+            # displaces the dated sample or claims to be the latest average.
+            if not include_unknown_snapshot or gp<=observed['games_played']:
+                return None
+            from news_digest import _aware
+            published=_aware(record.get('published_at'))
+            if not published or published.astimezone(ZoneInfo('America/New_York')).date().isoformat()<observed['through_date']:
+                return None
     averages={}
     for stat in stats:
         components=STAT_COMPONENTS.get(stat)
@@ -222,9 +249,18 @@ def published_average(store,player,stats,season):
             f"Source publication: {record.get('published_at','unknown')}.\n"+
             'Source: '+str(record.get('source','unavailable'))+
             '\nSeason totals are used once; named-opponent and defender samples remain separate. These aggregates do not provide individual game logs.')
-    return {'answer':answer,'ai_used':False,'sources':[{'tool':'published_player_totals','arguments':{'player':player,'season':season}}],
+    result={'answer':answer,'ai_used':False,'sources':[{'tool':'published_player_totals','arguments':{'player':player,'season':season}}],
             'data':{'player':player,'averages':averages,'games_played':gp,'scope':'Published all-opponent season totals',
                     'through_date':record.get('data_through_date'),'source_published_at':record.get('published_at'),'games':[]}}
+    if separate_snapshot:
+        sample=player_log(store,player,stats=stats,season=season,phase='Regular Season',all_games=True)
+        sample['answer']+='\n\nSeparate published snapshot:\n'+answer+(
+            '\nThis broader snapshot has unknown game coverage; it does not establish the latest season average. '
+            'The two samples are not combined.')
+        sample['sources']+=result['sources']
+        sample['data']['published_snapshot']=result['data']
+        return sample
+    return result
 
 
 def player_log_command(store, argument):

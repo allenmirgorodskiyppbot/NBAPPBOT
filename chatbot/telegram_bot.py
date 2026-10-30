@@ -31,6 +31,7 @@ logging.getLogger('httpcore').setLevel(logging.WARNING)
 log = logging.getLogger('knicks.telegram')
 
 MAX_UPLOAD = 8 * 1024 * 1024
+TYPING_INTERVAL_SECONDS = 4
 
 
 def safe_ai_request_details(value):
@@ -42,7 +43,8 @@ def safe_ai_request_details(value):
         item = value.get(key)
         if type(item) in (int, float) and math.isfinite(item) and item >= 0:
             safe[key] = round(item, 3)
-    for key in ('prompt_chars', 'evidence_count', 'omitted_evidence_count', 'prompt_tokens', 'generated_tokens'):
+    for key in ('prompt_chars', 'evidence_count', 'omitted_evidence_count', 'prompt_tokens', 'generated_tokens',
+                'model_calls', 'repair_attempts'):
         item = value.get(key)
         if type(item) is int and item >= 0:
             safe[key] = item
@@ -50,7 +52,9 @@ def safe_ai_request_details(value):
         safe['cache_hit'] = value['cache_hit']
     enums = {
         'phase': {'evidence_reply'},
-        'status': {'running', 'needs_retrieval', 'completed', 'cancelled', 'failed'},
+        'status': {'running', 'repairing', 'needs_retrieval', 'completed', 'cancelled', 'failed'},
+        'validation_reason': {'invalid_json', 'invalid_schema', 'invalid_evidence', 'analysis_too_long',
+                              'retrieval_with_analysis', 'empty_reply', 'numerical_prose', 'unsupported_assignment', 'unsupported_scope'},
         'finish_reason': {'stop', 'length', 'load'},
         'failure_category': {'timeout', 'connection_error', 'model_error', 'invalid_model_response',
                              'empty_model_answer', 'output_limit', 'tool_limit', 'grounding_error', 'internal_error'},
@@ -262,9 +266,14 @@ class TelegramBot:
 
     def _remember(self, chat_id, update_id, question, answer=None):
         with self._db() as db:
-            db.execute('INSERT INTO telegram_conversation VALUES (?,?,?,?,?) '
-                       'ON CONFLICT(chat_id,update_id) DO UPDATE SET answer=excluded.answer',
-                       (chat_id, update_id, question[:3000], answer[:4000] if answer else None, utcnow()))
+            if answer is None:
+                db.execute('INSERT OR IGNORE INTO telegram_conversation VALUES (?,?,?,?,?)',
+                           (chat_id, update_id, question[:3000], None, utcnow()))
+            else:
+                # A completed older answer must not resurrect a conversation that
+                # was cleared, or a question already removed by the history limit.
+                db.execute('UPDATE telegram_conversation SET answer=? WHERE chat_id=? AND update_id=?',
+                           (answer[:4000], chat_id, update_id))
             db.execute('DELETE FROM telegram_conversation WHERE chat_id=? AND update_id NOT IN '
                        '(SELECT update_id FROM telegram_conversation WHERE chat_id=? '
                        'ORDER BY update_id DESC LIMIT 3)', (chat_id, chat_id))
@@ -328,6 +337,21 @@ class TelegramBot:
             code = int(data.get('error_code', response.status_code))
             raise RuntimeError(f'Telegram API returned status {code}; check private bot setup.')
         return data.get('result')
+
+    async def _typing(self, chat_id):
+        """Temporary Telegram activity only, scoped to a pending private answer."""
+        if not self.enabled or self.client is None or chat_id not in self.allowed_user_ids:
+            return
+        while True:
+            try:
+                await self._api('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Best effort: a typing failure must never interrupt the answer,
+                # queue a permanent notification, or expose Telegram credentials.
+                pass
+            await asyncio.sleep(TYPING_INTERVAL_SECONDS)
 
     async def flush_outbox(self):
         if not self.enabled:
@@ -622,7 +646,12 @@ class TelegramBot:
         chat_id = message['chat']['id']
         history = self._conversation(chat_id)
         self._remember(chat_id, update_id, text)
-        response = await self.answer_callback(text, history)
+        typing = asyncio.create_task(self._typing(chat_id))
+        try:
+            response = await self.answer_callback(text, history)
+        finally:
+            typing.cancel()
+            await asyncio.gather(typing, return_exceptions=True)
         self._remember(chat_id, update_id, text, response)
         return response
 

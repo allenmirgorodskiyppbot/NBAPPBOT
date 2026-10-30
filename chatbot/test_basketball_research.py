@@ -146,11 +146,12 @@ class ResearchTests(unittest.TestCase):
         def reply(request):
             payload = json.loads(request.content)
             seen.append(payload)
-            context = json.loads(payload['messages'][-1]['content'])
+            context = json.loads(payload['messages'][-2]['content'])
             card = next(c for c in context['evidence'] if c['kind']=='tentative_assignment')
-            self.assertIn('Royce O', card['text'])
-            self.assertIn('2026-10-22', card['text'])
-            self.assertIn('direction unconfirmed', card['text'])
+            self.assertNotIn('Royce O', card['text'])
+            self.assertNotIn('2026-10-22', card['text'])
+            self.assertIn('guarding direction', card['text'])
+            self.assertIn('unconfirmed', card['text'])
             self.assertNotIn('tools',payload)
             return httpx.Response(200,json={'message':{'content':json.dumps({
                 'evidence_ids':[card['id']], 'analysis':'The assignment alone cannot justify changing his scoring projection.',
@@ -161,6 +162,8 @@ class ResearchTests(unittest.TestCase):
                 app.ChatRequest(message='Explain OG’s projected matchup against the Hornets'), {}, self.master))
         self.assertIn('tentative', answer['answer'].lower())
         self.assertIn('cannot justify', answer['answer'])
+        self.assertIn('Royce O', answer['answer'])
+        self.assertIn('2026-10-22', answer['answer'])
         self.assertNotIn('ai_failure_category',answer)
         self.assertEqual(len(seen), 1)
 

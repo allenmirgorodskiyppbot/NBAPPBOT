@@ -51,8 +51,10 @@ class AIRuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn('tools', data)
             self.assertLessEqual(data['options']['num_ctx'], 4096)
             self.assertLessEqual(data['options']['num_predict'], 512)
-            if app.MODEL.startswith('qwen3:'):
+            if app.MODEL.startswith('qwen3:') and 'instruct' not in app.MODEL.lower():
                 self.assertTrue(data['messages'][-1]['content'].endswith('/no_think'))
+            else:
+                self.assertFalse(data['messages'][-1]['content'].endswith('/no_think'))
             self.assertIn('Jalen Smith', data['messages'][-1]['content'])
             self.assertIn('finger sprain', data['messages'][-1]['content'])
             self.assertEqual(data['format']['properties']['reports']['maxItems'], 1)

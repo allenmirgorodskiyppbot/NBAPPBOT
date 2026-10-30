@@ -120,6 +120,7 @@ class PlayerStatsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_natural_lookup_works_even_when_model_is_busy_or_not_ready(self):
         state = app.app.state
+        state.store = None
         state.master = self.store
         state.phase, state.detail = 'model', 'Loading'
         state.chat_lock = asyncio.Lock()

@@ -24,8 +24,10 @@ class CompactEvidenceTests(unittest.TestCase):
         selected = compact_evidence(cards, 'Explain scoring')
         self.assertIs(selected[0], cards[0])
         self.assertEqual(cards, before)
-        self.assertEqual(prompt_evidence(selected), [
-            {'id': 'E7', 'kind': cards[0]['kind'], 'text': cards[0]['text']}])
+        self.assertEqual(prompt_evidence(selected)[0]['id'], 'E7')
+        self.assertEqual(prompt_evidence(selected)[0]['kind'], cards[0]['kind'])
+        self.assertIn('all-opponent', prompt_evidence(selected)[0]['text'])
+        self.assertNotIn('20 PPG', prompt_evidence(selected)[0]['text'])
         self.assertEqual(selected[0]['query'], 'original query')
 
     def test_whole_source_text_and_dates_survive_a_tight_budget(self):

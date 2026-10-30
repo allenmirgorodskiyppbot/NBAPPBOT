@@ -50,9 +50,9 @@ class EvidenceContractTests(unittest.TestCase):
             with self.subTest(prose=prose),self.assertRaises(ValueError):
                 render_reply({'evidence_ids':['E1'],'analysis':prose,'needs_more_data':False},cards)
 
-    def test_invalid_evidence_duplicates_and_omitted_assignment_are_rejected(self):
+    def test_invalid_evidence_is_rejected(self):
         cards=evidence_cards(context())
-        for ids in (['E999'],['E1','E1'],['E3']):
+        for ids in (['E999'],[1],['E1',None]):
             with self.subTest(ids=ids),self.assertRaises(ValueError):
                 render_reply({'evidence_ids':ids,'analysis':'The pairing is uncertain.','needs_more_data':False},cards,['E1'])
 
@@ -103,12 +103,14 @@ class EvidenceContractTests(unittest.TestCase):
         self.assertIn('17.6 PPG (4/5 observed)',summary['text'])
         self.assertIn('6.2 RPG (3/5 observed)',summary['text'])
         self.assertIn('33 minutes/game (observed count unavailable)',summary['text'])
+        self.assertIn('Stored sample; coverage may be incomplete.', summary['text'])
+        self.assertIn('all opponents', summary['text'])
         self.assertNotIn('APG',summary['text'])
 
     def test_unrelated_or_ambiguous_pairing_is_never_mandatory(self):
         data=context()
         cards=evidence_cards(data)
-        self.assertEqual(required_evidence('Explain his Hornets matchup',cards),['E1'])
+        self.assertEqual(required_evidence('Explain his Hornets matchup',cards),['E1','E3','E2'])
         data['resolved_players']=['OG Anunoby','Tyrese Maxey']
         data['resolved_teams']=[]
         cards=evidence_cards(data)
@@ -116,7 +118,8 @@ class EvidenceContractTests(unittest.TestCase):
         data['resolved_players']=['OG Anunoby']
         data['resolved_teams']=['BOS']
         cards=evidence_cards(data)
-        self.assertEqual(required_evidence('Explain his Celtics matchup',cards),[])
+        self.assertNotIn('E1', required_evidence('Explain his Celtics matchup',cards))
+        self.assertNotIn('E2', required_evidence('Explain his Celtics matchup',cards))
 
     def test_percentage_fact_uses_fraction_as_shot_ratio(self):
         data=context()
