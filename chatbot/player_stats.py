@@ -54,7 +54,8 @@ def _resolve(db, text, exact=False):
     return candidates[0] if len(ids) == 1 else None
 
 
-def player_log(store, player, stats=('pts',), limit=5, season=None, phase='Regular Season', exact=True):
+def player_log(store, player, stats=('pts',), limit=5, season=None, phase='Regular Season', exact=True,
+               all_games=False):
     if type(limit) is not int or not 1 <= limit <= 20:
         raise ValueError('Player-log limits must be between 1 and 20 games.')
     if not stats or len(stats) > 4 or any(stat not in STAT_COMPONENTS for stat in stats):
@@ -76,7 +77,8 @@ def player_log(store, player, stats=('pts',), limit=5, season=None, phase='Regul
             params.append(season)
         predicate = ' AND '.join(where)
         sql = 'SELECT p.* FROM player_games p JOIN games g ON g.id=p.game_id WHERE ' + predicate
-        rows = [dict(row) for row in db.execute(sql + ' ORDER BY p.date DESC,p.game_id DESC LIMIT ?', params + [limit])]
+        rows = [dict(row) for row in db.execute(sql + ' ORDER BY p.date DESC,p.game_id DESC' +
+                ('' if all_games else ' LIMIT ?'), params if all_games else params + [limit])]
         newest = db.execute('SELECT MAX(substr(p.date,1,10)) FROM player_games p '
                             'JOIN games g ON g.id=p.game_id WHERE ' + predicate, params).fetchone()[0]
     name = match['player']
@@ -92,9 +94,13 @@ def player_log(store, player, stats=('pts',), limit=5, season=None, phase='Regul
     values = {stat: [value(row, stat) for row in rows] for stat in stats}
     def number(value):
         return 'missing' if value is None else f'{value:g}'
-    lines = [f'{name} — last {len(rows)} of up to {limit} requested stored games played.',
+    heading = f'{name} — {len(rows)} stored games played.' if all_games else \
+              f'{name} — last {len(rows)} of up to {limit} requested stored games played.'
+    lines = [heading,
              'Filter: final games; Played; ' + scope + '.']
     for index, row in enumerate(rows):
+        if all_games:
+            break
         detail = ', '.join(stat + '=' + number(values[stat][index]) for stat in stats)
         lines.append(str(row['date'])[:10] + ' vs ' + str(row.get('opponent') or 'unknown opponent') + ': ' + detail)
     for stat in stats:
@@ -121,19 +127,20 @@ def player_log(store, player, stats=('pts',), limit=5, season=None, phase='Regul
         lines.append('Source: ' + citation)
     lines.append('Stored coverage may be incomplete; these calculations are not a live league-wide feed.')
     return {'answer': '\n'.join(lines), 'sources': [{'tool': 'player_log', 'arguments': {
-        'player_id': match['player_id'], 'stats': list(stats), 'limit': limit, 'phase': phase, 'season': season}}],
+        'player_id': match['player_id'], 'stats': list(stats), 'limit': None if all_games else limit,
+        'phase': phase, 'season': season}}],
         'ai_used': False, 'data': {'games': rows, 'averages': {stat: statistics.mean(
             [value for value in values[stat] if value is not None]) if any(value is not None for value in values[stat])
             else None for stat in stats}}}
 
 
-def answer_player_question(store, question):
+def answer_player_question(store, question, history=None):
     text = str(question)
     lower = text.casefold()
     # These modifiers need the general query planner; never silently ignore them.
     if re.search(r'\b(compare|versus|vs\.?|against|between|than|home|away|since|before|after|'
                  r'injur\w*|news|parlay|picks?|quarter|half|prediction|probability|week|month|'
-                 r'yesterday|today|january|february|march|april|may|june|july|august|'
+                 r'career|lifetime|yesterday|today|january|february|march|april|may|june|july|august|'
                  r'september|october|november|december)\b', lower):
         return None
     if re.search(r'\b20\d{2}-\d{2}-\d{2}\b', lower):
@@ -142,13 +149,14 @@ def answer_player_question(store, question):
     if any(re.search(r'\b' + re.escape(term) + r'\b', lower)
            for team, name in TEAM_WORDS.items() for term in (team.casefold(), name)):
         return None
-    if not re.search(r'\b(last|latest|recent)\b', lower):
-        return None
     match = re.search(r'\b(?:last|latest|recent)\s+(\d{1,3}|' + '|'.join(_NUMBERS) +
                       r')\s+(?:(?:completed|regular[- ]season|played)\s+)*games?\b', lower)
-    if not match:
+    aggregate = match is None and bool(re.search(r'\b(averag\w*|ppg|rpg|apg)\b', lower))
+    if not match and not aggregate:
         return None
-    token = match.group(1)
+    if not match and re.search(r'\blast\b|\ball[- ](?:time|seasons)\b', lower):
+        return None
+    token = match.group(1) if match else 'five'
     limit = _NUMBERS[token] if token in _NUMBERS else int(token)
     if not 1 <= limit <= 20:
         return None
@@ -167,16 +175,23 @@ def answer_player_question(store, question):
             return None
     elif re.search(r'\b20\d{2}\b', text):
         return None
-    elif re.search(r'\b(this|current) season\b', lower):
+    elif aggregate or re.search(r'\b(this|current) season\b', lower):
         today = dt.datetime.now(ZoneInfo('America/New_York'))
         start = today.year if today.month >= 7 else today.year - 1
         season = f'{start}-{(start + 1) % 100:02d}'
     phase = 'Playoffs' if 'playoff' in lower else 'Preseason' if 'preseason' in lower else 'Regular Season'
     with _open(store) as db:
         player = _resolve(db, text)
+        if player is None and re.search(r'\b(his|he|him|their)\b', lower):
+            for turn in reversed(history or []):
+                if turn['role'] == 'user':
+                    player = _resolve(db, turn['content'])
+                    if player is not None:
+                        break
     if player is None:
         return None
-    return player_log(store, player['player'], stats=stats, limit=limit, season=season, phase=phase)
+    return player_log(store, player['player'], stats=stats, limit=limit, season=season, phase=phase,
+                      all_games=aggregate)
 
 
 def player_log_command(store, argument):

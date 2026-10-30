@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import io
 import json
 import logging
@@ -40,6 +40,7 @@ HELP = '''Knicks Research bot
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
+/clear — clear this chat's recent conversation context
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
 /stats <JSON list> — import manually supplied box-score rows
@@ -198,7 +199,33 @@ class TelegramBot:
                     chat_id INTEGER NOT NULL, kind TEXT NOT NULL,
                     text TEXT NOT NULL, created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS telegram_conversation (
+                    chat_id INTEGER NOT NULL,update_id INTEGER NOT NULL,
+                    question TEXT NOT NULL,answer TEXT,created_at TEXT NOT NULL,
+                    PRIMARY KEY(chat_id,update_id)
+                );
             ''')
+
+    def _conversation(self, chat_id):
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+        with self._db() as db:
+            rows = db.execute('SELECT question,answer FROM telegram_conversation WHERE chat_id=? '
+                              'AND created_at>=? ORDER BY update_id DESC LIMIT 3', (chat_id, cutoff)).fetchall()
+        history = []
+        for row in reversed(rows):
+            history.append({'role': 'user', 'content': row['question']})
+            if row['answer']:
+                history.append({'role': 'assistant', 'content': row['answer']})
+        return history[-6:]
+
+    def _remember(self, chat_id, update_id, question, answer=None):
+        with self._db() as db:
+            db.execute('INSERT INTO telegram_conversation VALUES (?,?,?,?,?) '
+                       'ON CONFLICT(chat_id,update_id) DO UPDATE SET answer=excluded.answer',
+                       (chat_id, update_id, question[:3000], answer[:4000] if answer else None, utcnow()))
+            db.execute('DELETE FROM telegram_conversation WHERE chat_id=? AND update_id NOT IN '
+                       '(SELECT update_id FROM telegram_conversation WHERE chat_id=? '
+                       'ORDER BY update_id DESC LIMIT 3)', (chat_id, chat_id))
 
     def _get_state(self, name, default=''):
         with self._db() as db:
@@ -380,6 +407,10 @@ class TelegramBot:
         argument = argument.strip()
         if command in {'/start', '/help'}:
             return HELP
+        if command == '/clear':
+            with self._db() as db:
+                db.execute('DELETE FROM telegram_conversation WHERE chat_id=?', (message['chat']['id'],))
+            return 'Recent conversation context cleared. Your dataset and picks remain saved.'
         if command == '/status':
             return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
         if command == '/playerlog':
@@ -523,7 +554,12 @@ class TelegramBot:
             return 'Unknown command. Use /help to see available commands.'
         if len(text) > 3000:
             raise ValueError('Please keep questions under 3000 characters, or upload a CSV/JSON board.')
-        return await self.answer_callback(text, [])
+        chat_id = message['chat']['id']
+        history = self._conversation(chat_id)
+        self._remember(chat_id, update_id, text)
+        response = await self.answer_callback(text, history)
+        self._remember(chat_id, update_id, text, response)
+        return response
 
     async def process_update(self, update):
         update_id = update.get('update_id')

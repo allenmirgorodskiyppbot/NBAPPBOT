@@ -271,6 +271,33 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.received_questions, [])
         self.assertIn('24.00', self.rows('telegram_outbox')[-1]['text'])
 
+    async def test_conversation_context_survives_restart_and_clear_is_scoped(self):
+        received = []
+        async def answer(text, history):
+            received.append((text, history))
+            return 'A reply about Jalen Brunson.'
+        bot = TelegramBot(self.store, answer, token=TOKEN, allowed_user_ids=[USER_ID, USER_ID + 1])
+        await bot.process_update(update(170, 'Tell me about Jalen Brunson'))
+        restarted = TelegramBot(self.store, answer, token=TOKEN, allowed_user_ids=[USER_ID, USER_ID + 1])
+        await restarted.process_update(update(171, 'What is his defensive percentage against Maxey?'))
+        self.assertIn('Jalen Brunson', received[-1][1][0]['content'])
+        await restarted.process_update(update(172, 'Hello', user=USER_ID + 1))
+        self.assertEqual(received[-1][1], [])
+        await restarted.process_update(update(173, '/clear'))
+        await restarted.process_update(update(174, 'New topic'))
+        self.assertEqual(received[-1][1], [])
+        self.assertTrue(restarted._conversation(USER_ID + 1))
+
+    async def test_conversation_history_is_bounded_and_unauthorized_messages_are_not_saved(self):
+        for number in range(180, 185):
+            await self.bot.process_update(update(number, 'Question ' + str(number)))
+        self.assertLessEqual(len(self.rows('telegram_conversation')), 3)
+        await self.bot.process_update(update(186, 'Private injection', user=999))
+        self.assertNotIn('Private injection', str(self.rows('telegram_conversation')))
+        with self.bot._db() as db:
+            db.execute("UPDATE telegram_conversation SET created_at='2000-01-01T00:00:00+00:00'")
+        self.assertEqual(self.bot._conversation(USER_ID), [])
+
     async def test_ai_status_uses_only_safe_local_metadata_and_does_not_call_model(self):
         calls = []
 

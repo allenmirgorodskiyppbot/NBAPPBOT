@@ -177,9 +177,14 @@ def master_context(master):
 async def telegram_answer(text, history=None):
     state = app.state
     from player_stats import answer_player_question
-    direct = await asyncio.to_thread(answer_player_question, state.master, text)
+    direct = await asyncio.to_thread(answer_player_question, state.master, text, history or [])
     if direct is not None:
         return direct['answer']
+    if state.store is not None:
+        from matchup_queries import answer_matchup_question
+        matchup = await asyncio.to_thread(answer_matchup_question, state.store, text, history or [])
+        if matchup is not None:
+            return matchup['answer']
     if state.phase != 'ready':
         return ('The AI model is not ready yet: ' + state.detail +
                 '. /summary shows collected injury reports without waiting for AI. '
@@ -569,9 +574,15 @@ async def answer_news_question(request, progress, master, topic):
 
 
 async def answer_question(store, request, progress, master=None):
+    from matchup_queries import answer_matchup_question
+    matchup = await asyncio.to_thread(answer_matchup_question, store, request.message,
+                                      [message.model_dump() for message in request.history])
+    if matchup is not None:
+        return matchup
     if master is not None:
         from player_stats import answer_player_question
-        direct = await asyncio.to_thread(answer_player_question, master, request.message)
+        direct = await asyncio.to_thread(answer_player_question, master, request.message,
+                                          [message.model_dump() for message in request.history])
         if direct is not None:
             progress['detail'] = 'Calculated from stored player games'
             return direct

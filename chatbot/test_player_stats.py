@@ -59,6 +59,17 @@ class PlayerStatsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('44.50', answer)
         self.assertIn('1 missing', answer)
 
+    def test_natural_average_needs_no_game_count_and_uses_the_whole_requested_season(self):
+        result = answer_player_question(self.store, 'What is Jalen Brunson averaging in 2025-26?')
+        self.assertEqual(result['data']['averages']['pts'], 32.5)
+        self.assertIn('5 stored games', result['answer'])
+        self.assertNotIn('last 5', result['answer'])
+
+    def test_pronoun_average_uses_recent_context_without_numeric_inputs(self):
+        result = answer_player_question(self.store, 'What is his PPG in 2025-26?',
+                    [{'role': 'user', 'content': 'Tell me about Jalen Brunson'}])
+        self.assertEqual(result['data']['averages']['pts'], 32.5)
+
     def test_explicit_season_is_not_silently_ignored(self):
         result = answer_player_question(self.store, 'Show Jalen Brunson last five games in 2026-27 and points.')
         self.assertIn('No completed', result['answer'])

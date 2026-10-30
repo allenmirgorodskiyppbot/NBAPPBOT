@@ -38,6 +38,26 @@ The [model registry](https://ollama.com/library/qwen2.5:3b) documents the model 
 
 ## Test the bot without a live PrizePicks board
 
+Normal sentences are the primary chat interface; numeric command arguments are optional
+shortcuts. Telegram retains the last three natural-language turns per private chat and
+uses context from the last twelve hours, including across restarts. Commands and uploads
+are not added to that conversation history. `/clear` clears that chat's context without
+changing its dataset or picks.
+For example, “What is Brunson averaging?” needs no game-count argument: the bot uses
+all stored completed games played in the current regular season and states that scope.
+“What is his PPG?” can use the recent player topic. An explicit season is honored;
+career, opponent and other unsupported filters go to the general query planner.
+
+For measured matchups, ask “What FG% does Tyrese Maxey shoot when Jalen Brunson guards
+him?” The bot reads the dated measured-pair section of `Pair_Tracking`, calculates
+FGM/FGA, and returns the season, phase, game/date range and Excel/source citations.
+It never adds overlapping historical aggregate phases or substitutes whole-game
+coappearances for measured defending. A follow-up using “his” can use the previous
+player topic. “Defensive percentage” alone prompts a clarification of the metric;
+the user supplies names/intent, not shot counts. Missing, zero-attempt or conflicting
+samples are reported rather than replaced with a guessed percentage. The current
+quick matchup path handles overall FG% allowed; other metrics remain separate requests.
+
 Player game logs have a direct read-only path that does not wait for model inference:
 
 ```text
