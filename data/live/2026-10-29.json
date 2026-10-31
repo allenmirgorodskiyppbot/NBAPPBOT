@@ -42,6 +42,7 @@
       "status": "final"
     }
   ],
+  "inventory_scope": "Games present in the published extract; complete NBA schedule not independently verified.",
   "pending_game_ids": [],
   "player_games": [
     {
@@ -1473,10 +1474,11 @@
   ],
   "publication_source": "SportsDataverse public ESPN extract",
   "published_at": "2026-10-31T11:32:06+00:00",
+  "publisher_file_data_through_date": "2026-10-30",
   "schema_version": 1,
   "scope_revision": "6b49a4f7df12f3d309d16860b0da458bcbc49f11eccf4965bf3fca89e4a67148",
   "source": "espn",
-  "source_data_through_date": "2026-10-30",
+  "source_data_through_date": "2026-10-29",
   "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.csv",
   "upstream_full_game_validated": true
 }
