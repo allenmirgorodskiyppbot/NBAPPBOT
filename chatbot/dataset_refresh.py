@@ -44,13 +44,17 @@ def index_workbook_evidence(store,workbook):
     from workbook import quote
     import sqlite3
     groups={'assignments':assignment_rows(workbook),'measured_pairs':_records(workbook)}
-    for sheet,key in [('Team_Schedule','rest_schedule'),('Calculated_Splits','splits'),('Correlations','correlations')]:
+    for sheet,key in [('Team_Schedule','rest_schedule'),('Calculated_Splits','splits'),('Correlations','correlations'),
+                      ('Pair_Summaries','pair_summaries'),('Season_Totals','season_totals'),
+                      ('Sources','sources'),('Missing_Data','missing_data')]:
         info=getattr(workbook,'sheets',{}).get(sheet)
         if info and info.get('named_table_rows'):
             with workbook.connect() as db:
                 db.row_factory=sqlite3.Row
                 groups[key]=[dict(row) for row in db.execute('SELECT * FROM '+quote(info['sql_table']))]
-    revision=hashlib.sha256(json.dumps(groups,sort_keys=True,default=str).encode()).hexdigest()
+    inventory=[{'sheet':name,'columns':info.get('columns',[]),'rows':info.get('nonempty_rows'),
+                'notes':info.get('notes',[])} for name,info in getattr(workbook,'sheets',{}).items()]
+    revision=hashlib.sha256(json.dumps({'groups':groups,'inventory':inventory},sort_keys=True,default=str).encode()).hexdigest()
     prior=store.get_checkpoint('research_evidence_revision',{})
     if prior.get('revision')==revision:
         return
@@ -62,6 +66,7 @@ def index_workbook_evidence(store,workbook):
                 (kind,str(row.get('selected_player') or row.get('player') or row.get('offense_player') or row.get('team') or ''),json.dumps(row,default=str))
                 for row in rows])
     store.set_checkpoint('research_evidence_revision',{'revision':revision,'scope':'Existing workbook records only; no new metric types or pair definitions.'})
+    store.set_checkpoint('workbook_sheet_inventory',inventory)
     store.set_checkpoint('metric_refresh_coverage',{
         'player_production_efficiency_volume':'Recomputed from new observations for existing players after every imported completed game, against any opponent.',
         'overall_team_statistics':'Only existing team metrics and matching source observations may refresh; incomplete player subsets do not establish team totals.',

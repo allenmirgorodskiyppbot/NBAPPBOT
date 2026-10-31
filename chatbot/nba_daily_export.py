@@ -184,6 +184,12 @@ async def main_async(args):
             print(day,result['source'],'games',len(result['games']),'players',len(result['player_games']),
                   'complete',result['complete'],flush=True)
         advanced_ok=await mirror.tracking(output)
+        # Try missing original tracking populations separately. The helper uses
+        # its own cooldown and never replaces successful mirror categories with
+        # a failed direct request.
+        from advanced_refresh import supplement_tracking
+        direct_ok=await supplement_tracking(collector,output)
+        advanced_ok=bool(advanced_ok or direct_ok)
         print('Existing-statistics source collected:',advanced_ok,flush=True)
     if failures:
         print('Some daily dates could not be collected; no success was fabricated.',flush=True)

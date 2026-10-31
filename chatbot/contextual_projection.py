@@ -81,6 +81,9 @@ def projection_for_leg(store,leg,now):
         cohorts.append({'type':'opponent_team','team':opponent,'n':len(cohort),'adjustment':adjustment})
     rest=context.get('scheduled_rest_days')
     rest_rows=_evidence(store,'rest_schedule',team) if team else []
+    if team:
+        from season_calendar import refreshed_rest_rows
+        rest_rows.extend(row for row in refreshed_rest_rows(store,now) if row['team']==team)
     rest_lookup={str(r.get('date',''))[:10]:r.get('rest_days') for r in rest_rows}
     if rest is not None:
         same_rest=[r for r in valid if rest_lookup.get(r['date'])==rest]
@@ -112,7 +115,8 @@ def projection_for_leg(store,leg,now):
         if len(source_news)==3:break
     if source_news:
         limitations.append('Recent collected reports may affect this player; no minutes/role change is invented from an unverified headline.')
-    assignments=[r for r in _evidence(store,'assignments',player) if r.get('opponent_team')==opponent
+    from assignment_refresh import assignment_rows_for, refresh_caution
+    assignments=[r for r in assignment_rows_for(store, now=now) if r.get('selected_player')==player and r.get('opponent_team')==opponent
                  and str(r.get('assignment_asof',''))[:10]<=today]
     assignments=sorted(assignments,key=lambda r:str(r.get('assignment_asof','')),reverse=True)[:1]
     pairing=None
@@ -120,8 +124,13 @@ def projection_for_leg(store,leg,now):
         assignment=assignments[0]
         pairing={'primary':assignment.get('primary'),'alternate':assignment.get('alternate'),
                  'asof':assignment.get('assignment_asof'),'excel_row':assignment.get('_row'),
-                 'status':'Tentative; direction and actual game-day defensive assignment are not confirmed.'}
+                 'status':'Tentative; direction and actual game-day defensive assignment are not confirmed.',
+                 'last_checked':assignment.get('last_checked'),
+                 'refresh_state':assignment.get('refresh_state'),
+                 'refresh_caution':refresh_caution(assignment)}
         reasons.append(f"Dated tentative pairing: {pairing['primary']} / {pairing['alternate']} ({str(pairing['asof'])[:10]}). It informs a conditional research scenario, not a made-up defender adjustment.")
+        if pairing['refresh_caution']:
+            limitations.append(pairing['refresh_caution'])
     # Unpriced research uses the same workload/context model without fabricating
     # a sportsbook line. Margins only exist after an actual offered side/line.
     priced=leg.get('line') is not None and leg.get('side') in {'more','less'}

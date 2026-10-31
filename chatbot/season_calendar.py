@@ -177,3 +177,40 @@ def calendar_context(store, date, team):
             'previous_scheduled_team_game':previous['date'] if previous else None,
             'scheduled_rest_days':max(0,(dt.date.fromisoformat(date)-dt.date.fromisoformat(previous['date'])).days-1) if previous and rest_covered else None,
             'participation_note':'Team calendar dates do not establish which players participated.'}
+
+
+def refreshed_rest_rows(store, now=None):
+    """Derive rest only where a published calendar covers the whole interval.
+
+    Actual final games must match the saved date and opponents. No player-log gap
+    or incomplete league game inventory can establish a team's rest schedule.
+    The calendar source date stays visible, including saved-publication limits.
+    """
+    now=now or dt.datetime.now(dt.timezone.utc)
+    today=now.astimezone(EASTERN).date().isoformat()
+    with store.connect() as db:
+        games=[dict(row) for row in db.execute(
+            "SELECT s.* FROM season_schedule s JOIN games g ON s.id=g.id "
+            "WHERE g.status='final' AND g.date=s.date AND g.home_team=s.home_team "
+            "AND g.away_team=s.away_team AND s.date<=? "
+            "AND s.status NOT IN ('canceled','postponed')",(today,))]
+    result=[]
+    for game in games:
+        for team in (game['home_team'],game['away_team']):
+            context=calendar_context(store,game['date'],team)
+            days=context.get('scheduled_rest_days')
+            if days is None:
+                continue
+            # A same-season calendar cannot prove a prior offseason interval.
+            previous=context.get('previous_scheduled_team_game')
+            if not previous or current_season(dt.datetime.fromisoformat(previous).replace(tzinfo=EASTERN))!=game['season']:
+                continue
+            bucket='0 (B2B)' if days==0 else str(days) if days in (1,2) else '3-6' if days<=6 else '7+'
+            result.append({'team':team,'date':game['date'],'game_id':game['id'],
+                           'opponent':context['opponent'],'venue':context['venue'],
+                           'previous_team_game':previous,'rest_days':days,'rest_bucket':bucket,
+                           'offseason_gap':False,'source':game['source'],
+                           'source_asof':game['source_asof'],'source_kind':game['source_kind'],
+                           'status':'derived_from_published_calendar',
+                           'note':'Rest follows the complete published interval. Later unverified schedule changes may be missed.'})
+    return result

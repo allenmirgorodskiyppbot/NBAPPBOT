@@ -444,14 +444,19 @@ def evidence_cards(context, question=''):
             'local workbook tools cannot fetch a new official report. Explain that limit directly instead of '
             'requesting the same missing data or claiming a player is healthy, injured or ruled out.')
     for row in context.get('assignment_projections',[])[:2]:
+        from assignment_refresh import refresh_caution
         text=(f"{row['selected_player']}–{row['opponent_team']} pairing: {row.get('primary') or 'unavailable'}"
               +(f"; alternate {row['alternate']}" if row.get('alternate') else '')
               +f". Tentative as of {date(row.get('assignment_asof'))}; guarding direction unconfirmed. "
               +f"Source: Matchup_Assignments row {row.get('_row','unknown')}.")
+        caution = refresh_caution(row)
+        if caution:
+            text += ' ' + caution
         add('tentative_assignment',text,row,'Matchup_Assignments')
         cards[-1].update(entity=row['selected_player'], opponent=row['opponent_team'],
                          primary=row.get('primary'), alternate=row.get('alternate'),
                          assignment_date=date(row.get('assignment_asof')),
+                         assignment_refresh_state=row.get('refresh_state'),
                          assignment_direction='unconfirmed', verified_game_day_assignment=False,
                          matches_resolved_matchup=(len(players)==1 and len(teams)==1 and
                              players[0]==row['selected_player'] and teams[0]==row['opponent_team']))
@@ -560,6 +565,11 @@ def prompt_evidence(cards):
         if card['kind'] == 'tentative_assignment' and card.get('verified_game_day_assignment') is not True:
             value['text'] = ('A dated tentative pairing exists; guarding direction and the current lineup '
                              'are unconfirmed. Exact sourced pairing names will be displayed separately.')
+            if card.get('assignment_refresh_state') == 'needs_review':
+                value['text'] += (' Collected roster or game-specific availability evidence conflicts with using '
+                                  'the saved pairing; do not treat its names as current assignments.')
+            elif card.get('assignment_refresh_state') == 'recheck_overdue':
+                value['text'] += ' Its roster and availability recheck is overdue.'
         result.append(value)
     return result
 

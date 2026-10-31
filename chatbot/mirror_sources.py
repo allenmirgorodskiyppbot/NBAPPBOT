@@ -95,7 +95,9 @@ def existing_game_snapshots(content,scope,published_at,source):
             target['pending_game_ids'].append(game_id);target['errors'].append({'game_id':game_id,'error_type':'SourceValidationError'})
     through=max(days) if days else None
     for day,target in days.items():
-        target['complete']=not target['pending_game_ids'];target['source_data_through_date']=through
+        target['complete']=not target['pending_game_ids'];target['source_data_through_date']=day
+        target['publisher_file_data_through_date']=through
+        target['inventory_scope']='Games present in the published extract; complete NBA schedule not independently verified.'
     return days
 
 
@@ -129,7 +131,7 @@ class PublishedNBAData:
 
     async def tracking(self,output):
         import pyarrow.parquet as pq
-        from advanced_refresh import normalize_records
+        from advanced_refresh import normalize_records,preserve_sparse_fields
         from master import clear_unverified_tracking_coverage
         pair_scope=json.loads(Path(__file__).with_name('matchup_refresh_scope.json').read_text())
         assets=[('Player totals','player_stats_base'),('Team totals','team_stats_base'),('Team defense','team_stats_opponent'),
@@ -137,7 +139,7 @@ class PublishedNBAData:
                 ('Possessions','player_tracking_possessions'),('Rim','player_tracking_defense')]
         target=Path(output)/'existing_tracking.json'
         old=json.loads(target.read_text()) if target.exists() else {}
-        prior={(r.get('season'),r.get('entity'),r.get('category')):r for r in old.get('records',[])}
+        prior={(r.get('season'),r.get('entity'),r.get('category')):r for r in old.get('records',[]) if r.get('season')==self.season}
         records=[];coverage=[];published=[]
         for category,prefix in assets:
             try:
@@ -151,8 +153,10 @@ class PublishedNBAData:
                 if not normalized:raise ValueError('No existing metric values returned.')
                 for record in normalized:
                     record.update(source=meta['browser_download_url'],published_at=meta['updated_at'],
-                        publication_source='SportsDataverse published NBA Stats extract')
+                        source_published_at=meta['updated_at'],publication_time_kind='publisher_modified',
+                        retrieved_at=self.now.isoformat(),publication_source='SportsDataverse published NBA Stats extract')
                     tracking_coverage(record,prior.get((record['season'],record['entity'],record['category'])))
+                    record.update(preserve_sparse_fields(record,prior.get((record['season'],record['entity'],record['category']))))
                 dates=[r.get('data_through_date') for r in normalized]
                 through=min(dates) if dates and all(dates) else None
                 records.extend(normalized);published.append(meta['updated_at'])
@@ -165,15 +169,16 @@ class PublishedNBAData:
         # The current public mirror does not supply these populations. Prior dated
         # records remain unchanged; neither box production nor rim FG substitutes.
         coverage.extend({'category':category,'status':'unavailable','reason':'No current-season extract in this publication.'}
-                        for category in ('Overall','Named pair'))
-        successful={c['category'] for c in coverage if c['status']=='collected'}
+                        for category in ('Overall','Named pair','Less Than 6Ft','Hustle'))
+        imported_keys={(r['season'],r['entity'],r['category']) for r in records}
         records.extend(clear_unverified_tracking_coverage(dict(r)) for r in old.get('records',[])
-                       if r.get('category') not in successful)
+                       if r.get('season')==self.season and (r.get('season'),r.get('entity'),r.get('category')) not in imported_keys)
         if not published:return False
         known=[c.get('source_data_through_date') for c in coverage if c['status']=='collected']
         through=min(known) if known and all(known) else None
         document={'schema_version':1,'scope_revision':self.scope['revision'],'season':self.season,
-            'last_attempt':max(published),'records':records,'coverage':coverage,
+            'last_attempt':self.now.isoformat(),'source_published_at':max(published),'records':records,'coverage':coverage,
+            'direct_tracking_attempted_at':old.get('direct_tracking_attempted_at'),
             'source_data_through_date':through,'policy':'Only existing workbook entities/metrics; source publication lag is preserved.'}
         target.write_text(json.dumps(document,indent=2,sort_keys=True)+'\n')
         return True

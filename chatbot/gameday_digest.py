@@ -126,6 +126,11 @@ def relevant_reports(store, opponent, now):
 
 
 def render_digest(store, game, now, schedule_checked, refresh_ok):
+    from assignment_refresh import refresh_assignments
+    try:
+        refresh_assignments(store, now)
+    except Exception as error:
+        store.feed_failure('assignment_refresh',type(error).__name__+'; original dated estimates retained.')
     opponent = game['away_team'] if game['home_team'] == 'NYK' else game['home_team']
     tip = _aware(game['start_time']).astimezone(EASTERN)
     lines = [f"Knicks game-day projections / injury update — {tip.strftime('%b %d')}",

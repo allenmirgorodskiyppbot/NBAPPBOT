@@ -26,8 +26,13 @@ types or unrelated matchup populations.
 
 The original **53-sheet Excel workbook remains a dated reference snapshot**. The
 persistent master database and regenerated `NBA_Master.xlsx` export contain the
-refreshable observations, current summaries and season calendar. Older workbook
-values are not silently presented as freshly collected statistics.
+refreshable observations, current summaries and season calendar. The export also
+recalculates the existing split, correlation and coappearance definitions and
+builds readable views for the original player/opponent pages. `Tracking_Metrics`
+exposes source values and dates in ordinary columns; `Refresh_Coverage` identifies
+what could be recomputed and what still requires its own source. The original
+formatted workbook is preserved separately; a download does not overwrite a copy
+already saved on your computer.
 
 ## Morning statistics refresh
 
@@ -35,6 +40,12 @@ The application checks at **11:30 AM America/New_York** for the previous day's
 published data, including games unrelated to the Knicks when they update existing
 players or teams. It catches up after a restart and retries pending publication
 **hourly**. Daylight saving time follows the New York timezone.
+
+Tracking imports have their own hourly retry even after game observations finish.
+Only dates actually imported advance game coverage; tracking publication dates
+cannot make a missing game appear covered. Older source publications cannot undo
+newer game corrections. Each completed collection attempt rebuilds the export,
+including source failures and unchanged values, with coverage recorded first.
 
 The working free source is the public
 [SportsDataverse data repository](https://github.com/sportsdataverse/sportsdataverse-data),
@@ -62,6 +73,32 @@ named measured-pair extracts. Those records retain their original dates and show
 unavailable/stale coverage. Rim defense, scoring totals and whole-game coappearance
 never substitute for those missing populations. Other unsupported tracking fields
 also keep their source dates. Inspect `/status` before interpreting a value as current.
+
+The relay also makes a bounded direct NBA Stats attempt for missing individual
+defense, rim, named-pair and existing hustle fields (contested shots/deflections),
+with a separate six-hour cooldown and a stop after host refusal/timeout. A working
+mirror category is preserved if that attempt fails. Source availability is not
+guaranteed. Sparse updates keep omitted old fields separately with their original
+dates and denominators; they do not mix old counts into a newer total.
+
+Existing calculated splits and correlations are regenerated from final played
+observations with season, phase, opponent and same-game populations kept explicit.
+AI retrieval can read these same regenerated tables through a bounded, read-only
+tool with exact player/season/metric filters. Explicit original-sheet or cell
+requests still read the original dated workbook.
+Published calendar coverage can update Knicks rest context for matching completed
+games; a player's appearance gap cannot establish team rest. Missing shot-location,
+rotation, on/off, play-type or measured-defender inputs remain explicit gaps.
+Team totals, rim defense and lineup positions are not substitutes for those inputs.
+
+Tentative pairings now share a recheck across direct answers, AI evidence,
+projections and Excel. Startup, collection cycles and pregame research check the
+existing names against recent team observations and game-specific injury reports.
+Conflicts are flagged. The original assignment date remains unchanged unless a
+new assignment source exists; rechecking the October 22 estimate is not a new
+defender prediction. Available directional measured history is shown separately
+from an upcoming coaching assignment. No complete verified pregame-defender feed
+has been established.
 
 Manual statistics uploads remain available as an explicit fallback. The bot does
 not send box-score recaps or create a new unrelated matchup archive.
@@ -324,3 +361,15 @@ matched all 19 supported card occurrences (17 distinct markets and 29 visible
 sides), including side-specific Standard/Goblin/Demon markers, against independent
 visual inspection. Unsupported quarters-with-points and two-point-attempt markets,
 and cut-off cards, stayed excluded. No original screenshots were published.
+
+
+## October 31 existing-statistic refresh validation
+
+The expanded refresh release passed **525 automated tests**. A temporary master
+imported actual published October 29–30 game observations and 1,281 current
+tracking records, then rebuilt the Excel export without modifying the original
+master or creating entries. The export includes 4,953 existing split definitions,
+4,137 correlation definitions and 232 rechecked tentative pairings. Unavailable
+inputs remain explicitly unavailable. See the [validation record](docs/validation-refresh-2026-10-31.json)
+for sample coverage, source limitations and checks. Live Akash activation remains
+a separate deployment step.

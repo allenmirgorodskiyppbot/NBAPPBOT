@@ -8,6 +8,7 @@ from unittest.mock import patch
 import httpx
 
 import app
+import assignment_refresh
 import dataset_refresh
 import release_checks
 
@@ -62,6 +63,7 @@ class MockedStartupTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(dataset_refresh, 'initialize_scope'), \
                 patch.object(dataset_refresh, 'index_workbook_evidence'), \
                 patch.object(dataset_refresh, 'supplement_existing_observation_fields'), \
+                patch.object(assignment_refresh, 'refresh_assignments'), \
                 patch.object(release_checks, 'model_startup_completed'), \
                 patch.object(app.asyncio, 'to_thread', direct), patch.object(app.log, 'exception'):
             await app.initialize(SimpleNamespace(state=state))

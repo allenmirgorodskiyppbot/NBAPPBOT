@@ -28,7 +28,8 @@ def data_revision(store):
         parts.append(tuple(db.execute('SELECT COUNT(*),MAX(created_at) FROM boards').fetchone()))
         parts.append(tuple(db.execute('SELECT COUNT(*),MAX(graded_at),MAX(settled_at) FROM entries').fetchone()))
         from season_calendar import current_season
-        for key in ('research_evidence_revision','season_calendar:'+current_season(dt.datetime.now(dt.timezone.utc))):
+        for key in ('research_evidence_revision','assignment_refresh_status',
+                    'season_calendar:'+current_season(dt.datetime.now(dt.timezone.utc))):
             row=db.execute('SELECT value_json FROM checkpoints WHERE name=?',(key,)).fetchone()
             value=json.loads(row[0]) if row else None
             parts.append(value.get('revision') if isinstance(value,dict) else value)

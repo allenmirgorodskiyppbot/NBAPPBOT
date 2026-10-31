@@ -80,6 +80,9 @@ def import_daily_snapshot(store, document, day, now):
     prior=store.get_checkpoint('daily_nba:'+day,{})
     if prior.get('sha256')==digest:
         return {**prior,'unchanged':True}
+    prior_publication=_aware(prior.get('publisher_retrieved_at'))
+    if prior_publication and published<prior_publication:
+        return {**prior,'unchanged':True,'ignored_older_publication':True}
     count=0
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
@@ -98,6 +101,7 @@ def import_daily_snapshot(store, document, day, now):
             store.upsert_game(game,db=db)
         record={'date':day,'complete':complete,'games':len(games),'expected_games':expected,
                 'player_rows':len(rows),'changed_player_rows':count,'source':document['source'],
+                'inventory_scope':document.get('inventory_scope','published snapshot inventory; full league schedule not independently verified'),
                 'publisher_retrieved_at':published.isoformat(),'imported_at':now.isoformat(),'sha256':digest}
         db.execute('INSERT INTO checkpoints VALUES (?,?) ON CONFLICT(name) DO UPDATE SET value_json=excluded.value_json',
                    ('daily_nba:'+day,json.dumps(record)))
@@ -136,11 +140,21 @@ class NightlyNBARefresh:
                 # startup/backfill dates. Restarting after the deadline catches up.
                 pending=[target,(target_day-dt.timedelta(days=1)).isoformat(),*pending]
                 status['handled_target_date']=target
+            elif local>=deadline and not self.store.get_checkpoint('daily_nba:'+target,{}).get('complete'):
+                pending=[target,*pending]
             last=_aware(status.get('last_attempt'))
-            through=status.get('source_data_through_date')
-            if pending and (due or not last or (now-last).total_seconds()>=3600):
-                from efficient_ai import data_revision
-                before_revision=data_revision(self.store)
+            # Repair legacy status that may have borrowed the tracking/source
+            # file's newest date even though that game day was never imported.
+            with self.store.connect() as db:
+                imported=[json.loads(row[0]) for row in db.execute(
+                    "SELECT value_json FROM checkpoints WHERE name LIKE 'daily_nba:%'")]
+            through=max((r['date'] for r in imported if r.get('complete') is True
+                         and isinstance(r.get('date'),str) and r['date']<=target),default=None)
+            game_attempt=bool(pending and (due or not last or (now-last).total_seconds()>=3600))
+            tracking_last=_aware(status.get('last_tracking_attempt'))
+            tracking_attempt=bool((local>=deadline or game_attempt) and
+                                  (due or not tracking_last or (now-tracking_last).total_seconds()>=3600))
+            if game_attempt:
                 pending=list(dict.fromkeys(pending))
                 if target in pending:
                     pending=[target,*[day for day in pending if day!=target]]
@@ -150,7 +164,9 @@ class NightlyNBARefresh:
                         document=await self.worker.request(self.base+'/'+day+'.json')
                         report=await asyncio.to_thread(import_daily_snapshot,self.store,document,day,now)
                         if report['complete']:
-                            through=max(str(through or ''),str(document.get('source_data_through_date') or day))
+                            # Only this validated date was imported. The upstream
+                            # file may also contain later games or tracking data.
+                            through=max(str(through or ''),day)
                             self.store.feed_success('nba_daily_refresh',f"Existing scoped statistics for {day}: {report['games']} published games, {report['player_rows']} existing-player observations.")
                         else:
                             pending.append(day)
@@ -160,21 +176,30 @@ class NightlyNBARefresh:
                         code=getattr(getattr(error,'response',None),'status_code',None)
                         self.store.feed_failure('nba_daily_refresh',type(error).__name__+(f': HTTP {code}' if code else '')+
                             '; previous-day data not available for '+day+'. Prior verified values retained; hourly retry is automatic.')
+                status['last_attempt']=now.isoformat()
+            if tracking_attempt:
                 try:
                     tracking=await self.worker.request(self.base+'/existing_tracking.json')
                     from advanced_refresh import import_tracking
                     await asyncio.to_thread(import_tracking,self.store,tracking,now)
-                    if tracking.get('source_data_through_date'):
-                        through=max(str(through or ''),str(tracking['source_data_through_date']))
+                    coverage=self.store.get_checkpoint('tracking_refresh_status',{}).get('coverage',[])
+                    status['tracking_refresh_phase']=('partial' if any(c.get('status')!='collected' for c in coverage)
+                        else 'collected' if coverage else 'unavailable')
+                    status['tracking_source_data_through_date']=self.store.get_checkpoint('tracking_refresh_status',{}).get('source_data_through_date')
                 except asyncio.CancelledError:raise
                 except Exception as error:
+                    status['tracking_refresh_phase']='unavailable'
                     self.store.feed_failure('existing_tracking_refresh',type(error).__name__+
                         '; missing tracking fields keep their original source dates and are not inferred from game totals.')
-                status['last_attempt']=now.isoformat()
-                if self.exporter and self.data_dir and data_revision(self.store)!=before_revision:
-                    from pathlib import Path
-                    await asyncio.to_thread(self.exporter,self.store,Path(self.data_dir)/'exports')
-                    status['master_export_updated_at']=now.isoformat()
+                status['last_tracking_attempt']=now.isoformat()
+            if game_attempt or tracking_attempt:
+                try:
+                    from assignment_refresh import refresh_assignments
+                    await asyncio.to_thread(refresh_assignments,self.store,now)
+                except asyncio.CancelledError:raise
+                except Exception as error:
+                    self.store.feed_failure('assignment_refresh',type(error).__name__+
+                        '; prior tentative source dates retained; no new defender assumed.')
             pending=list(dict.fromkeys(pending))
             waiting=target in pending or not through or through<target
             if waiting and status.get('last_attempt'):
@@ -184,9 +209,26 @@ class NightlyNBARefresh:
             status.update(enabled=True,phase='waiting_for_publication' if waiting else 'updated',timezone='America/New_York',
                           daily_time='11:30',target_game_date=target,next_daily_run=next_run.isoformat(),
                           pending_dates=pending,source_data_through_date=through,retry_seconds=3600,
+                          older_pending_dates=[day for day in pending if day<target],
+                          game_refresh_phase='waiting_for_publication' if waiting else 'updated',
+                          completeness_scope='Published game inventory processed; all NBA games and every tracking metric are not independently verified by this status.',
+                          tracking_retry_seconds=3600,
                           source='Independently published public NBA extracts; existing workbook entities only',
-                          note='Morning refresh covers the previous day. Source lag is visible; no AI inference is used.')
+                          note='Game refresh status covers imported game observations only. Tracking metrics and tentative assignments have separate coverage and source dates; rebuilding Excel does not make every field current.')
             self.store.set_checkpoint('nightly_nba_refresh',status)
+            # Persist current coverage before rebuilding, including failed or
+            # unchanged source checks. A new file time is never a source date.
+            if (game_attempt or tracking_attempt) and self.exporter and self.data_dir:
+                from pathlib import Path
+                try:
+                    await asyncio.to_thread(self.exporter,self.store,Path(self.data_dir)/'exports')
+                    status['master_export_updated_at']=now.isoformat()
+                    status['master_export_error']=None
+                except asyncio.CancelledError:raise
+                except Exception as error:
+                    status['master_export_error']=type(error).__name__
+                    self.store.feed_failure('master_export',type(error).__name__+'; previous Excel export retained.')
+                self.store.set_checkpoint('nightly_nba_refresh',status)
 
     async def run(self):
         while True:

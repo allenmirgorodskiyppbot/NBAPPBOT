@@ -521,6 +521,14 @@ class TelegramBot:
                 # Existing feed timestamps remain visible; failed refreshes do
                 # not get relabeled fresh and never block screenshot processing.
                 log.warning('Board news refresh incomplete; using saved source timestamps.')
+        if callable(getattr(self.store,'connect',None)):
+            try:
+                from assignment_refresh import refresh_assignments
+                await asyncio.to_thread(refresh_assignments,self.store)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.warning('Tentative matchup recheck incomplete; original source dates retained.')
 
     async def _shortlist_reply(self, report):
         if callable(getattr(self.store, 'connect', None)) and 'original_legs' in report:

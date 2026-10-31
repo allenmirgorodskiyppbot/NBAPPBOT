@@ -89,7 +89,7 @@ class CompactPlannerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Potential assists', cards[0]['text'])
         self.assertNotIn('Unrelated 49', seen[0]['messages'][0]['content'])
         self.assertEqual(seen[0]['options']['num_ctx'], 4096)
-        self.assertEqual(len(seen[0]['tools']), 8)
+        self.assertEqual(len(seen[0]['tools']), 9)
         self.assertEqual(len(seen), 2)
 
     async def test_tracking_query_keeps_requested_player_season_and_metric(self):

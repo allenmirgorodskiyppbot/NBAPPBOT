@@ -53,9 +53,12 @@ def _has(text, phrase):
     return bool(re.search(r'(?<!\w)' + re.escape(_key(phrase)) + r'(?!\w)', _key(text)))
 
 
-def assignment_rows(store):
+def assignment_rows(store, master=None):
     cached = getattr(store, '_research_assignments', None)
     if cached is not None:
+        if master is not None:
+            from assignment_refresh import assignment_rows_for
+            return assignment_rows_for(master, cached)
         return cached
     info = getattr(store, 'sheets', {}).get('Matchup_Assignments')
     if not info or 'selected_player' not in info.get('columns', []):
@@ -67,6 +70,9 @@ def assignment_rows(store):
     rows = [row for row in rows if row.get('selected_player') and row.get('opponent_team')
             and row.get('assignment_asof') and str(row['assignment_asof'])[:10] <= today]
     store._research_assignments = rows
+    if master is not None:
+        from assignment_refresh import assignment_rows_for
+        return assignment_rows_for(master, rows)
     return rows
 
 
@@ -214,8 +220,8 @@ def _opponent(resolved, master):
     return None
 
 
-def assignments_for(store, players, opponent=None):
-    rows = [row for row in assignment_rows(store) if row['selected_player'] in players
+def assignments_for(store, players, opponent=None, master=None):
+    rows = [row for row in assignment_rows(store, master) if row['selected_player'] in players
             and (not opponent or row['opponent_team'] == opponent)]
     if not opponent:
         return rows[:4]
@@ -251,7 +257,7 @@ def answer_assignment_question(store, master, question, history=None, resolved=N
     if not opponent:
         return result(f'Which opponent do you mean for {player}? I can look up the saved matchup pairing. '
                       'A confirmed game-day assignment also depends on the current lineup.')
-    rows = assignments_for(store, [player], opponent)
+    rows = assignments_for(store, [player], opponent, master)
     if not rows:
         return result(f'I don’t have a saved matchup assignment for {player} against {opponent}. '
                       'The current lineup and defensive scheme would be needed to project it; I won’t infer who guards whom from whole-game stats.')
@@ -270,6 +276,10 @@ def answer_assignment_question(store, master, question, history=None, resolved=N
               + 'The record does not specify the direction of the assignment, so it does not establish who guards whom. '
               + 'Current lineups, availability, and switches can change the pairing.\n'
               + f"Source: Matchup_Assignments, Excel row {row['_row']}; assignment {row.get('assignment_id') or 'ID unavailable'}.")
+    from assignment_refresh import refresh_caution
+    caution = refresh_caution(row)
+    if caution:
+        answer += '\n\n' + caution
     return result(answer, rows)
 
 
@@ -313,14 +323,14 @@ def _requested_population(resolved):
             'season_basis': 'explicit request' if seasons else 'previous season' if relative_previous else 'current season'}
 
 
-def _context_assignments(store, players, opponent, population):
+def _context_assignments(store, players, opponent, population, master=None):
     # A comparison without one requested opponent has no relevant assignment
     # pair. Arbitrary first-sheet opponents can crowd out both players' actual
     # baselines and wrongly suggest that a prior matchup is still the topic.
     if not opponent:
         return []
     rows = []
-    for row in assignment_rows(store):
+    for row in assignment_rows(store, master):
         if row['selected_player'] not in players or opponent and row['opponent_team'] != opponent:
             continue
         stamp = str(row.get('assignment_asof') or '')
@@ -403,7 +413,7 @@ def research_context(store, master, resolved):
     opponent = _opponent(resolved, master)
     context = {'resolved_players': resolved['players'], 'resolved_teams': resolved['teams'],
                'requested_population': population, 'name_resolution_is_not_roster_verification': True,
-               'assignment_projections': _context_assignments(store, resolved['players'], opponent, population),
+               'assignment_projections': _context_assignments(store, resolved['players'], opponent, population, master),
                'player_sheets': [], 'news': [], 'current_player_statistics': [],
                'opponent_player_statistics': [], 'current_tracking': [],
                'freshness_priority': 'Prefer newer evidence only for the same entity, metric, population, season and phase. Broad season totals never replace opponent samples or tentative assignments. Covered game dates, publication dates and assignment dates are distinct.'}

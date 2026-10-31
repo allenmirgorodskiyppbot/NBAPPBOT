@@ -236,21 +236,23 @@ def master_context(master):
 async def telegram_answer(text, history=None):
     state = app.state
     source_lookup = explicit_source_request(text)
+    from current_research import wants_current_research
+    derived_lookup = not source_lookup and wants_current_research(text)
     from basketball_research import resolve_question, canonical_history, answer_assignment_question
     resolved = await asyncio.to_thread(resolve_question, state.store, state.master, text, history or [])
     assignment = (await asyncio.to_thread(answer_assignment_question, state.store, state.master,
                                           text, history or [], resolved)
-                  if state.store is not None and not source_lookup else None)
+                  if state.store is not None and not source_lookup and not derived_lookup else None)
     if assignment is not None:
         return assignment['answer']
     text = resolved['question']
     history = await asyncio.to_thread(canonical_history, state.store, state.master, history or [])
     from player_stats import answer_player_question
     direct = (await asyncio.to_thread(answer_player_question, state.master, text, history or [])
-              if not source_lookup else None)
+              if not source_lookup and not derived_lookup else None)
     if direct is not None:
         return direct['answer']
-    if state.store is not None and not source_lookup:
+    if state.store is not None and not source_lookup and not derived_lookup:
         from matchup_queries import answer_matchup_question
         matchup = await asyncio.to_thread(answer_matchup_question, state.store, text, history or [], state.master)
         if matchup is not None:
@@ -289,27 +291,8 @@ def save_backup(master, directory):
 
 
 def export_master(master, directory):
-    import openpyxl
-    workbook = openpyxl.Workbook(write_only=True)
-    with master.connect() as db:
-        for table in ['games', 'player_games', 'news', 'feed_status', 'boards', 'entries', 'grade_events', 'season_schedule', 'season_averages', 'refreshed_tracking']:
-            sheet = workbook.create_sheet(table)
-            cursor = db.execute(f'SELECT * FROM {table}')
-            sheet.append([c[0] for c in cursor.description])
-            for row in cursor:
-                # Force imported strings to text: never turn source content into Excel formulas.
-                values = []
-                for value in row:
-                    if isinstance(value, str) and value[:1] in {'=', '+', '-', '@'}:
-                        value = "'" + value
-                    values.append(value)
-                sheet.append(values)
-    directory.mkdir(parents=True, exist_ok=True)
-    target = directory / 'NBA_Master.xlsx'
-    temporary = directory / ('NBA_Master-' + uuid.uuid4().hex + '.partial.xlsx')
-    workbook.save(temporary)
-    temporary.replace(target)
-    return target
+    from refresh_export import export_master as export_refreshed_master
+    return export_refreshed_master(master, directory)
 
 
 async def notify_feed_health(master, notify, current=None):
@@ -412,6 +395,12 @@ async def initialize(application):
         await asyncio.to_thread(initialize_scope, state.master)
         await asyncio.to_thread(index_workbook_evidence, state.master, state.store)
         await asyncio.to_thread(supplement_existing_observation_fields, state.master, state.store)
+        from assignment_refresh import refresh_assignments
+        try:
+            await asyncio.to_thread(refresh_assignments, state.master)
+        except Exception as error:
+            state.master.feed_failure('assignment_refresh',type(error).__name__+
+                '; original dated estimates retained.')
         state.data_ready = True
         if state.release_check_task is None:
             from release_checks import automatic_release_checks
@@ -574,6 +563,16 @@ TOOLS = [
          'Use live player_games/games for updated results, and inspect schemas with master_status. '
          'Report source timestamps; never combine overlapping master and historical workbook games.',
          {'sql': {'type': 'string'}}, ['sql']),
+    tool('read_current_research', 'Read regenerated saved-master statistics using the same definitions as the current Excel export. '
+         'Prefer this for current splits, correlations, pair summaries and refresh coverage. '
+         'Use exact filters: player plus window/season_type/statistic for splits; player/other_player/x/y/window for correlations; '
+         'entity/category/metric/season for tracking; selected_player/opponent_team for assignments; team/date for schedule. '
+         'A read does not establish fresh source coverage. Original Excel row requests still use read_sheet.',
+         {'table': {'type': 'string', 'enum': ['Player_Metrics','Calculated_Splits','Correlations','Pair_Summaries',
+                    'Tracking_Metrics','Measured_Pair_Metrics','Matchup_Assignments','Team_Schedule','Refresh_Coverage']},
+          'filters': {'type': 'object', 'description': 'Exact named column filters. Use at least one player/entity/team for data tables.',
+                      'additionalProperties': {'type': ['string','null']}},
+          'limit': {'type': 'integer', 'minimum': 1, 'maximum': 20}}, ['table','filters']),
     tool('master_status', 'Get master table schemas, feed freshness, connection status and current Eastern date.', {}, []),
     tool('recent_news', 'Read collected NBA news with sources and timestamps. Source coverage is limited; '
          'absence of a report is not proof a player is healthy.', {}, []),
@@ -593,6 +592,9 @@ Season averages, opponent samples and measured defender pairs are distinct. Assi
 with unknown guarding direction. Retain sample size, source and covered dates; publication dates differ.
 Use refreshed_tracking.payload_json for tracking metrics, not unrelated box-score statistics.
 Inspect its fields before calculating. Missing reports do not prove availability or complete injury coverage.
+Use read_current_research for regenerated splits, correlations, pair summaries and refreshed assignment checks.
+Prefer these regenerated records over original workbook snapshots for current statistical questions.
+Keep their exact windows, sample sizes, missing values and freshness warnings; regeneration is not new source data.
 For explicit source row/cell coordinates use read_sheet directly; describe_sheet is not a prerequisite.
 Use master_status for collection health, describe_sheet for SQL columns, recent_news for collected reports,
 and analyze_board for uploaded lines. The workbook is an incomplete dated snapshot. Never invent data,
@@ -619,6 +621,7 @@ def compact_chat_context(store, master=None, resolved=None):
                                    'player_games': PLAYER_FIELDS + ['updated_at'],
                                    'refreshed_tracking': ['season', 'entity', 'category', 'payload_json']}
         context['tracking_json_keys'] = ['gp', 'fields', 'data_through_date', 'published_at']
+        context['regenerated_research'] = 'read_current_research: Calculated_Splits, Correlations, Pair_Summaries, Player_Metrics, Tracking_Metrics, Matchup_Assignments, Team_Schedule, Refresh_Coverage; exact entity/population filters.'
         context['statistics_mode'] = ('nightly_existing_scope' if os.getenv('DAILY_NBA_REFRESH','1')=='1'
                                       else os.getenv('NBA_DATA_SOURCE', 'espn'))
         context['coverage'] = 'Stored master and embedded workbook subset, not complete league history.'
@@ -628,7 +631,7 @@ def compact_chat_context(store, master=None, resolved=None):
 
 
 def execute_tool(store, name, args, master=None):
-    if name in {'master_status', 'query_master', 'recent_news', 'analyze_board'}:
+    if name in {'master_status', 'query_master', 'recent_news', 'analyze_board', 'read_current_research'}:
         if master is None:
             raise ValueError('The live master database is not available.')
         if name == 'query_master':
@@ -637,6 +640,9 @@ def execute_tool(store, name, args, master=None):
             return master_context(master)
         if name == 'recent_news':
             return master.recent_news(limit=10)
+        if name == 'read_current_research':
+            from current_research import read_current_research
+            return read_current_research(master, args['table'], args.get('filters'), args.get('limit', 5))
         return analyze_board(master, args['board_id'])
     if name == 'describe_sheet':
         return store.describe(args['sheet'])
@@ -874,6 +880,9 @@ def query_evidence_card(name,args,result,index):
                 'source':'recent_news'} if reports else None
     if not isinstance(result,dict) or result.get('error'):
         return None
+    if name=='read_current_research':
+        from current_research import current_research_card
+        return current_research_card(result,index)
     if name=='analyze_board' and result.get('engine_version') and isinstance(result.get('legs'),list):
         from analysis_engine import format_analysis
         return {'id':f'E{index}','kind':'experimental_analysis','text':format_analysis(result),'source':'analyze_board'}
@@ -949,9 +958,11 @@ async def answer_question(store, request, progress, master=None):
                                      answer_assignment_question, research_context, ScopedNewsStore)
     history = [message.model_dump() for message in request.history]
     source_lookup = explicit_source_request(request.message)
+    from current_research import wants_current_research
+    derived_lookup = not source_lookup and wants_current_research(request.message)
     resolved = await asyncio.to_thread(resolve_question, store, master, request.message, history)
     assignment = (await asyncio.to_thread(answer_assignment_question, store, master, request.message, history, resolved)
-                  if not source_lookup else None)
+                  if not source_lookup and not derived_lookup else None)
     if assignment is not None:
         return assignment
     normalized_history = await asyncio.to_thread(canonical_history, store, master, history)
@@ -959,10 +970,10 @@ async def answer_question(store, request, progress, master=None):
     from matchup_queries import answer_matchup_question
     matchup = (await asyncio.to_thread(answer_matchup_question, store, request.message,
                                       [message.model_dump() for message in request.history],master)
-               if not source_lookup else None)
+               if not source_lookup and not derived_lookup else None)
     if matchup is not None:
         return matchup
-    if master is not None and not source_lookup:
+    if master is not None and not source_lookup and not derived_lookup:
         from player_stats import answer_player_question
         direct = await asyncio.to_thread(answer_player_question, master, request.message,
                                           [message.model_dump() for message in request.history])
@@ -977,7 +988,7 @@ async def answer_question(store, request, progress, master=None):
     from grounded_reply import evidence_cards
     cards=evidence_cards(evidence,request.message) if not source_lookup else []
     conversation=not resolved['players'] and not resolved['teams']
-    if not source_lookup and (cards or conversation):
+    if not source_lookup and not derived_lookup and (cards or conversation):
         brief=await generated_evidence_reply(request,progress,master,cards)
         if brief is not None:
             return brief

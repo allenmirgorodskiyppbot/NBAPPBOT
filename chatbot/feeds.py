@@ -578,6 +578,15 @@ class FeedWorker:
         if self.data_source != 'espn':
             await asyncio.to_thread(self.store.feed_failure, 'availability_coverage',
                                     'Unavailable: collected headlines/manual statistics are not a complete official injury report. Verify current player availability.')
+        if callable(getattr(self.store, 'connect', None)):
+            try:
+                from assignment_refresh import refresh_assignments
+                await asyncio.to_thread(refresh_assignments, self.store)
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                await asyncio.to_thread(self.store.feed_failure, 'assignment_refresh',
+                                        type(error).__name__+'; original dated estimates retained.')
 
     async def run(self):
         while True:
