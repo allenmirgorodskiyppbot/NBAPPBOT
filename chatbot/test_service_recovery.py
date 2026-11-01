@@ -88,14 +88,19 @@ class DownloadRecoveryTests(unittest.IsolatedAsyncioTestCase):
             return path
         with patch.object(app, 'call_service', export):
             pending = asyncio.create_task(app.prepare_download('master', object(), 'file.xlsx', 'test'))
-            await entered.wait()
+            await asyncio.wait_for(entered.wait(), 2)
             with self.assertRaises(HTTPException) as error:
                 await app.prepare_download('master', object(), 'file.xlsx', 'test')
             self.assertEqual(error.exception.status_code, 409)
             self.assertEqual(len(calls), 1)
             release.set()
             response = await pending
-        await response({'type': 'http', 'method': 'GET', 'headers': []}, AsyncMock(), AsyncMock())
+        # Exercise response cleanup without an unrelated framework file-worker
+        # lifetime in this isolated loop; the integration suite tests real GETs.
+        response.stat_result = Path(response.path).stat()
+        response.set_stat_headers(response.stat_result)
+        await asyncio.wait_for(response({'type': 'http', 'method': 'HEAD', 'headers': []},
+                                       AsyncMock(), AsyncMock()), 2)
         self.assertFalse(calls[0].exists())
         self.assertFalse(self.locks['master'].locked())
 
@@ -104,10 +109,10 @@ class DownloadRecoveryTests(unittest.IsolatedAsyncioTestCase):
         directory.mkdir()
         path = directory / 'file.xlsx'
         path.write_bytes(b'test')
-        response = app.DownloadFileResponse(path, directory)
+        response = app.DownloadFileResponse(path, directory, stat_result=path.stat())
         with self.assertRaises(OSError):
-            await response({'type': 'http', 'method': 'GET', 'headers': []},
-                           AsyncMock(), AsyncMock(side_effect=OSError('connection lost')))
+            await asyncio.wait_for(response({'type': 'http', 'method': 'GET', 'headers': []},
+                           AsyncMock(), AsyncMock(side_effect=OSError('connection lost'))), 2)
         self.assertFalse(directory.exists())
 
     async def test_export_failure_cleans_partial_directory_and_releases_lock(self):
@@ -136,13 +141,13 @@ class DownloadRecoveryTests(unittest.IsolatedAsyncioTestCase):
             return path
         with patch.object(app, 'call_service', export):
             pending = asyncio.create_task(app.prepare_download('master', object(), 'file.xlsx', 'test'))
-            await entered.wait()
+            await asyncio.wait_for(entered.wait(), 2)
             pending.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await pending
             self.assertTrue(self.locks['master'].locked())
             release.set()
-            await completed.wait()
+            await asyncio.wait_for(completed.wait(), 2)
             await asyncio.sleep(0)
         self.assertFalse(self.locks['master'].locked())
         self.assertFalse(paths[0].exists())
