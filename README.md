@@ -400,7 +400,7 @@ for sample coverage, source limitations and checks. Live Akash activation remain
 a separate deployment step.
 
 
-The November 1 recovery update passed **552 automated tests**, including simulated
+The November 1 recovery update passed **553 automated tests**, including simulated
 multi-day outages, worker crashes, Telegram rate limits, command-capacity pressure,
 failed backup/export steps and disconnected downloads. These tests use temporary
 fixtures and mocked services; they do not establish live publisher availability or
@@ -410,3 +410,7 @@ Run `python chatbot/run_tests.py` from the repository root to use the same test
 runner as CI. Async tests have a 30-second deadline; stalled runs print diagnostic
 stacks. The test-only event-loop tick also supports idle mocked services in managed
 execution environments and is not installed in the deployed chatbot.
+
+Runtime Python packages, including web-framework transitive dependencies, are pinned
+to the same tested versions. Download cleanup tests cover both ASGI disconnect
+events and send failures using valid protocol messages.

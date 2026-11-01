@@ -16,6 +16,12 @@ import app
 import refresh_export
 
 
+async def no_disconnect():
+    # A real ASGI connection waits for another event. An unconstrained AsyncMock
+    # returns immediately forever, starving newer FileResponse disconnect loops.
+    await asyncio.Event().wait()
+
+
 class MaintenanceRecoveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_grading_and_notification_failure_do_not_block_backup_or_export(self):
         master = SimpleNamespace(grade_entries=Mock(side_effect=OSError('private detail')),
@@ -100,7 +106,7 @@ class DownloadRecoveryTests(unittest.IsolatedAsyncioTestCase):
         response.stat_result = Path(response.path).stat()
         response.set_stat_headers(response.stat_result)
         await asyncio.wait_for(response({'type': 'http', 'method': 'HEAD', 'headers': []},
-                                       AsyncMock(), AsyncMock()), 2)
+                                       no_disconnect, AsyncMock()), 2)
         self.assertFalse(calls[0].exists())
         self.assertFalse(self.locks['master'].locked())
 
@@ -110,9 +116,27 @@ class DownloadRecoveryTests(unittest.IsolatedAsyncioTestCase):
         path = directory / 'file.xlsx'
         path.write_bytes(b'test')
         response = app.DownloadFileResponse(path, directory, stat_result=path.stat())
+        async def failed_send(message):
+            raise OSError('connection lost')
         with self.assertRaises(OSError):
-            await asyncio.wait_for(response({'type': 'http', 'method': 'GET', 'headers': []},
-                           AsyncMock(), AsyncMock(side_effect=OSError('connection lost'))), 2)
+            await asyncio.wait_for(response({'type': 'http', 'method': 'GET', 'headers': [],
+                                             'asgi': {'version': '3.0', 'spec_version': '2.4'}},
+                                            no_disconnect, failed_send), 2)
+        self.assertFalse(directory.exists())
+
+    async def test_disconnect_event_cleans_up_legacy_asgi_transfer(self):
+        directory = self.root / 'legacy-transfer'
+        directory.mkdir()
+        path = directory / 'file.xlsx'
+        path.write_bytes(b'test')
+        response = app.DownloadFileResponse(path, directory, stat_result=path.stat())
+        async def disconnected():
+            return {'type': 'http.disconnect'}
+        async def blocked_send(message):
+            await asyncio.Event().wait()
+        await asyncio.wait_for(response({'type': 'http', 'method': 'GET', 'headers': [],
+                                         'asgi': {'version': '3.0', 'spec_version': '2.0'}},
+                                        disconnected, blocked_send), 2)
         self.assertFalse(directory.exists())
 
     async def test_export_failure_cleans_partial_directory_and_releases_lock(self):

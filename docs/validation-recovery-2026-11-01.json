@@ -3,10 +3,11 @@
   "base_commit": "9846ca66968b66ef0c1787decb760bcd57655e19",
   "scope": "Automatic service recovery, durable refresh catch-up, Telegram delivery/capacity, isolated backup/export recovery and CI regression checks.",
   "automated_tests": {
-    "passed": 552,
+    "passed": 553,
     "failed": 0,
     "skipped": 0,
-    "environment": "Python 3.12 unittest using shared run_tests.py with idle loop ticks and a 30-second per-async-test deadline; temporary fixtures and mocked services."
+    "environment": "Fresh Python 3.12.14 virtual environment installed from the locked runtime requirements; shared run_tests.py, temporary fixtures and mocked services.",
+    "elapsed_seconds": 55.238
   },
   "scenarios": [
     "Crashed service restarts with backoff capped at 60 seconds; cancellation and disabled services do not restart",
@@ -30,5 +31,14 @@
     "One combined Knicks game-day digest; no additional unsolicited alerts",
     "Existing dataset scope, source freshness semantics and confirmed-settlement accounting"
   ],
-  "test_runner": "The shared CI/local runner changes no assertions or application code. It bounds stalled async tests and emits diagnostic stacks."
+  "test_runner": "The shared CI/local runner changes no assertions or application code. It bounds stalled async tests and emits diagnostic stacks.",
+  "dependency_validation": {
+    "starlette": "1.10.0",
+    "anyio": "4.16.0",
+    "runtime_packages_pinned": true,
+    "download_protocols": [
+      "ASGI 2.0 disconnect event",
+      "ASGI 2.4 send failure"
+    ]
+  }
 }
