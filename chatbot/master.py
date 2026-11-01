@@ -357,6 +357,7 @@ class MasterStore:
         checks = self.get_checkpoint('release_checks', {})
         with self.connect() as db:
             return {'schema_version': 2,
+                    'service_health': {name: dict(value) for name, value in getattr(self, 'service_health', {}).items()},
                     'knicks_digest': self.get_checkpoint('knicks_digest_status', {}),
                     'release_checks': {key: checks[key] for key in ['phase','passed','failed','warnings','checked_at'] if key in checks},
                     'nightly_nba_refresh': self.get_checkpoint('nightly_nba_refresh', {}),

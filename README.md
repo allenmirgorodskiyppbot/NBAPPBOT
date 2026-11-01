@@ -41,11 +41,17 @@ published data, including games unrelated to the Knicks when they update existin
 players or teams. It catches up after a restart and retries pending publication
 **hourly**. Daylight saving time follows the New York timezone.
 
+After several missed daily runs, every skipped date is queued and retained across
+restarts. Catch-up processes at most three game dates per hourly batch, with the
+latest required date first. Older gaps remain explicit in `pending_dates`.
+
 Tracking imports have their own hourly retry even after game observations finish.
 Only dates actually imported advance game coverage; tracking publication dates
 cannot make a missing game appear covered. Older source publications cannot undo
 newer game corrections. Each completed collection attempt rebuilds the export,
 including source failures and unchanged values, with coverage recorded first.
+Failed Excel builds retry independently; a successful rebuild clears its export
+error without claiming that unavailable source statistics became current.
 
 The working free source is the public
 [SportsDataverse data repository](https://github.com/sportsdataverse/sportsdataverse-data),
@@ -102,6 +108,25 @@ has been established.
 
 Manual statistics uploads remain available as an explicit fallback. The bot does
 not send box-score recaps or create a new unrelated matchup archive.
+
+## Automatic recovery
+
+Unexpected failures in the news collector, reminder, daily refresh, maintenance
+or Telegram service restart that worker with exponential backoff capped at one
+minute. `/status` includes `service_health` with retry state and restart counts.
+This recovers exited workers; it cannot repair unavailable publishers, exhausted
+storage or a stopped Akash deployment.
+
+Telegram delivery errors remain visible separately from polling health. Rate-limit
+cooldowns persist across restarts, outgoing delivery is serialized, and `/help`,
+`/status` and `/ai_status` stay available when slow-command capacity is full.
+Routine retries do not add off-day messages or invoke the AI model.
+
+Database backups continue even if grading notifications or Excel generation fail.
+Excel builds run one at a time across scheduled jobs and downloads; the browser
+disables repeat download clicks while a file is being prepared. Failed or abandoned
+downloads clean up their temporary files. These controls reduce duplicate work
+without changing the deployed model or hardware allocation.
 
 ## Season calendar and game-day message
 
@@ -373,3 +398,11 @@ master or creating entries. The export includes 4,953 existing split definitions
 inputs remain explicitly unavailable. See the [validation record](docs/validation-refresh-2026-10-31.json)
 for sample coverage, source limitations and checks. Live Akash activation remains
 a separate deployment step.
+
+
+The November 1 recovery update passed **552 automated tests**, including simulated
+multi-day outages, worker crashes, Telegram rate limits, command-capacity pressure,
+failed backup/export steps and disconnected downloads. These tests use temporary
+fixtures and mocked services; they do not establish live publisher availability or
+future pick accuracy. GitHub now runs the regression suite on application changes;
+data-only publications do not start redundant test runs.

@@ -6,6 +6,7 @@ Only explicitly allowlisted users in private chats can invoke commands.
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 import csv
 from datetime import datetime, timezone, timedelta
 import io
@@ -32,6 +33,17 @@ log = logging.getLogger('knicks.telegram')
 
 MAX_UPLOAD = 8 * 1024 * 1024
 TYPING_INTERVAL_SECONDS = 4
+MAX_ACTIVE_COMMANDS = 10
+RESPONSIVE_COMMANDS = {'/start', '/help', '/status', '/ai_status', '/clear', '/newboard',
+                       '/reminder', '/usage'}
+
+
+class TelegramAPIError(RuntimeError):
+    """Safe error metadata; never retain provider text or token-bearing URLs."""
+    def __init__(self, code, retry_after=None):
+        super().__init__(f'Telegram API returned status {code}; retrying when available.')
+        self.code = code
+        self.retry_after = retry_after
 
 
 def safe_ai_request_details(value):
@@ -276,6 +288,7 @@ class TelegramBot:
         self._photo_semaphore = asyncio.Semaphore(1)
         self._album_batches = {}
         self._album_tasks = set()
+        self._delivery_lock = asyncio.Lock()
         self.token = token if token is not None else os.getenv('TELEGRAM_BOT_TOKEN', '')
         configured = (os.getenv('TELEGRAM_ALLOWED_USER_IDS') or
                       os.getenv('TELEGRAM_ALLOWED_USER_ID', ''))
@@ -390,7 +403,9 @@ class TelegramBot:
                 'pending_messages': pending,
                 'last_poll_success': self._get_state('last_poll_success') or None,
                 'last_delivery': self._get_state('last_delivery') or None,
-                'last_error': self._get_state('last_error') or None,
+                'last_error': self._get_state('last_delivery_error') or self._get_state('last_error') or None,
+                'last_poll_error': self._get_state('last_error') or None,
+                'last_delivery_error': self._get_state('last_delivery_error') or None,
                 'offset': int(self._get_state('offset', '0'))}
 
     def _authorized(self, message):
@@ -426,10 +441,18 @@ class TelegramBot:
             data = response.json()
         except (httpx.HTTPError, ValueError):
             raise RuntimeError('Telegram request failed; retrying automatically.') from None
+        if not isinstance(data, dict):
+            raise RuntimeError('Telegram returned an invalid response; retrying automatically.')
         if response.status_code != 200 or not data.get('ok'):
             # Do not expose provider errors or URLs which might contain credentials.
-            code = int(data.get('error_code', response.status_code))
-            raise RuntimeError(f'Telegram API returned status {code}; check private bot setup.')
+            code = data.get('error_code', response.status_code)
+            if type(code) is not int or not 100 <= code <= 599:
+                code = response.status_code
+            parameters = data.get('parameters')
+            retry_after = parameters.get('retry_after') if isinstance(parameters, dict) else None
+            if type(retry_after) not in (int, float) or not math.isfinite(retry_after) or retry_after < 0:
+                retry_after = None
+            raise TelegramAPIError(code, retry_after if code == 429 else None)
         return data.get('result')
 
     async def _typing(self, chat_id):
@@ -450,11 +473,19 @@ class TelegramBot:
     async def flush_outbox(self):
         if not self.enabled:
             return
+        # One sender per bot instance prevents overlapping flushes from reading
+        # and delivering the same pending rows before either marks them sent.
+        async with self._delivery_lock:
+            await self._flush_outbox()
+
+    async def _flush_outbox(self):
         with self._db() as db:
             db.execute("UPDATE telegram_outbox SET status='expired' WHERE status='pending' "
                        'AND expires_at IS NOT NULL AND expires_at<=?', (time.time(),))
             rows = db.execute("SELECT * FROM telegram_outbox WHERE status='pending' "
                               'AND next_attempt<=? ORDER BY id LIMIT 20', (time.time(),)).fetchall()
+        if float(self._get_state('delivery_retry_at', '0')) > time.time():
+            return
         for row in rows:
             if row['expires_at'] is not None and row['expires_at'] <= time.time():
                 with self._db() as db:
@@ -467,17 +498,29 @@ class TelegramBot:
             try:
                 await self._api('sendMessage', {'chat_id': row['chat_id'], 'text': row['text'],
                                                'link_preview_options': {'is_disabled': True}})
-            except RuntimeError:
+            except RuntimeError as error:
                 attempts = row['attempts'] + 1
+                retry_delay = min(900, 5 * 2 ** min(attempts, 8))
+                if isinstance(error, TelegramAPIError) and error.retry_after is not None:
+                    retry_delay = max(retry_delay, error.retry_after)
+                    # Telegram rate limits can apply across outgoing messages.
+                    # Retain the cooldown on disk so a restart will honor it.
+                    self._set_state('delivery_retry_at', time.time() + retry_delay)
                 with self._db() as db:
                     db.execute('UPDATE telegram_outbox SET attempts=?,next_attempt=? WHERE id=?',
-                               (attempts, time.time() + min(900, 5 * 2 ** min(attempts, 8)), row['id']))
-                self._set_state('last_error', 'Telegram delivery failed; queued for retry.')
+                               (attempts, time.time() + retry_delay, row['id']))
+                self._set_state('last_delivery_error', 'Telegram delivery failed; queued for retry.')
                 return
             with self._db() as db:
                 db.execute("UPDATE telegram_outbox SET status='delivered',delivered_at=? WHERE id=?",
                            (utcnow(), row['id']))
             self._set_state('last_delivery', utcnow())
+        with self._db() as db:
+            failed_pending = db.execute("SELECT 1 FROM telegram_outbox WHERE status='pending' "
+                                        'AND attempts>0 LIMIT 1').fetchone()
+        if not failed_pending:
+            self._set_state('last_delivery_error', '')
+            self._set_state('delivery_retry_at', '0')
 
     async def _download(self, file_id, declared_size=0):
         if declared_size and int(declared_size) > MAX_UPLOAD:
@@ -889,7 +932,7 @@ class TelegramBot:
         self._remember(chat_id, update_id, text, response)
         return response
 
-    async def process_update(self, update):
+    async def process_update(self, update, *, overloaded=False):
         update_id = update.get('update_id')
         if not isinstance(update_id, int):
             return False
@@ -910,7 +953,11 @@ class TelegramBot:
             return False
         if authorized:
             try:
-                response = await self._handle_message(message, update_id)
+                if overloaded:
+                    response = ('I’m finishing earlier requests. This request was not started and no records '
+                                'were changed. Try again shortly; /status, /ai_status and /help still work.')
+                else:
+                    response = await self._handle_message(message, update_id)
             except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeError) as error:
                 # Validation errors contain user data or field names, not network credentials.
                 response = 'Could not save that input: ' + str(error)[:500] + '\nUse /help for the required format.'
@@ -960,7 +1007,10 @@ class TelegramBot:
                 except asyncio.CancelledError:
                     raise
                 except Exception:
-                    self._set_state('last_error', 'Telegram message delivery is retrying.')
+                    # A database/storage failure may also prevent writing its
+                    # diagnostic. Keep the sender alive to retry once it recovers.
+                    with suppress(Exception):
+                        self._set_state('last_delivery_error', 'Telegram message delivery is retrying.')
                 await asyncio.sleep(1)
 
         delivery_task = asyncio.create_task(deliver_messages())
@@ -982,8 +1032,16 @@ class TelegramBot:
                     for update in updates or []:
                         # Keep polling and short commands responsive while a
                         # self-hosted CPU model is answering another question.
-                        if len(command_tasks) >= 10:
-                            await asyncio.wait(command_tasks, return_when=asyncio.FIRST_COMPLETED)
+                        if len(command_tasks) >= MAX_ACTIVE_COMMANDS:
+                            message = update.get('message') or {}
+                            text = str(message.get('text', '')).strip().split(maxsplit=1)
+                            command = text[0].split('@', 1)[0].lower() if text else ''
+                            responsive = (command in RESPONSIVE_COMMANDS and not message.get('photo')
+                                          and not message.get('document'))
+                            # Do not stop polling behind slow inference/uploads.
+                            # Receipt and any busy response remain deduplicated.
+                            await self.process_update(update, overloaded=not responsive)
+                            continue
                         task = asyncio.create_task(self.process_update(update))
                         command_tasks.add(task)
                         task.add_done_callback(command_finished)
@@ -992,11 +1050,12 @@ class TelegramBot:
                     await asyncio.sleep(0)
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as error:
                     self.connected = False
                     self._set_state('last_error', 'Telegram polling failed; check bot token, existing webhook and connectivity.')
                     log.warning('Telegram polling failed; retrying without logging credentials.')
-                    await asyncio.sleep(10)
+                    delay = max(10, error.retry_after or 0) if isinstance(error, TelegramAPIError) else 10
+                    await asyncio.sleep(delay)
         finally:
             self.connected = False
             delivery_task.cancel()
@@ -1005,6 +1064,15 @@ class TelegramBot:
             for task in list(self._album_tasks):
                 task.cancel()
             await asyncio.gather(delivery_task, *command_tasks, *self._album_tasks, return_exceptions=True)
+            # run() can be restarted on this instance. Do not let a later album
+            # fragment attach to a collector cancelled during the previous run.
+            self._album_batches.clear()
+            self._album_tasks.clear()
             if self._owns_client:
-                await self.client.aclose()
+                # A close failure must not leave a closed/broken client attached
+                # for the supervisor's next run of this same bot instance.
+                client = self.client
                 self.client = None
+                self._owns_client = False
+                if client is not None:
+                    await client.aclose()

@@ -7,6 +7,7 @@ and source coverage; unknown and historical inputs remain visible.
 from __future__ import annotations
 
 from collections import defaultdict
+from contextlib import suppress
 import datetime as dt
 from functools import lru_cache
 import json
@@ -565,31 +566,33 @@ def _cell(value):
 def export_master(master, directory, now=None):
     import openpyxl
     tables=build_export_tables(master,now)
-    workbook=openpyxl.Workbook(write_only=True)
-    for name,rows in tables.items():
-        sheet=workbook.create_sheet(name)
-        columns=list(dict.fromkeys(key for row in rows for key in row))
-        if not columns:
-            # Preserve meaningful raw table headers for empty fresh databases.
-            if name in RAW_TABLES:
-                with master.connect() as db:
-                    columns=[r[0] for r in db.execute('SELECT * FROM '+name+' LIMIT 0').description]
-            else:
-                columns=['status']
-        sheet.append([_cell(column) for column in columns])
-        for row in rows:
-            sheet.append([_cell(row.get(key)) for key in columns])
-        sheet.close()
     directory=Path(directory)
     directory.mkdir(parents=True,exist_ok=True)
     target=directory/'NBA_Master.xlsx'
     temporary=directory/('NBA_Master-'+uuid.uuid4().hex+'.partial.xlsx')
+    workbook=openpyxl.Workbook(write_only=True)
     try:
+        for name,rows in tables.items():
+            sheet=workbook.create_sheet(name)
+            columns=list(dict.fromkeys(key for row in rows for key in row))
+            if not columns:
+                # Preserve meaningful raw table headers for empty fresh databases.
+                if name in RAW_TABLES:
+                    with master.connect() as db:
+                        columns=[r[0] for r in db.execute('SELECT * FROM '+name+' LIMIT 0').description]
+                else:
+                    columns=['status']
+            sheet.append([_cell(column) for column in columns])
+            for row in rows:
+                sheet.append([_cell(row.get(key)) for key in columns])
+            sheet.close()
         workbook.save(temporary)
         temporary.replace(target)
     finally:
         temporary.unlink(missing_ok=True)
         for sheet in workbook.worksheets:
+            with suppress(Exception):
+                sheet.close()
             writer=getattr(sheet,'_writer',None)
             if writer is not None and isinstance(writer.out,str) and Path(writer.out).exists():
                 writer.cleanup()

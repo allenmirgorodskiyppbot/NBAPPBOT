@@ -12,6 +12,7 @@ import datetime as dt
 from pathlib import Path
 import secrets
 import tempfile
+import threading
 import time
 import uuid
 from typing import Literal
@@ -30,7 +31,6 @@ from telegram_bot import TelegramBot
 from zoneinfo import ZoneInfo
 import sqlite3
 import shutil
-from starlette.background import BackgroundTask
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger('knicks')
@@ -44,6 +44,7 @@ CHAT_PASSWORD = os.getenv('CHAT_PASSWORD', '')
 DATA_DIR = Path(os.getenv('DATA_DIR', str(ROOT.parent / 'runtime')))
 COMPACT_AI_TIMEOUT_SECONDS = 180
 MODEL_CONTEXT = 4096
+_EXPORT_LOCK = threading.Lock()
 
 
 def model_options(output_tokens=192):
@@ -292,7 +293,10 @@ def save_backup(master, directory):
 
 def export_master(master, directory):
     from refresh_export import export_master as export_refreshed_master
-    return export_refreshed_master(master, directory)
+    # Maintenance, scheduled refresh and browser downloads share a CPU/memory
+    # budget. Building several full workbooks concurrently can starve the model.
+    with _EXPORT_LOCK:
+        return export_refreshed_master(master, directory)
 
 
 async def notify_feed_health(master, notify, current=None):
@@ -328,28 +332,54 @@ async def notify_feed_health(master, notify, current=None):
 async def maintenance(application):
     state = application.state
     last_backup = ''
+    last_export = ''
     while True:
+        last_backup, last_export = await maintenance_cycle(state, last_backup, last_export)
+        await asyncio.sleep(60)
+
+
+async def maintenance_cycle(state, last_backup='', last_export='', current=None):
+    """A failed notification or Excel build must not prevent the database backup."""
+    async def attempt(name, operation, detail):
         try:
-            await notify_feed_health(state.master, state.telegram.notify)
-            changed = await asyncio.to_thread(state.master.grade_entries)
-            for entry in changed:
-                await state.telegram.notify(
-                    f"Entry {entry['id']}: provisional result {entry.get('provisional_status', 'updated')}. "
-                    'Use /entries for details. PrizePicks credited payout requires reconciliation.',
-                    event_key='grade:' + entry['id'] + ':' + str(entry.get('graded_at', '')))
-            current = dt.datetime.now(dt.timezone.utc)
-            bucket = current.date().isoformat() + ':' + str(current.hour // 6)
-            if bucket != last_backup:
-                await asyncio.to_thread(save_backup, state.master, DATA_DIR / 'backups')
-                await asyncio.to_thread(export_master, state.master, DATA_DIR / 'exports')
-                last_backup = bucket
-                state.master.feed_success('local_backup', 'Six-hourly backup/export, latest 7 daily snapshots; same persistent volume, not off-provider storage.')
+            await operation()
+            await asyncio.to_thread(state.master.feed_success, name, detail)
+            return True
         except asyncio.CancelledError:
             raise
         except Exception as error:
-            state.master.feed_failure('maintenance', type(error).__name__)
-            log.warning('Grading/backup maintenance failed: %s', type(error).__name__)
-        await asyncio.sleep(60)
+            log.warning('Maintenance step failed: %s category=%s', name, type(error).__name__)
+            # Reporting a transient DB error must not stop the other steps.
+            with suppress(Exception):
+                await asyncio.to_thread(state.master.feed_failure, name, type(error).__name__)
+            return False
+
+    async def grade():
+        changed = await asyncio.to_thread(state.master.grade_entries)
+        for entry in changed:
+            await state.telegram.notify(
+                f"Entry {entry['id']}: provisional result {entry.get('provisional_status', 'updated')}. "
+                'Use /entries for details. PrizePicks credited payout requires reconciliation.',
+                event_key='grade:' + entry['id'] + ':' + str(entry.get('graded_at', '')))
+
+    await attempt('feed_notifications', lambda: notify_feed_health(state.master, state.telegram.notify),
+                  'Notification check completed; configured quiet hours/mode retained.')
+    await attempt('entry_grading', grade, 'Saved entry grading checked; actual payout still requires confirmation.')
+    current = current or dt.datetime.now(dt.timezone.utc)
+    bucket = current.date().isoformat() + ':' + str(current.hour // 6)
+    if bucket != last_backup:
+        if await attempt('local_backup', lambda: asyncio.to_thread(save_backup, state.master, DATA_DIR / 'backups'),
+                         'Six-hourly database backup, latest 7 daily snapshots; same persistent volume, not off-provider storage.'):
+            last_backup = bucket
+    next_export = getattr(state, 'maintenance_export_retry_at', None)
+    if bucket != last_export and (next_export is None or current >= next_export):
+        if await attempt('master_export', lambda: asyncio.to_thread(export_master, state.master, DATA_DIR / 'exports'),
+                         'Excel rebuilt from saved observations; source dates and coverage remain separate.'):
+            last_export = bucket
+            state.maintenance_export_retry_at = None
+        else:
+            state.maintenance_export_retry_at = current + dt.timedelta(hours=1)
+    return last_backup, last_export
 
 
 def model_downloaded(tags, model):
@@ -372,16 +402,24 @@ async def initialize(application):
     state = application.state
     try:
         if not state.service_tasks:
+            from service_runtime import supervise_service
+            state.service_health = {}
+            # In-memory health stays readable even if database error reporting
+            # was what caused a worker to stop.
+            state.master.service_health = state.service_health
+            def start(name, factory):
+                state.service_tasks.append(asyncio.create_task(
+                    supervise_service(name, factory, state.service_health), name=name))
             state.worker = FeedWorker(state.master, notify=state.telegram.notify)
             from gameday_digest import GamedayDigest
             state.digest = GamedayDigest(state.master, state.worker, state.telegram.notify)
-            state.service_tasks.append(asyncio.create_task(state.worker.run(), name='nba-feeds'))
-            state.service_tasks.append(asyncio.create_task(state.digest.run(), name='knicks-gameday-digest'))
+            start('nba-feeds', state.worker.run)
+            start('knicks-gameday-digest', state.digest.run)
             from nightly_data import NightlyNBARefresh
             state.nightly = NightlyNBARefresh(state.master, state.worker,exporter=export_master,data_dir=DATA_DIR)
-            state.service_tasks.append(asyncio.create_task(state.nightly.run(), name='nightly-nba-refresh'))
-            state.service_tasks.append(asyncio.create_task(maintenance(application), name='grading-backups'))
-            state.service_tasks.append(asyncio.create_task(state.telegram.run(), name='telegram'))
+            start('nightly-nba-refresh', state.nightly.run)
+            start('grading-backups', lambda: maintenance(application))
+            start('telegram', state.telegram.run)
             log.info('Data collection, entry grading and backups started; Telegram configured=%s', state.telegram.enabled)
         state.phase, state.detail = 'workbook', 'Reading the Knicks workbook'
         if state.store is None:
@@ -479,6 +517,7 @@ async def lifespan(application):
     state.service_tasks = []
     state.chat_lock = asyncio.Lock()
     state.self_test_lock = asyncio.Lock()
+    state.download_locks = {'master': asyncio.Lock(), 'backup': asyncio.Lock()}
     state.board_news_lock = asyncio.Lock()
     state.board_news_attempt = 0.0
     async def refresh_board_news():
@@ -1232,18 +1271,61 @@ async def results():
 
 @app.get('/api/export/master.xlsx', dependencies=[Depends(authenticate)])
 async def download_master():
-    directory = DATA_DIR / 'downloads' / uuid.uuid4().hex
-    path = await call_service(export_master, app.state.master, directory)
-    return FileResponse(path, filename='NBA_Master.xlsx', media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        background=BackgroundTask(shutil.rmtree, directory, ignore_errors=True))
+    return await prepare_download('master', export_master, 'NBA_Master.xlsx',
+                                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 @app.get('/api/export/backup.sqlite', dependencies=[Depends(authenticate)])
 async def download_backup():
+    return await prepare_download('backup', save_backup, 'NBA_Master_Backup.sqlite', 'application/octet-stream')
+
+
+class DownloadFileResponse(FileResponse):
+    def __init__(self, path, directory, **kwargs):
+        super().__init__(path, **kwargs)
+        self.directory = directory
+
+    async def __call__(self, scope, receive, send):
+        try:
+            return await super().__call__(scope, receive, send)
+        finally:
+            # BackgroundTask alone is skipped when streaming disconnects or
+            # invalid range requests return early.
+            shutil.rmtree(self.directory, ignore_errors=True)
+
+
+async def prepare_download(kind, exporter, filename, media_type):
+    lock = app.state.download_locks[kind]
+    if lock.locked():
+        raise HTTPException(409, 'This download is already being prepared. Wait for it to finish before requesting another.')
+    await lock.acquire()
     directory = DATA_DIR / 'downloads' / uuid.uuid4().hex
-    path = await call_service(save_backup, app.state.master, directory)
-    return FileResponse(path, filename='NBA_Master_Backup.sqlite', media_type='application/octet-stream',
-                        background=BackgroundTask(shutil.rmtree, directory, ignore_errors=True))
+
+    async def build():
+        try:
+            return await call_service(exporter, app.state.master, directory)
+        finally:
+            lock.release()
+
+    def clean_failed_download(task):
+        # Retrieving the exception avoids an unobserved-task warning if the
+        # browser disconnected while the thread was still writing the file.
+        if not task.cancelled():
+            task.exception()
+        shutil.rmtree(directory, ignore_errors=True)
+
+    task = asyncio.create_task(build(), name='download-' + kind)
+    try:
+        path = await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # to_thread keeps running after cancellation. Clean up only after the
+        # exporter finishes, and keep the lock until then.
+        task.add_done_callback(clean_failed_download)
+        raise
+    except Exception:
+        shutil.rmtree(directory, ignore_errors=True)
+        raise
+    return DownloadFileResponse(path, directory, filename=filename, media_type=media_type)
 
 
 class StatsImportRequest(BaseModel):

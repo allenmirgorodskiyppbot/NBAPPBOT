@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-01",
+  "base_commit": "9846ca66968b66ef0c1787decb760bcd57655e19",
+  "scope": "Automatic service recovery, durable refresh catch-up, Telegram delivery/capacity, isolated backup/export recovery and CI regression checks.",
+  "automated_tests": {
+    "passed": 552,
+    "failed": 0,
+    "skipped": 0,
+    "environment": "Local Python 3.12; standard unittest suite with a sandbox-only asyncio heartbeat wrapper. Temporary fixtures and mocked network/model/Telegram services."
+  },
+  "scenarios": [
+    "Crashed service restarts with backoff capped at 60 seconds; cancellation and disabled services do not restart",
+    "Multi-day missed refresh deadlines persist all intervening dates and process no more than three game dates per hourly batch",
+    "Failed Excel generation retries and clears failure on successful rebuild without advancing source freshness",
+    "Telegram 429 cooldown persists across restart; delivery errors survive successful polling",
+    "Outbox sends serialized; help/status available at active-command capacity; excess work rejected before mutation",
+    "Temporary delivery diagnostic write failure does not kill sender; failed client cleanup and interrupted albums recover on same bot instance",
+    "Backup remains independent from grading/notification/Excel failures",
+    "Concurrent Excel generation serialized; duplicate download requests bounded; failures/disconnects remove temporary files",
+    "Workbook sheet-build failure retains previous valid export and cleans temporary XML spool files"
+  ],
+  "limits": [
+    "No live Akash deployment or Telegram delivery was performed from this environment.",
+    "Publisher availability, current defender assignments and future prediction accuracy are not established by these tests.",
+    "Telegram sendMessage has no idempotency key; an acknowledgement lost after delivery can still cause a retry duplicate.",
+    "The supervisor restarts failed coroutines; it does not repair a killed hosting deployment or detect every possible hung external dependency."
+  ],
+  "unchanged": [
+    "Model and Akash resource allocation",
+    "One combined Knicks game-day digest; no additional unsolicited alerts",
+    "Existing dataset scope, source freshness semantics and confirmed-settlement accounting"
+  ]
+}

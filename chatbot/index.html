@@ -115,7 +115,19 @@ $('live-health').addEventListener('click',()=>liveRequest('/api/master/status',d
 }));
 $('live-news').addEventListener('click',()=>liveRequest('/api/news',rows=>rows.length?rows.map(item=>`${item.title}\n${item.published_at||'Publication time unknown'} · ${item.source||''}\n${item.url||''}`).join('\n\n'):'No news has been collected yet.'));
 $('live-results').addEventListener('click',()=>liveRequest('/api/results',data=>`Entries: ${data.entries} · Settled: ${data.settled_entries}\nConfirmed wins: ${data.settled_wins} · Losses: ${data.settled_losses} · Break-even: ${data.settled_break_even}\nConfirmed net profit: $${data.net_profit} · ROI: ${data.roi_percent===null?'not available':data.roi_percent+'%'}\n\nProvisional entry results: ${JSON.stringify(data.provisional_entry_results)}\n${data.note}`));
-async function download(path,name){try{showLive('Preparing download…');const response=await fetch(path,{headers:{'X-Chat-Password':password}});if(!response.ok)throw new Error('Download unavailable. Check data readiness and password.');const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);showLive('Download ready. Keep backups somewhere outside this provider too.');}catch(error){showLive(error.message);}}
+let downloadBusy=false;
+async function download(path,name){
+  if(downloadBusy)return;
+  downloadBusy=true;$('live-export').disabled=true;$('live-backup').disabled=true;
+  try{
+    showLive('Preparing download… Please wait; large Excel files can take about a minute.');
+    const response=await fetch(path,{headers:{'X-Chat-Password':password}});
+    if(!response.ok){let detail='Download unavailable. Check data readiness and password.';try{const error=await response.json();if(typeof error.detail==='string')detail=error.detail;}catch{}throw new Error(detail);}
+    const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
+    showLive('Download ready. Keep backups somewhere outside this provider too.');
+  }catch(error){showLive(error.message);}
+  finally{downloadBusy=false;$('live-export').disabled=false;$('live-backup').disabled=false;}
+}
 $('stats-import').addEventListener('click',async()=>{try{const file=$('stats-file').files[0];if(!file)throw new Error('Choose a CSV or JSON box-score file.');if(file.size>2000000)throw new Error('Use a file smaller than 2 MB.');showLive('Validating statistics…');const result=await api('/api/import/stats',{method:'POST',body:JSON.stringify({filename:file.name,content:await file.text()})});showLive(result);}catch(error){showLive(error.message);}});
 $('live-export').addEventListener('click',()=>download('/api/export/master.xlsx','NBA_Master.xlsx'));
 $('live-backup').addEventListener('click',()=>download('/api/export/backup.sqlite','NBA_Master_Backup.sqlite'));

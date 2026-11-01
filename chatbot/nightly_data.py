@@ -138,7 +138,18 @@ class NightlyNBARefresh:
             if due:
                 # Today's required previous-day update comes first, before older
                 # startup/backfill dates. Restarting after the deadline catches up.
-                pending=[target,(target_day-dt.timedelta(days=1)).isoformat(),*pending]
+                # A restart can miss several daily deadlines. Queue every skipped
+                # date, not just the two newest dates; the three-date batch below
+                # still bounds each collection pass and persists the remainder.
+                missed=[]
+                try:
+                    handled=dt.date.fromisoformat(str(status.get('handled_target_date','')))
+                except ValueError:
+                    handled=None
+                if handled and handled<target_day:
+                    missed=[(target_day-dt.timedelta(days=n)).isoformat()
+                            for n in range((target_day-handled).days)]
+                pending=[target,(target_day-dt.timedelta(days=1)).isoformat(),*missed,*pending]
                 status['handled_target_date']=target
             elif local>=deadline and not self.store.get_checkpoint('daily_nba:'+target,{}).get('complete'):
                 pending=[target,*pending]
@@ -205,6 +216,12 @@ class NightlyNBARefresh:
             if waiting and status.get('last_attempt'):
                 self.store.feed_failure('nba_daily_refresh','Waiting for publication of '+target+
                     '; latest published covered game date is '+str(through or 'unknown')+'. Hourly catch-up remains enabled.')
+            elif game_attempt:
+                older_pending=[day for day in pending if day<target]
+                detail='Required published game inventory for '+target+' imported.'
+                if older_pending:
+                    detail+=f' {len(older_pending)} older dates remain pending; hourly catch-up is automatic. See pending_dates.'
+                self.store.feed_success('nba_daily_refresh',detail)
             next_run=deadline if local<deadline else dt.datetime.combine(today+dt.timedelta(days=1),dt.time(11,30),EASTERN)
             status.update(enabled=True,phase='waiting_for_publication' if waiting else 'updated',timezone='America/New_York',
                           daily_time='11:30',target_game_date=target,next_daily_run=next_run.isoformat(),
@@ -218,12 +235,18 @@ class NightlyNBARefresh:
             self.store.set_checkpoint('nightly_nba_refresh',status)
             # Persist current coverage before rebuilding, including failed or
             # unchanged source checks. A new file time is never a source date.
-            if (game_attempt or tracking_attempt) and self.exporter and self.data_dir:
+            export_last=_aware(status.get('last_export_attempt'))
+            export_retry=bool(status.get('master_export_error') and
+                              (not export_last or (now-export_last).total_seconds()>=3600))
+            if (game_attempt or tracking_attempt or export_retry) and self.exporter and self.data_dir:
                 from pathlib import Path
+                status['last_export_attempt']=now.isoformat()
                 try:
                     await asyncio.to_thread(self.exporter,self.store,Path(self.data_dir)/'exports')
                     status['master_export_updated_at']=now.isoformat()
                     status['master_export_error']=None
+                    self.store.feed_success('master_export',
+                        'Master Excel rebuilt from saved records; source freshness remains separate in Refresh_Coverage.')
                 except asyncio.CancelledError:raise
                 except Exception as error:
                     status['master_export_error']=type(error).__name__

@@ -259,6 +259,35 @@ class RefreshSchedulerTests(unittest.TestCase):
         self.assertEqual(state['older_pending_dates'], ['2026-10-27'])
         self.assertIn('2026-10-27', state['pending_dates'])
         self.assertIn('not independently verified', state['completeness_scope'])
+        feed = next(row for row in self.store.status()['feeds'] if row['name'] == 'nba_daily_refresh')
+        self.assertIsNone(feed['error'])
+        self.assertIn('1 older dates remain pending', feed['detail'])
+
+    def test_multi_day_outage_catches_every_missed_date_in_bounded_restartable_batches(self):
+        self.store.set_checkpoint('nightly_nba_refresh', {
+            'initialized': True, 'pending_dates': [], 'handled_target_date': '2026-10-20',
+            'last_attempt': (NOW - dt.timedelta(minutes=5)).isoformat(),
+        })
+        expected = [(dt.date(2026, 10, 30) - dt.timedelta(days=n)).isoformat()
+                    for n in range(10)]
+        self.run_tick(self.service())
+        first_dates = [name[:-5] for name in self.calls if name != 'existing_tracking.json']
+        self.assertEqual(first_dates, expected[:3])
+        self.assertEqual(self.status()['pending_dates'], expected[3:])
+        self.assertEqual(self.status()['handled_target_date'], TARGET)
+
+        for _ in range(3):
+            self.now[0] += dt.timedelta(hours=1)
+            before = len(self.calls)
+            # A new service instance models a restart with the persisted queue.
+            self.run_tick(self.service())
+            self.assertLessEqual(len([name for name in self.calls[before:]
+                                      if name != 'existing_tracking.json']), 3)
+        imported_dates = [name[:-5] for name in self.calls if name != 'existing_tracking.json']
+        self.assertEqual(imported_dates, expected)
+        self.assertEqual(self.status()['pending_dates'], [])
+        for day in expected:
+            self.assertTrue(self.store.get_checkpoint('daily_nba:' + day)['complete'])
 
     def test_export_failure_preserves_last_success_time_and_reports_error(self):
         previous = '2026-10-30T15:30:00+00:00'
@@ -274,6 +303,61 @@ class RefreshSchedulerTests(unittest.TestCase):
         self.assertEqual(self.status()['master_export_error'], 'OSError')
         errors = {r['name']: r['error'] for r in self.store.status()['feeds']}
         self.assertIn('previous Excel export retained', errors['master_export'])
+
+    def test_export_failure_retries_without_waiting_for_another_source_refresh(self):
+        # Before the morning deadline, an otherwise current service has no game
+        # or tracking fetch to trigger export recovery. It must still retry the
+        # failed export, but must not spin once a minute while the disk is full.
+        self.now[0] = dt.datetime(2026, 11, 1, 14, 0, tzinfo=UTC)  # 9 AM Eastern.
+        old_attempt = self.now[0] - dt.timedelta(minutes=30)
+        self.store.set_checkpoint('nightly_nba_refresh', {
+            'initialized': True, 'pending_dates': [], 'handled_target_date': TARGET,
+            'last_export_attempt': old_attempt.isoformat(),
+            'master_export_updated_at': '2026-10-31T15:00:00+00:00',
+            'master_export_error': 'OSError',
+        })
+        self.store.feed_failure('master_export', 'OSError; previous Excel export retained.')
+        exports = []
+        service = self.service(lambda store, directory: exports.append(directory))
+        self.run_tick(service)
+        self.assertEqual(exports, [])
+        self.assertEqual(self.calls, [])
+
+        self.now[0] += dt.timedelta(minutes=30)
+        self.run_tick(service)
+        self.assertEqual(exports, [self.root / 'exports'])
+        self.assertEqual(self.calls, [])
+        self.assertIsNone(self.status()['master_export_error'])
+        self.assertEqual(self.status()['master_export_updated_at'], self.now[0].isoformat())
+        feed = next(row for row in self.store.status()['feeds'] if row['name'] == 'master_export')
+        self.assertIsNone(feed['error'])
+        self.assertIn('source freshness remains separate', feed['detail'])
+
+        self.now[0] += dt.timedelta(minutes=1)
+        self.run_tick(service)
+        self.assertEqual(len(exports), 1)
+
+    def test_repeated_export_failure_does_not_retry_every_worker_tick(self):
+        self.now[0] = dt.datetime(2026, 11, 1, 14, 0, tzinfo=UTC)
+        self.store.set_checkpoint('nightly_nba_refresh', {
+            'initialized': True, 'pending_dates': [], 'handled_target_date': TARGET,
+            'master_export_updated_at': '2026-10-31T15:00:00+00:00',
+            'master_export_error': 'OSError',
+        })
+        attempts = []
+
+        def failed_export(store, directory):
+            attempts.append(directory)
+            raise OSError('fixture disk temporarily unavailable')
+
+        service = self.service(failed_export)
+        self.run_tick(service)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(self.status()['last_export_attempt'], self.now[0].isoformat())
+        self.now[0] += dt.timedelta(minutes=1)
+        self.run_tick(service)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(self.status()['master_export_updated_at'], '2026-10-31T15:00:00+00:00')
 
     def test_import_keeps_publication_inventory_scope_instead_of_claiming_full_league(self):
         document = self.empty_day(TARGET)
