@@ -6,7 +6,7 @@
     "passed": 552,
     "failed": 0,
     "skipped": 0,
-    "environment": "Local Python 3.12; standard unittest suite with a sandbox-only asyncio heartbeat wrapper. Temporary fixtures and mocked network/model/Telegram services."
+    "environment": "Python 3.12 unittest using shared run_tests.py with idle loop ticks and a 30-second per-async-test deadline; temporary fixtures and mocked services."
   },
   "scenarios": [
     "Crashed service restarts with backoff capped at 60 seconds; cancellation and disabled services do not restart",
@@ -29,5 +29,6 @@
     "Model and Akash resource allocation",
     "One combined Knicks game-day digest; no additional unsolicited alerts",
     "Existing dataset scope, source freshness semantics and confirmed-settlement accounting"
-  ]
+  ],
+  "test_runner": "The shared CI/local runner changes no assertions or application code. It bounds stalled async tests and emits diagnostic stacks."
 }

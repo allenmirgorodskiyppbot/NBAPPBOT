@@ -406,3 +406,7 @@ failed backup/export steps and disconnected downloads. These tests use temporary
 fixtures and mocked services; they do not establish live publisher availability or
 future pick accuracy. GitHub now runs the regression suite on application changes;
 data-only publications do not start redundant test runs.
+Run `python chatbot/run_tests.py` from the repository root to use the same test
+runner as CI. Async tests have a 30-second deadline; stalled runs print diagnostic
+stacks. The test-only event-loop tick also supports idle mocked services in managed
+execution environments and is not installed in the deployed chatbot.

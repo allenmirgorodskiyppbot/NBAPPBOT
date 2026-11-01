@@ -36,4 +36,4 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends tesseract-ocr fonts-dejavu-core
       - name: Test isolated fixtures and mocked services
-        run: python -m unittest discover -s chatbot -p 'test_*.py' -v
+        run: python chatbot/run_tests.py
