@@ -90,7 +90,7 @@ HELP = '''Knicks Research bot
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
-/picks [YYYY-MM-DD] [2-6] — own projections and target lines; no upload needed
+/picks [Nov 2|today|tomorrow] [2-6] — own projections; date/count optional
 /clear — clear this chat's recent conversation context
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
@@ -106,7 +106,7 @@ HELP = '''Knicks Research bot
 /results — results and confirmed profit/loss
 /settle ENTRY_ID PAYOUT [note] — confirm the actual total return shown by PrizePicks
 
-Ask for picks or use /picks to get the bot's own projections and conditional target lines before checking PrizePicks. With no date, it uses the next unstarted saved Knicks game; "tonight" or an explicit date stays on that day. It can return fewer candidates when evidence is insufficient. These are model targets, not observed PrizePicks offers or placed entries.
+Ask for picks or use /picks to get the bot's own projections and conditional target lines before checking PrizePicks. You can also send just "Nov 2", "November 2", or "11/2". Dates without a year use the current NBA season (July–June); numeric dates are month/day. With no date, it uses the next unstarted saved Knicks game; "tonight" or an explicit date stays on that day. It can return fewer candidates when evidence is insufficient. These are model targets, not observed PrizePicks offers or placed entries.
 
 You can also send a question, a CSV/JSON board file, or screenshots for optional line comparison. Readable full-game cards are combined into a research shortlist; unclear cards stay out. Both visible More/Less choices are compared. The upload's Eastern date is used unless you caption the image YYYY-MM-DD; it must match a saved game. Send images as files for original quality. Check every displayed line. Available lines are separate from entries actually placed.
 
@@ -144,6 +144,33 @@ def chunks(text: str, size: int = 3500):
         text = text[boundary:]
 
 
+_PICK_MONTHS = {name: number for number, name in enumerate(
+    ('jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'), 1)}
+_SHORT_PICK_DATE = re.compile(
+    r'(?<![\w/-])(?:'
+    r'(?P<name>jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
+    r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
+    r'\.?\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(?P<year>\d{4}))?'
+    r'|(?P<month_number>\d{1,2})/(?P<day_number>\d{1,2})(?:/(?P<year_number>\d{4}))?'
+    r')(?![\w/–—-]|\.\d)')
+
+
+def _normalize_pick_dates(argument, current):
+    """Keep a short date in the current season, including past dates."""
+    from season_calendar import current_season
+    season_start = int(current_season(current).split('-')[0])
+    def replace(match):
+        month = (_PICK_MONTHS[match['name'][:3]] if match['name'] else int(match['month_number']))
+        day = int(match['day'] or match['day_number'])
+        explicit_year = match['year'] or match['year_number']
+        year = int(explicit_year) if explicit_year else season_start + (month < 7)
+        try:
+            return datetime(year, month, day).date().isoformat()
+        except ValueError:
+            raise ValueError('That date is not valid. Try Nov 2, 11/2, today, or a full YYYY-MM-DD date.') from None
+    return _SHORT_PICK_DATE.sub(replace, argument)
+
+
 def parse_picks_request(text, now=None):
     """Route explicit research requests; questions about old picks stay in chat.
 
@@ -157,8 +184,16 @@ def parse_picks_request(text, now=None):
         return None
     if command:
         argument = (command.group(1) or '').strip()
+    elif _SHORT_PICK_DATE.fullmatch(lower.rstrip('?! .')):
+        # An entire date is an explicit shortcut, not a phrase inside ordinary
+        # chat. It uses the same research path as /picks with no model call.
+        argument = lower.rstrip('?! .')
     else:
         lower = re.sub(r'\bnew york(?:\s+knicks)?\b', 'knicks', lower)
+        original_argument = lower
+        # Mask complete date spans for intent checks only. A month in a player
+        # name or unrelated prose must not broaden the supported request grammar.
+        lower = _SHORT_PICK_DATE.sub('2000-01-01', lower)
         quantity = r'(?:[2-6]|two|three|four|five|six)'
         request_head = (r'^(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?'
                         r'(?:(?:give|make|generate|find|show|recommend|suggest)|'
@@ -184,11 +219,14 @@ def parse_picks_request(text, now=None):
             'concise and model targets using saved data dataset no uploads screenshots').split())
         if any(word not in generic_words for word in re.findall(r"[a-z]+", lower)):
             return None
-        argument = lower
+        argument = original_argument
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
     today = current.astimezone(ZoneInfo('America/New_York')).date()
+    argument = _normalize_pick_dates(argument, current)
+    if '/' in argument:
+        raise ValueError('Use a complete month/day date such as 11/2 or Nov 2. A year, if included, needs four digits.')
     dates = set(re.findall(r'\b\d{4}-\d{2}-\d{2}\b', argument))
     relative = set(re.findall(r'\b(?:today|tonight|tomorrow|next)\b', argument))
     if 'today' in relative:
@@ -212,7 +250,7 @@ def parse_picks_request(text, now=None):
     if command:
         remaining = re.sub(r'\b(?:\d{4}-\d{2}-\d{2}|\d+|two|three|four|five|six|today|tonight|tomorrow|next)\b', '', argument)
         if remaining.strip():
-            raise ValueError('Use /picks [YYYY-MM-DD|today|tomorrow|next] [2-6].')
+            raise ValueError('Use /picks, /picks Nov 2, /picks 11/2, or /picks today. An optional count is 2–6.')
     return {'date': date, 'count': count, 'team': 'NYK'}
 
 

@@ -218,8 +218,13 @@ Leg frequencies are not multiplied into a claimed parlay win probability.
 
 Ask for picks or use `/picks` to generate research from the existing master without
 uploading any lines. The default is up to four distinct players for the next
-unstarted saved Knicks game. `/picks YYYY-MM-DD 4` requests an explicit game date;
-an already-started date is held instead of being silently treated as pregame.
+unstarted saved Knicks game. Send just `Nov 2`, `November 2`, or `11/2` to request
+that day, or use `/picks Nov 2` / `picks for November 2`. Numeric dates are
+month/day. Omitted years use the current July–June NBA season, so `Jan 5` in
+November 2026 means January 2027. A past date remains past; it is never silently
+moved into next year. `/picks today`, `/picks tomorrow`, and full YYYY-MM-DD dates
+still work. Add an optional count from 2–6; otherwise the default is four.
+An already-started date is held instead of being silently treated as pregame.
 The normal game-day digest includes a compact version of this independent research.
 
 Each item gives the bot's own statistical projection, workload/context evidence,
@@ -339,7 +344,7 @@ Useful Telegram commands:
 | `/summary [injuries\|news\|trades]` | Saved sourced reports without waiting for AI |
 | `/playerlog NAME \| points \| 5` | Stored game observations and averages |
 | `/boards`, `/analyze BOARD_ID` | Saved available lines and their research report |
-| `/picks [YYYY-MM-DD] [COUNT]` | Own projections and conditional targets, without an uploaded board |
+| `/picks [DATE] [COUNT]` | Own projections; DATE can be Nov 2 or 11/2, and a date-only message also works |
 | `/newboard` | Start a fresh screenshot set; leave saved boards/entries intact |
 | `/entries`, `/results` | Recorded entries, provisional outcomes and confirmed account results |
 | `/settle ENTRY_ID TOTAL_RETURN [note]` | Reconcile the actual credited return |

@@ -58,6 +58,58 @@ class PickRequestTests(unittest.TestCase):
         utc_after_midnight = dt.datetime(2026, 10, 31, 1, tzinfo=dt.timezone.utc)
         self.assertEqual(parse_picks_request('give me picks tonight', utc_after_midnight)['date'], DATE)
 
+    def test_short_dates_and_date_only_messages_keep_default_four_targets(self):
+        for text in ['Nov 2', 'November 2', '11/2', '11/02', 'NOV 2?', 'Nov 2.', '11/2.',
+                     '/picks Nov 2', '/picks November 2', '/picks 11/2',
+                     '/picks@my_bot Nov. 2nd', 'picks November 2',
+                     'give me picks for November 2', 'give me picks on 11/2',
+                     'please give me four Knicks picks for Nov 2']:
+            with self.subTest(text=text):
+                self.assertEqual(parse_picks_request(text, NOW),
+                                 {'date': '2026-11-02', 'count': 4, 'team': 'NYK'})
+
+    def test_date_day_is_never_count_and_explicit_year_is_preserved(self):
+        for text in ['/picks Nov 20', 'November 20', 'picks for 11/20']:
+            self.assertEqual(parse_picks_request(text, NOW),
+                             {'date': '2026-11-20', 'count': 4, 'team': 'NYK'})
+        for text in ['/picks Nov 2 6', 'give me six picks for November 2', '/picks 6 11/2']:
+            self.assertEqual(parse_picks_request(text, NOW)['count'], 6)
+        for text in ['/picks Nov 2, 2025', 'Nov 2 2025', 'picks for 11/2/2025']:
+            self.assertEqual(parse_picks_request(text, NOW)['date'], '2025-11-02')
+
+    def test_missing_year_uses_current_season_without_rolling_past_dates_forward(self):
+        november = dt.datetime(2026, 11, 2, 17, tzinfo=dt.timezone.utc)
+        january = dt.datetime(2027, 1, 10, 17, tzinfo=dt.timezone.utc)
+        for text, now, expected in [('Jan 5', november, '2027-01-05'),
+                                    ('Oct 30', november, '2026-10-30'),
+                                    ('Nov 2', january, '2026-11-02'),
+                                    ('Jan 5', january, '2027-01-05')]:
+            self.assertEqual(parse_picks_request(text, now)['date'], expected)
+        # June 30 in New York still belongs to the season that began in 2026.
+        utc_july = dt.datetime(2027, 7, 1, 1, tzinfo=dt.timezone.utc)
+        self.assertEqual(parse_picks_request('Nov 2', utc_july)['date'], '2026-11-02')
+
+    def test_invalid_or_conflicting_short_dates_never_fall_back_to_next_game(self):
+        for text in ['Feb 30', '13/2', '/picks 11/31', 'picks for April 31',
+                     '/picks Nov 2 today', '/picks Nov 2 Nov 3',
+                     '/picks 11/2 2026-11-03', '/picks Nov 2 7',
+                     '/picks 11/2/26', 'Feb 29', 'picks 11/2.5',
+                     'picks 2/2/2', 'picks 4/4/4', 'picks for 2/2/2', 'picks 2/2/today',
+                     'picks 2026-11-02/3']:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                parse_picks_request(text, NOW)
+        self.assertEqual(parse_picks_request('Feb 29 2028', NOW)['date'], '2028-02-29')
+
+    def test_month_names_do_not_capture_unrelated_chat_or_specific_player_questions(self):
+        for text in ['Who plays Nov 2?', 'How did the Nov 2 picks do?',
+                     'Explain my picks from November 2', 'Give me picks for Jalen Brunson on Nov 2',
+                     'Give me Lakers picks for November 2', 'I was born November 2',
+                     'May I have more details?', 'picks November', 'picks next Friday',
+                     'picks Nov 2.5', 'picks Nov 2–3',
+                     'give me picks against Brooklyn on November 2']:
+            with self.subTest(text=text):
+                self.assertIsNone(parse_picks_request(text, NOW))
+
 
 class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -113,6 +165,27 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.answer.assert_not_awaited()
         history = self.bot._conversation(USER)
         self.assertEqual(history[-1]['content'], response)
+
+    async def test_bare_month_day_runs_real_research_without_ai_or_recording_entry(self):
+        before = self.counts()
+        with patch('telegram_bot.parse_picks_request', side_effect=lambda text: parse_picks_request(text, NOW)), \
+                patch('independent_picks._now', return_value=NOW):
+            response = await self.bot._handle_message(self.message('Oct 30'), 20)
+        self.assertIn('My target lines', response)
+        self.assertIn('Jalen Brunson', response)
+        self.answer.assert_not_awaited()
+        self.refresh.assert_awaited_once()
+        self.assertEqual(self.counts(), before)
+
+    async def test_short_date_after_tipoff_is_held_instead_of_choosing_another_game(self):
+        after_tip = NOW + dt.timedelta(hours=2)
+        with patch('telegram_bot.parse_picks_request', side_effect=lambda text: parse_picks_request(text, after_tip)), \
+                patch('independent_picks._now', return_value=after_tip):
+            response = await self.bot._handle_message(self.message('10/30'), 21)
+        self.assertIn('started', response)
+        self.assertNotIn('Nov', response)
+        self.answer.assert_not_awaited()
+        self.assertEqual(self.store.list_entries(), [])
 
     async def test_explicit_started_day_is_not_silently_replaced_with_next_game(self):
         after_tip = NOW + dt.timedelta(hours=2)
