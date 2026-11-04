@@ -712,6 +712,7 @@ _UNITS = {
     'ra': r'(?:REBS?|rebounds?)\s*\+\s*(?:ASTS?|assists?)\b',
     'fga': r'(?:FG|field[- ]goal)\s*(?:attempts?|attempted)\b|FGA\b|shots?\s+attempted\b',
     'tpa': r'3PTA\b|three[- ]point\s+attempts?\b',
+    'attempts': r'attempts?\b|shots?\s+taken\b',
     'tpm': r'3P(?:T)?M\b|(?:made\s+)?threes\b|(?:3|three)[- ]pointers?(?:\s+made)?\b',
     'pts': r'PPG\b|points?(?:\s+(?:per\s+game|a\s+game))?\b',
     'reb': r'RPG\b|rebounds?(?:\s+(?:per\s+game|a\s+game))?\b',
@@ -823,7 +824,7 @@ def _quantity_supported(value, unit, fact):
         following = _UNIT_AFTER.match(text[match.end():])
         if following:
             explicit_units.add(_metric_for_unit(following.group(1)))
-    if unit in explicit_units:
+    if unit in explicit_units or (unit=='attempts' and explicit_units & {'fga','tpa'}):
         return True
     if unit == 'games' and fact.get('fact_type') in {'sample','sample_counts','counts'}:
         # A numerator in "3 of 7 games" is itself a count of games, even
@@ -839,7 +840,7 @@ def _quantity_supported(value, unit, fact):
     metric = str(fact.get('metric', '')).casefold()
     metric_key = _metric_for_unit(metric) or {'points':'pts', 'rebounds':'reb', 'assists':'ast',
                   'threes':'tpm', '3pm':'tpm', '3ptm':'tpm', 'fg_attempted':'fga'}.get(metric, metric)
-    if metric_key == unit and value in {float(n) for n in fact.get('values', []) if _finite(n)}:
+    if (metric_key == unit or (unit=='attempts' and metric_key in {'fga','tpa'})) and value in {float(n) for n in fact.get('values', []) if _finite(n)}:
         # Count denominators must not become a scoring or projection value.
         return fact.get('fact_type') in {'recent_values', 'projection', 'median', 'average', 'line'}
     return False
@@ -851,7 +852,7 @@ def _construction_numbers(text, question=''):
     requested = _numbers(question)
     normalized = re.sub(r'(?<!\w)([1-6])\s+(?:separate\s+)?(?:legs?|picks?|selections?)(?!\w)',
         lambda m: 'requested selections' if float(m.group(1)) in requested else m.group(), normalized, flags=re.I)
-    normalized = re.sub(r'\b1\s+(?:pick|player|selection)?\s*(?:from|for|on)\s+each\s+(?:team|side)\b',
+    normalized = re.sub(r'\b1\s+(?:(?:qualified|eligible|supported|distinct)\s+)*(?:pick|player|selection)?\s*(?:from|for|on)\s+each\s+(?:team|side)\b',
                         'a selection from each team', normalized, flags=re.I)
     normalized = re.sub(r'\b(?:players?|picks?|selections?|legs?)\s+'
                         r'(?:(?:are|come|coming|drawn|chosen|selected)\s+)?from\s+(?:at least\s+)?2\s+(?:different\s+)?teams?\b',
@@ -945,6 +946,19 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
             matching.extend(f for f in candidates if opponent_claim.group(0).casefold() in f.get('text', '').casefold())
             candidates = matching
         normalized = _construction_numbers(clause, question)
+        # A list of made-shot outcomes does not describe usage or attempts.
+        # Keep qualitative possibilities available, but bind empirical workload
+        # descriptions to actual workload measurements when numbers are given.
+        workload = re.search(r'\b(?:low|limited|reduced)[- ](?:usage|(?:shot[- ])?volume|attempts?|minutes?)\b',normalized,re.I)
+        if workload and not re.search(r'\b(?:if|could|can|may|might|would)\b',normalized,re.I):
+            workload_values = _numbers(normalized[workload.end():])
+            measured = set()
+            for fact in candidates:
+                metric = str(fact.get('metric',''))
+                if _metric_for_unit(metric) in {'fga','tpa','attempts','minutes'} or re.search(r'\b(?:usage|touches|possessions)\b',metric,re.I):
+                    measured.update(float(n) for n in fact.get('values',[]) if _finite(n))
+            if workload_values-measured:
+                raise ReplyValidationError('unsupported_metric')
         allowed = set().union(*(_numbers(f.get('text', '')) | {float(n) for n in f.get('values', []) if _finite(n)}
                                for f in candidates)) if candidates else set()
         for match in _NUMBER.finditer(normalized):
@@ -1171,6 +1185,11 @@ def render_natural_reply(document, cards, required=(), question=''):
         raise ReplyValidationError('invalid_evidence')
     selected = [by_id[i] for i in ids]
     text = re.sub(r'\s*\[[A-Z]\d+\]', '', text).strip()
+    # IDs identify tool records, not useful concepts in a user conversation.
+    # Preserve the claim and its citations while making bare labels readable.
+    for identity in by_id:
+        text = re.sub(r'\b(?:Evidence\s+)?'+re.escape(identity)+r'\b(?:[’\x27]s)?(?:\s+data)?',
+                      'The saved data', text, flags=re.I)
     if not text:
         raise ReplyValidationError('empty_reply')
     _validate_natural_numbers(text, selected, cards, question)

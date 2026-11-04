@@ -286,6 +286,45 @@ class ConversationTests(unittest.TestCase):
                 self.assertIsNone(result['clarification'])
                 self.assertFalse(result['complete_prop'])
 
+    def test_matchup_research_and_presentation_requests_do_not_become_preferences(self):
+        base = 'How does Jalen Brunson match up against Brooklyn, and what could affect his scoring?'
+        for text in [base + ' Keep it brief.', base + ' Keep the answer short.',
+                     'Briefly, ' + base, 'I want to know how Jalen Brunson matches up against Brooklyn.',
+                     'I want to understand Jalen Brunson against Brooklyn.',
+                     'Tell me why Jalen Brunson might score differently against Brooklyn.']:
+            with self.subTest(text=text):
+                result = self.resolve(text)
+                self.assertEqual(result['intent'], 'research')
+                self.assertEqual(result['slots']['player'], 'Jalen Brunson')
+                self.assertEqual(result['slots']['opponent'], 'BKN')
+                self.assertIsNone(result['clarification'])
+                self.assertFalse(result['complete_prop'])
+
+    def test_matchup_research_does_not_silently_assess_an_old_line(self):
+        prior = self.resolve('Brunson more 19.5 points')
+        for text in ['How does Brunson match up against Brooklyn? Keep it brief.',
+                     'I want to know how Brunson matches up against Brooklyn.']:
+            with self.subTest(text=text):
+                result = self.resolve(text, state=prior['state'])
+                self.assertEqual(result['intent'], 'research')
+                self.assertIsNone(result['clarification'])
+
+    def test_explanation_without_a_betting_line_does_not_ask_for_a_prop(self):
+        result = self.resolve('Tell me why Jalen Brunson is a good scorer against Brooklyn.')
+        self.assertEqual(result['intent'], 'explanation')
+        self.assertEqual(result['slots']['player'], 'Jalen Brunson')
+        self.assertEqual(result['slots']['opponent'], 'BKN')
+        self.assertIsNone(result['clarification'])
+        self.assertFalse(result['complete_prop'])
+
+    def test_actual_selection_preferences_still_work(self):
+        for text in ['Keep Randle in', 'Leave the picks unchanged', 'I liked attempts more',
+                     'I prefer rebounds', 'I want Brunson on the card']:
+            with self.subTest(text=text):
+                result = self.resolve(text)
+                self.assertEqual(result['intent'], 'preference')
+        self.assertEqual(self.resolve('Up or down choose')['intent'], 'clarification')
+
     def test_assistant_statistics_are_not_new_user_lines(self):
         history = [user('Josh Hart line 22.5 choose up or down'),
                    assistant('Josh Hart: 8.67 PPG; 7.5 RPG; 3.33 APG; 6 games. Source: saved data.')]

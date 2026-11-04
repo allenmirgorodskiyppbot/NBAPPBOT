@@ -150,11 +150,32 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_preference_does_not_invent_a_new_line_or_force_a_recommendation(self):
         history = [{'role': 'user', 'content': 'Brunson more 19.5 points'}]
-        await self.ask('I liked the attempts more', history, through_app=True)
-        self.assertEqual(self.generated[-1]['dialogue']['intent'], 'preference')
-        self.assertEqual(self.generated[-1]['cards'], [])
-        self.assertNotIn('line', self.generated[-1]['dialogue']['slots'])
-        self.assertIn('tradeoff', self.generated[-1]['dialogue']['action'])
+        result = await self.ask('I liked the attempts more', history, through_app=True)
+        self.assertNotIn('discussion', result)
+        self.assertTrue(self.generated[-1]['cards'])
+        self.assertIn('Jalen Brunson', str(self.generated[-1]['cards']))
+        self.assertNotIn('19.5', self.generated[-1]['request'].message)
+
+    async def test_named_matchup_with_brevity_request_uses_real_scoped_evidence(self):
+        base = 'How does Jalen Brunson match up against Brooklyn, and what could affect his scoring?'
+        before = self.snapshot()
+        for text in [base + ' Keep it brief.', base + ' Keep the answer short.',
+                     'Briefly, ' + base, 'I want to know how Jalen Brunson matches up against Brooklyn.',
+                     'Tell me why Jalen Brunson might score differently against Brooklyn.',
+                     'Tell me why Jalen Brunson is a good scorer against Brooklyn.']:
+            with self.subTest(text=text):
+                self.generated.clear()
+                result = await self.ask(text, through_app=True)
+                self.assertTrue(result['ai_used'])
+                generated = self.generated[-1]
+                self.assertTrue(generated['cards'], 'A style instruction must not bypass basketball evidence.')
+                self.assertTrue(generated.get('natural'))
+                evidence = str(generated['cards'])
+                self.assertIn('Jalen Brunson', evidence)
+                self.assertNotIn('Julius Randle', evidence)
+                self.assertNotIn('Josh Hart', evidence)
+                self.assertNotIn('discussion', result)
+        self.assertEqual(before, self.snapshot())
 
     async def test_social_thanks_is_generated_without_old_statistics(self):
         history = [{'role': 'user', 'content': 'Julius Randle more 1.5 threes'}]

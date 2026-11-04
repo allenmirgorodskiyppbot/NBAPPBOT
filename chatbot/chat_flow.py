@@ -24,6 +24,12 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
     intent = turn['intent']
     if intent == 'research':
         return None
+    if (intent in {'explanation','preference'} and turn.get('slots', {}).get('player')
+            and not turn.get('complete_prop') and not turn.get('recent_picks')):
+        # A named-player explanation still needs factual context even when it
+        # includes a style request or has no betting threshold. Keep the
+        # existing scoped retrieval path instead of free-form unsupported chat.
+        return None
     discussion = _context(turn)
     if intent == 'lineup_constraint':
         # This is an instruction about selecting a lineup, not a team-stat query.
@@ -36,7 +42,7 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
             fallback=('I’ll include at least one qualified player from each team when building the lineup. '
                       'If I can’t support both sides, I’ll tell you instead of filling a leg.' if both else
                       'I understand the team preference. I’ll still check the available evidence and offer rules.'))
-    if intent in {'prop','explanation'} and turn.get('complete_prop'):
+    if intent in {'prop','explanation','preference'} and turn.get('complete_prop'):
         report = await asyncio.to_thread(build_pick_discussion, master, turn['slots'])
         if not report.get('available'):
             return {'answer':report['fallback_answer'], 'sources':report.get('sources',[]), 'ai_used':False}

@@ -46,6 +46,14 @@ class NaturalReplyTests(unittest.TestCase):
         result = self.render('More than 1.5 made threes requires two made threes. That is possible, not guaranteed.')
         self.assertIn('requires two', result['answer'])
 
+    def test_internal_record_labels_are_rendered_as_readable_source_references(self):
+        for text in ("P1's data shows an average of 2 made threes.",
+                     'Evidence P1 shows an average of 2 made threes.'):
+            result = self.render(text)
+            self.assertTrue(result['answer'].startswith('The saved data shows'))
+            self.assertNotIn('P1', result['answer'])
+            self.assertEqual(result['sources'][0]['evidence_id'], 'P1')
+
     def test_sample_above_and_below_counts_cannot_be_swapped(self):
         self.render('Randle was below the line in 2 of 6 stored games.')
         self.assert_rejected('Randle was below the line in 4 of 6 stored games.', 'unsupported_metric')
@@ -84,6 +92,7 @@ class NaturalReplyTests(unittest.TestCase):
         self.render('I’ll choose four picks with one player from each team.', cards=[],
                     question='Please choose4picks frombothteams'.replace('choose4picks','choose 4 picks'))
         self.render('The lineup needs players from two teams.',cards=[])
+        self.render('A complete lineup includes at least one qualified player from each team.',cards=[])
         self.render('Your picks are from at least two different teams.',cards=[])
         self.assert_rejected('He averages 4 points.', 'unsupported_number', cards=[], question='choose 4 picks')
         self.assert_rejected('The player has played for 2 teams.', 'unsupported_number',cards=[])
@@ -182,6 +191,20 @@ class NaturalReplyTests(unittest.TestCase):
     def test_same_numeric_value_cannot_change_metric(self):
         self.assert_rejected('Randle averaged 2 points.', 'unsupported_metric')
         self.assert_rejected('Randle averaged 6 made threes.', 'unsupported_metric')
+
+    def test_made_shot_zeros_cannot_become_zero_attempts_or_observed_low_usage(self):
+        self.assert_rejected('Randle has frequent zero attempts.', 'unsupported_metric')
+        self.assert_rejected('The sample includes low-usage games (e.g., 0, 0, 0).', 'unsupported_metric')
+        self.render('Reduced minutes or fewer attempts could lower his made threes.')
+        self.render('Low usage could contribute to zero made threes, but the makes alone cannot establish usage.')
+        cards = prop_cards()+[{'id':'W1','kind':'prop_workload','entity':'Julius Randle',
+                              'text':'Julius Randle: recent FG attempts were 0, 4, 6.',
+                              'approved_facts':[{'text':'Julius Randle: recent FG attempts were 0, 4, 6.',
+                                                 'entity':'Julius Randle','metric':'FG attempts',
+                                                 'fact_type':'recent_values','values':[0,4,6]}]}]
+        self.render('The sample includes zero attempts.',cards=cards)
+        self.render('The sample includes low-attempt games (0 attempts).',cards=cards)
+        self.render('He recorded 4 attempts.',cards=cards)
 
     def test_unobserved_number_and_numeric_prediction_are_rejected(self):
         self.assert_rejected('Randle averaged 8 made threes.', 'unsupported_number')

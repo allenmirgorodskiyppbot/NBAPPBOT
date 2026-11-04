@@ -27,7 +27,7 @@ MARKET_LABELS = {
 }
 _NUMBER = r'(?:\d+(?:\.\d+)?|\.\d+)'
 _ASK = re.compile(r'\b(?:choose|picks?|recommend\w*|lean|good|bad|like|take|bet|play|'
-                  r'worth|over|under|more|less|higher|lower|up|down|line|prop|'
+                  r'worth|over|under|more|less|higher|lower|line|prop|'
                   r'safer|riskier|replace|swap)\b', re.I)
 _EXPLAIN = re.compile(r'\b(?:why|explain|reason\w*|clarif\w*|meaning|mean by|tell me more|elaborate|more detail|'
                       r'how come|what makes|what if|risk\w*|blowout|benched|'
@@ -36,11 +36,14 @@ _FOLLOWUP = re.compile(r'^\s*(?:and\b|but\b|why\b|how\b|what about\b|'
                        r'actually\b|no\b|nah\b|instead\b|i mean\b|'
                        r'up or down\b|more or less\b|over or under\b)|'
                        r'\b(?:he|him|his|that|those|it|they|their|them|same|instead)\b', re.I)
-_PREFERENCE = re.compile(r'\b(?:i (?:like|liked|prefer|want|wanted)|i(?:[’\']m| am) '
-                         r'(?:not )?a fan|rather|prefer|keep|leave|don.t change)\b', re.I)
+_PREFERENCE = re.compile(r'\b(?:i (?:like|liked|prefer|want|wanted)\s+'
+                         r'(?!to\b|(?:you\s+)?(?:tell|explain|show|give|check)\b|'
+                         r'(?:a\s+)?(?:brief|short|concise|simple)\b|(?:know|understand|learn)\b)|'
+                         r'i(?:[’\']m| am) (?:not )?a fan\b|'
+                         r'(?:rather|prefer)\s+(?!(?:a\s+)?(?:brief|short|concise|simple)\b))', re.I)
 _RESEARCH = re.compile(r'\b(?:average\w*|stats?|statistics|last \w+ games|'
                        r'game logs?|who guards?|defensive percentage|injur\w*|'
-                       r'news|schedule|score|scores|results?|records?|workbooks?|'
+                       r'news|schedule|score|scores|match(?:es)?\s*ups?|results?|records?|workbooks?|'
                        r'worksheets?|sheets?|rows?|cells?|columns?|tracking|passing|'
                        r'potential assists?|stored data|source data|dataset|database|'
                        r'look up|lookup|retrieve|query)\b', re.I)
@@ -247,6 +250,28 @@ def _count(text):
     return words[token] if token in words else int(token)
 
 
+def _selection_preference(text, names):
+    """Distinguish a selection preference from wording or research instructions."""
+    # Formatting clauses can follow a substantive question. They do not make
+    # the whole request an opinion about which players or markets to select.
+    presentation = r'\b(?:keep|make)\s+(?:(?:it|the|your|this|that|answer|reply|response|explanation)\s+){0,4}'
+    presentation += r'(?:brief|short|concise|simple)\b'
+    text = re.sub(presentation, ' ', text, flags=re.I)
+    if _PREFERENCE.search(text):
+        return True
+    selection = r'\b(?:keep|leave|don.t change)\s+(?:(?:the|my|this|that)\s+)?'
+    selection += r'(?:picks?|legs?|lineups?|cards?|slips?|players?|selections?|lines?|him|them)\b'
+    if re.search(selection, text, re.I):
+        return True
+    if re.search(r'\b(?:keep|leave)\s+(?:it|that|this|those|these)\s+(?:in|out|unchanged|as is|alone)\b', text, re.I):
+        return True
+    for match in re.finditer(r'\b(?:keep|leave|don.t change)\s+([^.!?;,]+)', text, re.I):
+        # Named player selections still work without a fixed list of phrases.
+        if _scan(' '.join(match.group(1).split()[:4]), names)['players']:
+            return True
+    return False
+
+
 def _empty_state():
     return {'version': 1, 'slots': {}, 'constraints': {}, 'recent_picks': [], 'ambiguous_players': []}
 
@@ -368,7 +393,7 @@ def _apply_user(text, state, names, now):
     followup = bool(_FOLLOWUP.search(text) or (slots.get('player') and
                     re.fullmatch(r'\s*' + _NUMBER + r'\s*[!?]?\s*', text)))
     explanation = bool(_EXPLAIN.search(text))
-    preference = bool(_PREFERENCE.search(text))
+    preference = _selection_preference(text, names)
     social = bool(_SOCIAL.fullmatch(text))
     both_teams = _constraint(text)
     count = _count(text)
@@ -459,6 +484,8 @@ def _apply_user(text, state, names, now):
                     or (followup and (market_error or (stat and prior.get('line') is not None)))))
     if preference:
         intent = 'preference'
+    elif research and line is None and not choosing and not asks and not explanation:
+        intent = 'research'
     elif explanation and (is_prop or prior.get('player') or state['recent_picks']):
         intent = 'explanation'
     elif is_prop:

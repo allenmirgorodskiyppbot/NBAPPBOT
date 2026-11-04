@@ -833,7 +833,7 @@ async def generated_evidence_reply(request, progress, master, cards, *, natural=
         instructions=(
             'You are a conversational basketball research assistant. Answer the latest question directly '
             'and naturally, using the resolved discussion and relevant history. Return JSON with '
-            'evidence_ids, reply, needs_more_data. Write at most three short sentences. '
+            'evidence_ids, reply, needs_more_data. Write at most three short sentences, under 75 words. '
             'For several picks, use one short bullet per pick instead. '
             'Lead with the requested lean, explanation, correction or acknowledgement. '
             'For why questions explain the actual evidence and its main risk; for a correction use '
@@ -842,11 +842,13 @@ async def generated_evidence_reply(request, progress, master, cards, *, natural=
             'A Pass means the evidence does not support choosing a side, even if the user insists. '
             'Specific numbers and factual claims must come from supplied approved facts, with their '
             'player, statistic, scope and dates intact. Select the supporting evidence IDs. '
+            'Separate outcomes from opportunities: zero made shots do not establish zero attempts or low usage. '
             'A lean is a cautious interpretation, not a guaranteed result or calibrated probability. '
             'Averages and historical hit counts alone do not prove a betting advantage. '
             'Explain unmeasured mechanisms such as blowout minutes conditionally. Do not invent '
             'defenders, injuries, current availability, bookmaker offers, or expected payouts. '
-            'Do not repeat source paragraphs or technical coverage boilerplate. '
+            'Use only the most relevant facts. Do not name internal evidence IDs, list every source, '
+            'or repeat source paragraphs or technical coverage boilerplate. '
             'For ordinary conversation respond normally without a data lookup. '
             'Ask one short clarification only when an essential detail is unresolved. '
             'Use needs_more_data=true with empty reply only for missing factual records, never for '
@@ -1078,12 +1080,22 @@ async def answer_question(store, request, progress, master=None):
     source_lookup = explicit_source_request(request.message)
     from current_research import wants_current_research
     derived_lookup = not source_lookup and wants_current_research(request.message)
+    conversation_turn = None
     if not source_lookup and not derived_lookup:
+        from conversation import resolve_conversation
         from chat_flow import answer_conversation
-        conversational = await answer_conversation(store, master, request, progress, generated_evidence_reply)
+        conversation_turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history)
+        conversational = await answer_conversation(store, master, request, progress, generated_evidence_reply,
+                                                   turn=conversation_turn)
         if conversational is not None:
             return conversational
     resolved = await asyncio.to_thread(resolve_question, store, master, request.message, history)
+    if conversation_turn and conversation_turn.get('slots', {}).get('player') and not resolved.get('players'):
+        # The dialogue resolver may know the player from an earlier prop after
+        # the legacy resolver loses a pronoun/preference reference. Carry that
+        # identity into retrieval, without carrying a cleared market threshold.
+        resolved = {**resolved, 'players':[conversation_turn['slots']['player']],
+                    'question':conversation_turn['canonical_question']}
     assignment = (await asyncio.to_thread(answer_assignment_question, store, master, request.message, history, resolved)
                   if not source_lookup and not derived_lookup else None)
     if assignment is not None:
