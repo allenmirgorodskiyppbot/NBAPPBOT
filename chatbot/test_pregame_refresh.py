@@ -250,5 +250,48 @@ class PregameRefreshTests(unittest.TestCase):
         self.assertTrue(self.store.get_checkpoint('daily_nba:'+backfill)['complete'])
         self.assertLessEqual(len([u for u in worker.calls if u.endswith('.json') and not u.endswith('existing_tracking.json')]),3)
 
+    def legacy_checkpoints(self):
+        older='2026-10-28'
+        documents={DAY:self.verified(self.empty()),older:self.final(older,'PHI')}
+        for day,document in documents.items():
+            import_daily_snapshot(self.store,document,day,NOW)
+            record=self.store.get_checkpoint('daily_nba:'+day)
+            for key in ('last_checked_at','last_refresh_status','last_refresh_error','final_game_ids','team_final_game_ids'):
+                record.pop(key,None)
+            self.store.set_checkpoint('daily_nba:'+day,record)
+        self.status();self.now[0]=NOW+dt.timedelta(minutes=5)
+        return older,documents
+
+    def test_upgrade_checks_legacy_completed_dates_immediately_despite_recent_global_attempt(self):
+        older,documents=self.legacy_checkpoints()
+        service,worker=self.service(documents)
+        asyncio.run(service.tick())
+        requests=[url.rsplit('/',1)[-1] for url in worker.calls]
+        self.assertEqual(requests,[DAY+'.json',older+'.json'])
+        for day in (DAY,older):
+            record=self.store.get_checkpoint('daily_nba:'+day)
+            self.assertEqual(record['last_checked_at'],self.now[0].isoformat())
+            self.assertEqual(record['last_refresh_status'],'success')
+            self.assertIn('team_final_game_ids',record)
+        self.assertEqual(self.store.get_checkpoint('nightly_nba_refresh')['last_attempt'],self.now[0].isoformat())
+
+    def test_upgrade_failure_retains_cooldown_across_restart_and_retries_hourly(self):
+        older,documents=self.legacy_checkpoints()
+        service,worker=self.service({})
+        asyncio.run(service.tick())
+        for day in (DAY,older):
+            record=self.store.get_checkpoint('daily_nba:'+day)
+            self.assertTrue(record['complete'])
+            self.assertEqual(record['last_refresh_status'],'failed')
+            self.assertEqual(record['last_checked_at'],self.now[0].isoformat())
+        restarted,worker=self.service(documents)
+        self.now[0]+=dt.timedelta(minutes=1)
+        asyncio.run(restarted.tick())
+        self.assertEqual(worker.calls,[])
+        self.now[0]+=dt.timedelta(minutes=59)
+        asyncio.run(restarted.tick())
+        self.assertTrue(any(url.endswith('/'+DAY+'.json') for url in worker.calls))
+        self.assertEqual(self.store.get_checkpoint('daily_nba:'+DAY)['last_refresh_status'],'success')
+
 
 if __name__=='__main__':unittest.main()

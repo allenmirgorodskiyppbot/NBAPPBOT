@@ -91,6 +91,24 @@ class PregameFreshnessCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Needs:', report)
         self.assertNotIn('current for both teams', report)
 
+    def test_schedule_failure_shows_safe_cause_without_a_status_dump(self):
+        check = self.store.get_checkpoint('nba_schedule_today')
+        check.update(status='failed', error='HTTPStatusError: HTTP 403')
+        self.store.set_checkpoint('nba_schedule_today', check)
+        report = freshness_report(self.store, NOW)
+        self.assertIn('Schedule check: failed — HTTPStatusError: HTTP 403', report)
+        self.assertIn('Nov 04, 3:00 PM Eastern', report)
+        self.assertNotIn('current for both teams', report)
+
+    def test_schedule_report_does_not_echo_arbitrary_exception_or_url_content(self):
+        check = self.store.get_checkpoint('nba_schedule_today')
+        check.update(status='failed', error='Bad response https://source.invalid/?token=private-value')
+        self.store.set_checkpoint('nba_schedule_today', check)
+        report = freshness_report(self.store, NOW)
+        self.assertIn('Schedule check: failed — source check failed', report)
+        self.assertNotIn('private-value', report)
+        self.assertNotIn('https://source.invalid', report)
+
     def test_pending_and_disabled_updates_remain_visible(self):
         state = self.store.get_checkpoint('nightly_nba_refresh')
         state.update(enabled=False, source_data_through_date='2026-11-01',

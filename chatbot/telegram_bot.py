@@ -197,6 +197,18 @@ def freshness_report(store, now=None):
         ready = all(report.get('ready') is True for report in reports)
         lines.append('Game-stat readiness: ' + ('current for both teams.' if ready else 'waiting for verified coverage.'))
         if not ready:
+            schedule = next((report.get('schedule_check') for report in reports
+                             if isinstance(report.get('schedule_check'), dict)), {})
+            if schedule.get('status'):
+                # The checker stores a safe error category/status, never the
+                # remote exception body or a configured URL with credentials.
+                error = str(schedule.get('error') or '')
+                safe_error = (error if re.fullmatch(r'[A-Za-z]+(?:: HTTP [1-5][0-9]{2})?', error)
+                              else 'event inventory mismatch' if schedule.get('status') == 'partial'
+                              else 'source check failed' if error else None)
+                label = schedule['status'] if schedule['status'] in {'success','failed','partial','checking'} else 'unknown'
+                lines.append('Schedule check: ' + label + (' — ' + safe_error if safe_error else '')
+                             + '; checked ' + stamp(schedule.get('checked_at')) + '.')
             reasons = list(dict.fromkeys(str(reason).replace('\n', ' ').strip()[:220]
                            for report in reports for reason in report.get('reasons', []) if reason))
             lines.extend('Needs: ' + reason for reason in reasons[:3])

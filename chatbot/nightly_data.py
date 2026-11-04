@@ -241,12 +241,21 @@ class NightlyNBARefresh:
                     "SELECT value_json FROM checkpoints WHERE name LIKE 'daily_nba:%'")]
             through=max((r['date'] for r in imported if r.get('complete') is True
                          and isinstance(r.get('date'),str) and r['date']<=target),default=None)
+            reports={r.get('date'):r for r in imported}
+            recheck_days=_pregame_recheck_days(self.store,imported,target,now) if pending or local>=deadline else []
+            # An upgrade may retain a recent old-worker attempt while its daily
+            # records lack the new per-date validation check. Bootstrap those
+            # required checks once, rather than waiting behind that legacy timer.
+            # Every real new attempt, including failure, stores last_checked_at;
+            # that durable marker restores the normal cooldown across restarts.
+            validation_bootstrap=bool(local>=deadline and any(not _aware(reports.get(day,{}).get('last_checked_at'))
+                                      for day in [target,*recheck_days[:2]]))
+            if validation_bootstrap:
+                pending=[target,*recheck_days[:2],*pending]
             if pending:
                 # Verified off days have no player rows. Also check each upcoming
                 # team's last actual game today. Once checked, let older pending
                 # imports advance instead of starving them behind routine rechecks.
-                recheck_days=_pregame_recheck_days(self.store,imported,target,now)
-                reports={r.get('date'):r for r in imported}
                 needs_today=[]
                 for day in recheck_days:
                     report=reports.get(day,{})
@@ -257,7 +266,7 @@ class NightlyNBARefresh:
                     if not checked or checked.astimezone(EASTERN).date()!=today:
                         needs_today.append(day)
                 pending=list(dict.fromkeys([target,*needs_today,*pending,*recheck_days]))
-            game_attempt=bool(pending and (due or not last or (now-last).total_seconds()>=3600))
+            game_attempt=bool(pending and (due or validation_bootstrap or not last or (now-last).total_seconds()>=3600))
             tracking_last=_aware(status.get('last_tracking_attempt'))
             tracking_attempt=bool((local>=deadline or game_attempt) and
                                   (due or not tracking_last or (now-tracking_last).total_seconds()>=3600))
