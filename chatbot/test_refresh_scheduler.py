@@ -124,7 +124,6 @@ class RefreshSchedulerTests(unittest.TestCase):
         self.assertEqual(first['pending_dates'], [])
         self.assertEqual(first['game_refresh_phase'], 'updated')
         self.assertEqual(first['tracking_refresh_phase'], 'unavailable')
-        game_attempt = first['last_attempt']
         self.calls.clear()
 
         self.now[0] += dt.timedelta(seconds=3599)
@@ -134,8 +133,8 @@ class RefreshSchedulerTests(unittest.TestCase):
         self.fail_tracking = False
         self.now[0] += dt.timedelta(seconds=1)
         self.run_tick(service)
-        self.assertEqual(self.calls, ['existing_tracking.json'])
-        self.assertEqual(self.status()['last_attempt'], game_attempt)
+        self.assertEqual(self.calls, [TARGET+'.json', 'existing_tracking.json'])
+        self.assertEqual(self.status()['last_attempt'], self.now[0].isoformat())
         self.assertEqual(self.status()['last_tracking_attempt'], self.now[0].isoformat())
         self.assertEqual(self.status()['tracking_refresh_phase'], 'collected')
 
@@ -146,7 +145,7 @@ class RefreshSchedulerTests(unittest.TestCase):
         self.points = 125
         self.now[0] += dt.timedelta(hours=1)
         self.run_tick(service)
-        self.assertEqual(self.calls, ['existing_tracking.json'])
+        self.assertEqual(self.calls, [TARGET+'.json', 'existing_tracking.json'])
         with self.store.connect() as db:
             row = db.execute("SELECT payload_json FROM refreshed_tracking WHERE entity='Tyrese Maxey'").fetchone()
         record = json.loads(row[0])
@@ -276,7 +275,9 @@ class RefreshSchedulerTests(unittest.TestCase):
         self.assertEqual(self.status()['pending_dates'], expected[3:])
         self.assertEqual(self.status()['handled_target_date'], TARGET)
 
-        for _ in range(3):
+        # One slot rechecks the required day for later score corrections, while
+        # the remaining two slots advance the durable outage backlog.
+        for _ in range(4):
             self.now[0] += dt.timedelta(hours=1)
             before = len(self.calls)
             # A new service instance models a restart with the persisted queue.
@@ -284,7 +285,8 @@ class RefreshSchedulerTests(unittest.TestCase):
             self.assertLessEqual(len([name for name in self.calls[before:]
                                       if name != 'existing_tracking.json']), 3)
         imported_dates = [name[:-5] for name in self.calls if name != 'existing_tracking.json']
-        self.assertEqual(imported_dates, expected)
+        self.assertEqual(list(dict.fromkeys(imported_dates)), expected)
+        self.assertEqual(imported_dates.count(TARGET), 5)
         self.assertEqual(self.status()['pending_dates'], [])
         for day in expected:
             self.assertTrue(self.store.get_checkpoint('daily_nba:' + day)['complete'])

@@ -13,6 +13,20 @@ REPOSITORY = 'allenmirgorodskiyppbot/NBAPPBOT'
 WORKBOOK_REF = '1188dd88beb128acba8afc66fb6918b6cc82ae6e'
 WORKBOOK_SHA256 = '02fba50eeda757f140fc7c4fb4a500ca6d565f6646c45481436d2b78db22ba04'
 
+APP_FILES = [
+    'app.py', 'workbook.py', 'requirements.txt', 'index.html', 'master.py',
+    'feeds.py', 'seed_master.py', 'analysis_engine.py', 'telegram_bot.py',
+    'nba_cdn.py', 'feed_diagnostics.py', 'manual_import.py', 'news_digest.py', 'self_check.py',
+    'player_stats.py', 'matchup_queries.py', 'gameday_digest.py', 'basketball_research.py',
+    'release_checks.py', 'season_calendar.py', 'season_schedule_2026_27.json', 'efficient_ai.py',
+    'nba_daily_export.py', 'nightly_data.py', 'dataset_refresh.py', 'refresh_scope_2026_27.json',
+    'contextual_projection.py', 'advanced_refresh.py', 'matchup_refresh_scope.json', 'mirror_sources.py',
+    'grounded_reply.py', 'screenshot_board.py', 'screenshot_intake.py', 'board_shortlist.py',
+    'independent_picks.py', 'assignment_refresh.py', 'refresh_export.py', 'current_research.py',
+    'service_runtime.py', 'conversation.py', 'chat_flow.py', 'pick_discussion.py',
+    'research_discussion.py', 'lineup_selection.py', 'pregame_freshness.py', 'game_schedule_check.py',
+]
+
 
 def download(url, destination):
     for attempt in range(5):
@@ -32,16 +46,7 @@ def main():
         raise ValueError('SOURCE_REF must be the full GitHub commit SHA.')
     root = Path('/app')
     root.mkdir(parents=True, exist_ok=True)
-    for name in ['app.py', 'workbook.py', 'requirements.txt', 'index.html', 'master.py',
-                 'feeds.py', 'seed_master.py', 'analysis_engine.py', 'telegram_bot.py',
-                 'nba_cdn.py', 'feed_diagnostics.py', 'manual_import.py', 'news_digest.py', 'self_check.py',
-                 'player_stats.py', 'matchup_queries.py', 'gameday_digest.py', 'basketball_research.py',
-                 'release_checks.py', 'season_calendar.py', 'season_schedule_2026_27.json', 'efficient_ai.py',
-                 'nba_daily_export.py', 'nightly_data.py', 'dataset_refresh.py', 'refresh_scope_2026_27.json',
-                 'contextual_projection.py', 'advanced_refresh.py', 'matchup_refresh_scope.json', 'mirror_sources.py',
-                 'grounded_reply.py', 'screenshot_board.py', 'screenshot_intake.py', 'board_shortlist.py',
-                 'independent_picks.py', 'assignment_refresh.py', 'refresh_export.py', 'current_research.py',
-                 'service_runtime.py']:
+    for name in APP_FILES:
         print('Downloading ' + name, flush=True)
         download(f'https://raw.githubusercontent.com/{REPOSITORY}/{ref}/chatbot/{name}', root / name)
     data = Path(os.getenv('DATA_DIR', '/data'))

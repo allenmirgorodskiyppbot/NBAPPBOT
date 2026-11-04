@@ -22,6 +22,13 @@ DAY = '2026-10-30'
 
 class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        # This suite verifies transport/history/preferences. Real publication
+        # readiness is separately covered with actual daily source checkpoints.
+        for name in ('board_shortlist', 'independent_picks'):
+            readiness = patch(name + '.assess_pregame_freshness', return_value={
+                'ready': True, 'reasons': [], 'current_player_stat_coverage': ['pts', 'reb', 'ast', 'pra', 'fga']})
+            readiness.start()
+            self.addCleanup(readiness.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')

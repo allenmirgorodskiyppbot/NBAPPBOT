@@ -16,6 +16,7 @@ from feeds import TEAM_WORDS, canonical_player, canonical_team
 from news_digest import _aware, _clean, _metadata, is_promotion
 from season_calendar import calendar_context, current_season
 from lineup_selection import select_lineup
+from pregame_freshness import assess_pregame_freshness
 
 EASTERN = ZoneInfo('America/New_York')
 MARKET_NAMES = {
@@ -156,7 +157,10 @@ def player_availability(news, player, date, now):
     # Only compare reliable instants. An untimed absence remains an unresolved
     # caution rather than being silently overridden by a different clock basis.
     timed = sorted((item for item in relevant if item['_stamp']), key=lambda item: item['_stamp'], reverse=True)
-    latest = timed[:1]
+    # Equal publication times cannot establish which contradictory report won.
+    # Retain every report at that instant so an out/clearance conflict holds the
+    # player regardless of RSS ordering.
+    latest = [item for item in timed if item['_stamp'] == timed[0]['_stamp']] if timed else []
     untimed = [item for item in relevant if not item['_stamp']]
     if any(item['state'] in {'out_report', 'unresolved_report'} for item in untimed):
         latest += [next(item for item in untimed if item['state'] in {'out_report', 'unresolved_report'})]
@@ -181,14 +185,30 @@ def player_availability(news, player, date, now):
 def _event(store, leg, now):
     date = str(leg.get('date') or '')[:10]
     team = canonical_team(leg.get('team', ''))
+    requested_id = leg.get('game_id')
     with store.connect() as db:
-        if leg.get('game_id'):
-            events = [dict(row) for row in db.execute('SELECT * FROM games WHERE id=?', (leg['game_id'],))]
+        if requested_id:
+            observed = [dict(row) for row in db.execute('SELECT * FROM games WHERE id=?', (requested_id,))]
+            scheduled = [dict(row) for row in db.execute('SELECT * FROM season_schedule WHERE id=?', (requested_id,))]
         elif date and team:
-            events = [dict(row) for row in db.execute('SELECT * FROM games WHERE date=? '
+            observed = [dict(row) for row in db.execute('SELECT * FROM games WHERE date=? '
+                      'AND (home_team=? OR away_team=?)', (date, team, team))]
+            scheduled = [dict(row) for row in db.execute('SELECT * FROM season_schedule WHERE date=? '
                       'AND (home_team=? OR away_team=?)', (date, team, team))]
         else:
-            events = []
+            observed, scheduled = [], []
+    # Match the exact event across sources. A date/team fallback must never
+    # silently turn an explicitly requested unknown event into a different game.
+    by_id = {event['id']: event for event in scheduled}
+    for event in observed:
+        by_id[event['id']] = {**by_id.get(event['id'], {}),
+                             **{key: value for key, value in event.items() if value is not None}}
+    events = list(by_id.values())
+    blocked_status = any(event.get('status') in {
+        'postponed', 'canceled', 'cancelled', 'suspended', 'live', 'final', 'post', 'completed', 'past_schedule_only'
+    } for event in [*scheduled, *observed])
+    if requested_id and not events:
+        return {}, 'The specified game is not in the saved schedule or game records.'
     if len(events) > 1:
         return {}, 'More than one stored game matches this line; the exact event is unresolved.'
     event = events[0] if events else {}
@@ -204,19 +224,26 @@ def _event(store, leg, now):
     if day < now.astimezone(EASTERN).date():
         return {}, 'The game date has passed.'
     context = calendar_context(store, date, team) if team else {}
-    if event.get('status') in {'postponed', 'canceled', 'cancelled', 'suspended', 'live', 'final', 'post', 'completed'}:
-        return context, 'The stored game is postponed, canceled or already started.'
-    if context.get('status') in {'postponed', 'canceled', 'live', 'final', 'past_schedule_only'}:
-        return context, 'The stored game is postponed, canceled or already started.'
-    if not context and event:
-        context = {'game_id': event.get('id'), 'tipoff': event.get('start_time'),
+    if event:
+        # Calendar rest context can accompany this same event, but its older
+        # clock/status cannot replace a later observed event update.
+        if context.get('game_id') != event.get('id'):
+            context = {}
+        context = {**context, 'game_id': event.get('id'), 'tipoff': event.get('start_time'),
                    'status': event.get('status'), 'source': event.get('source'),
                    'opponent': (event.get('away_team') if event.get('home_team') == team else event.get('home_team'))
                    if team else None}
     context = {**context, 'date': date}
+    opponent = canonical_team(leg.get('opponent'))
+    if opponent and context.get('opponent') and opponent != canonical_team(context['opponent']):
+        return context, 'The uploaded opponent conflicts with the specified game.'
+    if blocked_status or context.get('status') in {'postponed', 'canceled', 'cancelled', 'suspended', 'live', 'final', 'post', 'completed', 'past_schedule_only'}:
+        return context, 'The stored game is postponed, canceled or already started.'
     tip = _aware(context.get('tipoff'))
     if context.get('status') != 'scheduled' or not tip:
         return context, 'A scheduled game with a known tipoff is required; event timing is unresolved.'
+    if tip.astimezone(EASTERN).date() != day:
+        return context, 'The saved tipoff conflicts with this game date; confirm the current event.'
     if tip and tip <= now:
         return context, 'The saved tipoff has passed; this is no longer a pregame line.'
     return context, None
@@ -241,7 +268,7 @@ def _reason(item):
     return base
 
 
-def _watchlist(store, original_legs, news, now):
+def _watchlist(store, original_legs, news, now, held=None):
     """Rank observed workload/volume for other existing same-game players."""
     uploaded = {canonical_player(leg.get('player', '')) for leg in original_legs}
     contexts = {}
@@ -286,8 +313,16 @@ def _watchlist(store, original_legs, news, now):
             availability = player_availability(news, player['player'], date, now)
             if availability['blocked']:
                 continue
+            freshness = assess_pregame_freshness(store, date, team, now, player=player['player'])
+            if not freshness['ready']:
+                if held is not None:
+                    held.append({'player': player['player'], 'team': team,
+                                 'reason': 'Current game data is not ready: ' + ' '.join(freshness['reasons'])})
+                continue
             markets = []
             for stat, normal in (('pts', 15), ('reb', 6), ('ast', 4)):
+                if stat not in freshness.get('current_player_stat_coverage', []):
+                    continue
                 values = [_number(row.get(stat)) for row in recent]
                 if any(value is None for value in values):
                     continue
@@ -296,6 +331,9 @@ def _watchlist(store, original_legs, news, now):
                     continue
                 markets.append((average / normal, stat, average))
             if not markets:
+                if held is not None:
+                    held.append({'player': player['player'], 'team': team,
+                                 'reason': 'No current, complete volume statistic supports a watchlist comparison.'})
                 continue
             strength, stat, average = max(markets)
             points = minutes * math.log1p(len(recent)) + strength * 5
@@ -336,6 +374,10 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
     # Validate caller preferences before any optional lookup. Eligibility gates
     # below remain identical regardless of the requested lineup size.
     select_lineup([], count, constraints=constraints)
+    constraints = dict(constraints or {})
+    preferred_stat = constraints.get('preferred_stat')
+    if preferred_stat not in MARKET_NAMES:
+        preferred_stat = None
     original = list(report.get('original_legs') or [item.get('leg', {}) for item in report.get('legs', [])])
     news = store.recent_news(200)
     thresholds = defaultdict(set)
@@ -345,7 +387,7 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
         if number is not None:
             thresholds[_key(leg)].add(number)
             variants[_offer_key(leg)].add(_variant(leg))
-    skipped, usable = [], []
+    skipped, usable, freshness_cache = [], [], {}
     for item in report.get('legs', report.get('candidates', [])):
         leg = dict(item.get('leg', {}))
         leg['offer_variant'] = _variant(leg)
@@ -378,6 +420,15 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
                     reason = 'Comparable workload statistics are more than seven days behind this game.'
             except (ValueError, TypeError, KeyError):
                 reason = 'Comparable workload freshness is unresolved.'
+        freshness = None
+        if not reason:
+            key = (leg.get('date'), leg.get('team'), leg.get('player'), leg.get('stat'))
+            if key not in freshness_cache:
+                freshness_cache[key] = assess_pregame_freshness(store, leg['date'][:10],
+                    leg.get('team'), now, player=leg.get('player'), stat=leg.get('stat'))
+            freshness = freshness_cache[key]
+            if not freshness['ready']:
+                reason = 'Current game data is not ready: ' + ' '.join(freshness['reasons'])
         availability = None
         if not event_issue:
             availability = player_availability(news, leg.get('player', ''), leg['date'][:10], now)
@@ -394,8 +445,21 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
         usable.append({'leg': dict(leg), 'reason': _reason(item),
                        'caution': availability.get('note') if availability else None,
                        'availability': availability, 'projection': projection,
-                       'context': context, '_score': score})
+                       'context': context, 'freshness': freshness, '_score': score})
     usable.sort(key=lambda item: (-item['_score'], -int(item['projection'].get('n') or 0), item['leg']['player']))
+    if preferred_stat:
+        # Honor a market preference only after each actual offered side has
+        # passed the normal gates. Compare players using their chosen market's
+        # own score; a preference cannot manufacture a missing line or edge.
+        preferred = {}
+        for item in usable:
+            identity = canonical_player(item['leg']['player'])
+            previous = preferred.get(identity)
+            if previous is None or (previous['leg']['stat'] != preferred_stat and
+                                    item['leg']['stat'] == preferred_stat):
+                preferred[identity] = item
+        usable = sorted(preferred.values(), key=lambda item: (
+            -item['_score'], -int(item['projection'].get('n') or 0), item['leg']['player']))
     # Only a verified saved event establishes which two teams a single-game
     # request must cover. Do not infer the opponent from player names or images.
     event_teams = {}
@@ -408,6 +472,8 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
             event_teams.setdefault(event_id, set()).update((team, opponent))
     required_teams = next(iter(event_teams.values())) if len(event_teams) == 1 else ()
     chosen, coverage = select_lineup(usable, count, required_teams=required_teams, constraints=constraints)
+    if preferred_stat:
+        coverage['lineup_constraints']['preferred_stat'] = preferred_stat
     selected = [{key: value for key, value in item.items() if key != '_score'} for item in chosen]
     # Collapse repeated More/Less exclusions for the same missing sample or offer.
     unique_skipped = []
@@ -418,11 +484,13 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
             seen_skips.add(key)
             unique_skipped.append(item)
     adjusted_offers = any(_variant(leg) in {'goblin', 'demon'} for leg in original)
+    watchlist_held = []
+    watchlist = _watchlist(store, original, news, now, held=watchlist_held)
     return {'board_id': report.get('board_id'), 'report_id': report.get('id'),
             'generated_at': now.isoformat(), 'source_report_generated_at': report.get('generated_at'),
             'research_only': True, 'shortlist': selected, 'skipped': unique_skipped,
             **coverage,
-            'watchlist': _watchlist(store, original, news, now),
+            'watchlist': watchlist, 'watchlist_held': watchlist_held,
             'has_adjusted_offers': adjusted_offers,
             'notes': ['Experimental comparisons, not validated win probabilities.',
                       'Current availability and offer/payout terms still need checking; no entry was placed.'] +

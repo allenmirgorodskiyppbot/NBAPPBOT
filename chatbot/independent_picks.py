@@ -17,6 +17,7 @@ from contextual_projection import projection_for_leg
 from feeds import canonical_player, canonical_team
 from news_digest import _aware, _clean
 from lineup_selection import select_lineup
+from pregame_freshness import assess_pregame_freshness
 
 EASTERN = ZoneInfo('America/New_York')
 MARKETS = ('pts', 'reb', 'ast', 'pra', 'fga')
@@ -43,6 +44,8 @@ def _select_game(store, date, team, now):
             'SELECT * FROM games WHERE date>=? AND (home_team=? OR away_team=?) '
             'ORDER BY date,start_time,id', (date or today, team, team))]
     by_id = {row['id']: row for row in schedule}
+    blocked_ids = {row['id'] for row in [*schedule, *observed] if row.get('status') in {
+        'postponed', 'canceled', 'cancelled', 'suspended', 'live', 'final', 'post', 'completed', 'past_schedule_only'}}
     for row in observed:
         old = by_id.get(row['id'], {})
         by_id[row['id']] = {**old, **{key: value for key, value in row.items() if value is not None}}
@@ -51,8 +54,9 @@ def _select_game(store, date, team, now):
         games = [game for game in games if game['date'] == date]
     if not games:
         return None, 'No saved game was found for that date.' if date else 'No upcoming saved game is available.'
-    eligible = [g for g in games if g.get('status') == 'scheduled' and
-                _aware(g.get('start_time')) and _aware(g['start_time']) > now]
+    eligible = [g for g in games if g['id'] not in blocked_ids and g.get('status') == 'scheduled' and
+                _aware(g.get('start_time')) and _aware(g['start_time']) > now and
+                _aware(g['start_time']).astimezone(EASTERN).date().isoformat() == g['date']]
     if not eligible:
         return None, 'The saved game has started, ended, been postponed, or has no confirmed tipoff time.'
     first_date = eligible[0]['date']
@@ -117,6 +121,9 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     if error:
         return result
     teams = {game['home_team'], game['away_team']}
+    team_freshness = {value: assess_pregame_freshness(store, game['date'], value, now)
+                      for value in sorted(teams)}
+    result['freshness_by_team'] = team_freshness
     cutoff = min(game['date'], now.astimezone(EASTERN).date().isoformat())
     with store.connect() as db:
         players = [dict(row) for row in db.execute(
@@ -137,8 +144,20 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
         if availability['blocked']:
             result['held'].append({'player': player['player'], 'reason': availability['note']})
             continue
+        freshness = team_freshness[player['team']]
+        if freshness['ready']:
+            freshness = assess_pregame_freshness(store, game['date'], player['team'], now,
+                                                 player=player['player'])
+        if not freshness['ready']:
+            result['held'].append({'player': player['player'],
+                'reason': 'Current game data is not ready: ' + ' '.join(freshness['reasons']),
+                'freshness': freshness})
+            continue
         choices, reasons = [], []
         for stat in MARKETS:
+            if stat not in freshness.get('current_player_stat_coverage', []):
+                reasons.append('The requested statistic is missing or conflicting in the player’s latest completed game.')
+                continue
             try:
                 projection = projection_for_leg(store, {'player': player['player'], 'player_id': player['player_id'],
                     'team': player['team'], 'opponent': game['away_team'] if player['team'] == game['home_team'] else game['home_team'],
@@ -194,6 +213,8 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     result['picks'] = [{k: v for k, v in row.items() if k != '_rank'} for row in chosen]
     result['note'] = (f"{len(chosen)} of {count} requested player projections are supported." if len(chosen) < count else
                       'Compare these independent targets with the actual offers before selecting sides.')
+    if not chosen and any(not value['ready'] for value in team_freshness.values()):
+        result['note'] += ' Current game-stat coverage is missing or stale; /freshness shows the required updates.'
     if not result['lineup_complete']:
         result['note'] += ' ' + result['constraint_note']
     result['source_data_through_date'] = min((row['projection']['last_date'] for row in chosen), default=None)

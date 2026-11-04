@@ -10,10 +10,147 @@ import re
 
 from conversation import resolve_conversation
 from pick_discussion import build_pick_discussion
+from master import normalized_name
+from board_shortlist import MARKET_NAMES
 
 
 def _context(turn):
-    return {key:turn[key] for key in ('intent','slots','constraints') if turn.get(key)}
+    context = {key:turn[key] for key in ('intent','slots','constraints') if turn.get(key)}
+    index = turn.get('state', {}).get('selected_pick_index')
+    if type(index) is int and turn.get('recent_picks'):
+        context['selected_pick'] = {'position':index+1,
+            **{k:v for k,v in turn['recent_picks'][0].items() if k in ('player','stat','line_kind')}}
+    return context
+
+
+def _unavailable_card(pick, reason, index):
+    text = f"{pick['player']}: Hold. {reason}"
+    return {'id': f'H{index}', 'kind': 'prop_unavailable', 'entity': pick['player'],
+            'decision': 'pass', 'source': 'Saved pick input checks', 'text': text,
+            'approved_facts': [{'entity': pick['player'], 'fact_type': 'context',
+                                'text': text, 'values': []}]}
+
+
+def _changed_readiness(master, checks):
+    """A model may take long enough for a tipoff or source status to change."""
+    from pick_discussion import _now
+    from pregame_freshness import assess_pregame_freshness
+    now = _now()
+    held = []
+    for item in checks:
+        current = assess_pregame_freshness(master, item['date'], item['team'], now,
+                                           player=item['player'], stat=item['stat'])
+        if not current['ready']:
+            held.append(f"{item['player']}: {current['reasons'][0]}")
+    if held:
+        return {'answer':'Hold for now — readiness changed while I was preparing the answer.\n' + '\n'.join(held),
+                'sources':[], 'ai_used':False}
+    return None
+
+
+async def _explain_picks(master, turn, request, progress, generate, discussion):
+    """Recompute every selected leg, retaining unavailable and unpriced legs."""
+    from research_discussion import build_research_discussion
+    picks = turn['recent_picks']
+    slots = turn.get('slots', {})
+    targets = [p for p in picks if p.get('line_kind') == 'research_target']
+    priced = [p for p in picks if p.get('line_kind') != 'research_target']
+    cards, assessments, lines, sources, checks = [], [], [], [], []
+    if targets:
+        research = await asyncio.to_thread(build_research_discussion, master, targets, slots)
+        if not research.get('cards') and not priced:
+            return {'answer':research['fallback_answer'], 'sources':research.get('sources', []), 'ai_used':False}
+        cards.extend(research.get('cards', []))
+        checks.extend({key:item[key] for key in ('player','stat','team','date')}
+                      for item in research.get('assessments', []) if item.get('data_readiness', {}).get('ready'))
+        assessments.extend({key:item[key] for key in ('player','stat','status','reason','cautions') if key in item}
+                           for item in research.get('assessments', []))
+        assessments.extend({**item, 'status':'held', 'decision':'pass'} for item in research.get('held', []))
+        if not research.get('cards'):
+            # A valid priced leg must not hide a failed research leg, including
+            # whole-report failures such as a passed or conflicting game date.
+            for pick in targets:
+                reason = research['fallback_answer']
+                cards.append(_unavailable_card(pick, reason, len(cards) + 1))
+            if not research.get('held'):
+                assessments.extend({'player':p['player'], 'status':'held', 'decision':'pass',
+                                    'reason':research['fallback_answer']} for p in targets)
+        lines.append(research['fallback_answer'])
+        sources.extend(research.get('sources', []))
+        discussion['date'] = research.get('date')
+    for pick in priced:
+        # A card's line and game belong together. A new date never turns an old
+        # offer into a verified offer for another game; the resolver normally
+        # clears the old card, and this check also protects older saved state.
+        saved_date = pick.get('game_date') or pick.get('date')
+        requested_date = slots.get('game_date') or slots.get('date')
+        if saved_date and requested_date and saved_date != requested_date:
+            reason = 'The saved line is for a different game date. Send the line for the requested game.'
+            report = {'available':False, 'fallback_answer':reason}
+        else:
+            pick_slots = dict(pick)
+            if requested_date:
+                pick_slots['game_date'] = requested_date
+            # A shared opponent describes the selected game, not the opponent
+            # of every player on a two-team lineup. Only inherit it for a
+            # genuinely focused single-player question.
+            if (not pick_slots.get('opponent') and slots.get('player') and
+                    normalized_name(slots['player']) == normalized_name(pick['player'])):
+                pick_slots['opponent'] = slots.get('opponent')
+            report = await asyncio.to_thread(build_pick_discussion, master, pick_slots)
+        if not report.get('available'):
+            reason = report['fallback_answer']
+            cards.append(_unavailable_card(pick, reason, len(cards) + 1))
+            assessments.append({'player':pick['player'], 'stat':pick.get('stat'),
+                                'decision':'pass', 'status':'held', 'reason':reason})
+            lines.append(f"{pick['player']}: Hold. {reason}")
+            continue
+        card = dict(report['evidence_cards'][0])
+        card['id'] = 'P'+str(len(cards)+1)
+        card['decision'] = report['decision']
+        card['approved_facts'] = card['approved_facts'][:2] + [{
+            'text':report['reason'], 'entity':report['player'], 'fact_type':'assessment'}]
+        card['text'] = ' '.join(f['text'] for f in card['approved_facts'])
+        cards.append(card)
+        assessments.append({'player':report['player'], 'stat':report['stat'],
+                            'decision':report['decision'], 'reason':report['reason']})
+        sample = report['sample']
+        metric = MARKET_NAMES[report['stat']]
+        lines.append(f"{report['player']} — {report['decision'].title()} {report['line']:g} {metric}. "
+                     f"Above in {sample['more']}/{sample['n']}, below in {sample['less']}/{sample['n']} "
+                     f"stored games through {sample['last_date']}. {report['reason']}")
+        sources.extend(report.get('sources', []))
+        if report.get('data_readiness', {}).get('ready'):
+            checks.append({key:report[key] for key in ('player','stat','team','date')})
+    fallback = '\n\n'.join(lines)
+    fallback_result = {'answer':fallback, 'sources':list(dict.fromkeys(sources)), 'ai_used':False}
+    discussion.update(assessments=assessments, action=(
+        'Explain every supplied pick, including held picks. Research targets are hypothetical, '
+        'not actual offers. Supplied priced lines remain user-provided and unverified. '
+        'Do not omit a player because its evidence is unavailable.'))
+    if discussion.get('selected_pick'):
+        discussion['action'] += ' The user’s ordinal identifies the selected player in the lineup; explain why that player and market were selected.'
+    # The bounded model/validator supports four evidence cards. Larger lineups
+    # still get every computed explanation instead of silently dropping legs.
+    if len(cards) > 4:
+        return fallback_result
+    result = await generate(request, progress, master, cards, natural=True,
+                            dialogue=discussion, fallback=fallback)
+    changed = await asyncio.to_thread(_changed_readiness, master, checks)
+    if changed:
+        return changed
+    if result is None:
+        return fallback_result
+    from grounded_reply import _entity_mentions
+    entities = {p['player'] for p in picks}
+    mentioned = _entity_mentions(result.get('answer', ''), entities)
+    if not entities <= mentioned:
+        return fallback_result
+    held = [item['player'] for item in assessments
+            if item.get('status') == 'held' or item.get('decision') == 'pass']
+    if held and not re.search(r'\b(?:pass|hold|held|skip)\b', result.get('answer', ''), re.I):
+        result['answer'] = 'Hold for now: ' + ', '.join(dict.fromkeys(held)) + '.\n\n' + result['answer']
+    return result
 
 
 async def answer_conversation(store, master, request, progress, generate, turn=None):
@@ -58,47 +195,25 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         progress['detail'] = 'Explaining the line and its main risk'
         result = await generate(request, progress, master, report['evidence_cards'], natural=True,
                                 dialogue=discussion, fallback=report['fallback_answer'])
+        if report.get('data_readiness', {}).get('ready'):
+            changed = await asyncio.to_thread(_changed_readiness, master,
+                [{key:report[key] for key in ('player','stat','team','date')}])
+            if changed:
+                changed['discussion'] = {'player':report['player'], 'stat':report['stat'],
+                                        'line':report['line'], 'date':report['date'], 'decision':'pass'}
+                return changed
         if result is None:
             result = {'answer':report['fallback_answer'], 'sources':report.get('sources',[]), 'ai_used':False}
+        if (report['decision'] == 'pass' and
+                not re.search(r'\b(?:pass|hold|held|skip)\b', result.get('answer', ''), re.I)):
+            result['answer'] = 'Pass for now.\n\n' + result['answer']
         result['discussion'] = {'player':report['player'],'stat':report['stat'],'line':report['line'],
                                 'date':report['date'],'decision':report['decision']}
         return result
     if intent == 'explanation' and turn.get('recent_picks'):
         # Explain the selected identities, recomputing every claim from data.
         # Prior model prose is not recycled as authoritative evidence.
-        targets = [p for p in turn['recent_picks'] if p.get('line_kind') == 'research_target']
-        if targets:
-            from research_discussion import build_research_discussion
-            research = await asyncio.to_thread(build_research_discussion, master, targets, turn.get('slots', {}))
-            if not research.get('cards'):
-                return {'answer':research['fallback_answer'], 'sources':research.get('sources', []), 'ai_used':False}
-            discussion.update(assessments=[{key:item[key] for key in
-                ('player','stat','status','reason','cautions') if key in item}
-                for item in research['assessments']], date=research.get('date'),
-                              action='Explain these hypothetical research targets. No actual sportsbook line has been supplied.')
-            return await generate(request, progress, master, research['cards'], natural=True,
-                                  dialogue=discussion, fallback=research['fallback_answer'])
-        cards = []
-        summaries = []
-        for pick in turn['recent_picks'][:4]:
-            if pick.get('line_kind') == 'research_target':
-                continue
-            slots = {**turn.get('slots', {}), **pick}
-            report = await asyncio.to_thread(build_pick_discussion, master, slots)
-            if not report.get('available'):
-                continue
-            card = dict(report['evidence_cards'][0])
-            card['id'] = 'P'+str(len(cards)+1)
-            card['decision'] = report['decision']
-            card['approved_facts'] = card['approved_facts'][:2] + [{
-                'text':report['reason'], 'entity':report['player'], 'fact_type':'assessment'}]
-            card['text'] = ' '.join(f['text'] for f in card['approved_facts'])
-            cards.append(card)
-            summaries.append({'player':report['player'],'decision':report['decision'],
-                              'reason':report['reason']})
-        if cards:
-            discussion['assessments'] = summaries
-            return await generate(request, progress, master, cards, natural=True, dialogue=discussion)
+        return await _explain_picks(master, turn, request, progress, generate, discussion)
     if intent == 'preference':
         discussion['action'] = ('Acknowledge the preference and explain the relevant tradeoff. '
             'Do not reverse an assessment merely to agree, and do not ask for a new line unless '

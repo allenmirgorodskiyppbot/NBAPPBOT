@@ -129,6 +129,23 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
                     'season': '2026-27', 'season_type': 'Regular Season', 'appearance_state': 'Played',
                     'minutes': 32+number%3, 'pts': 20+number%4, 'reb': 5+number%3,
                     'ast': 4+number%2, 'fga': 17+number%4, 'source': 'isolated workflow fixture'})
+        games = self.store.games('2026-10-29')
+        self.store.set_checkpoint('daily_nba:2026-10-29', {
+            'date':'2026-10-29', 'complete':True, 'source':'isolated workflow inventory',
+            'last_checked_at':NOW.isoformat(), 'last_refresh_status':'success',
+            'last_refresh_error':None, 'publisher_retrieved_at':NOW.isoformat(),
+            'inventory_verified':True, 'inventory_verified_at':NOW.isoformat(),
+            'inventory_verification_source':'https://example.test/workflow-inventory',
+            'inventory_game_ids':[g['id'] for g in games],
+            'final_game_ids':[g['id'] for g in games],
+            'team_final_game_ids':{team:[g['id'] for g in games if team in (g['home_team'],g['away_team'])]
+                                   for team in ('NYK','PHI','BOS')}})
+        with self.store.connect() as db:
+            upcoming = [dict(row) for row in db.execute("SELECT * FROM season_schedule WHERE date='2026-10-30'")]
+        self.store.set_checkpoint('nba_schedule_today', {'date':'2026-10-30',
+            'status':'success', 'error':None, 'checked_at':NOW.isoformat(),
+            'source':'https://example.test/workflow-schedule', 'games':upcoming,
+            'expected_game_ids':[g['id'] for g in upcoming]})
         self.answer = AsyncMock(return_value='Ordinary research chat.')
         self.refresh = AsyncMock()
         self.bot = TelegramBot(self.store, self.answer, token='unit-test', allowed_user_ids=[USER],

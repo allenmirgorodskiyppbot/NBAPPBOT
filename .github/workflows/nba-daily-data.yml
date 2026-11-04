@@ -8,8 +8,9 @@ on:
       - 'chatbot/mirror_sources.py'
       - 'chatbot/advanced_refresh.py'
   schedule:
-    # Previous-day statistics: morning publication, then catch-up retries.
-    - cron: '15 15-22 * * *'
+    # Previous-day statistics: morning publication and hourly catches through the evening.
+    # UTC hours cover 10/11 AM through 10/11 PM Eastern across daylight saving time.
+    - cron: '15 0-3,15-23 * * *'
 permissions:
   contents: write
 concurrency:
@@ -38,3 +39,4 @@ jobs:
           git commit -m 'Refresh existing NBA dataset inputs'
           git pull --rebase origin main
           git push origin HEAD:main
+

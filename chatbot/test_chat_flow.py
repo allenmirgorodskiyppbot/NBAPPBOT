@@ -25,6 +25,23 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
         self.master.upsert_game({'id': 'tonight', 'date': '2026-11-02',
             'home_team': 'NYK', 'away_team': 'BKN', 'status': 'scheduled',
             'start_time': '2026-11-03T00:30:00+00:00', 'source': 'synthetic calendar'})
+        self.master.set_checkpoint('nba_schedule_today', {'date':'2026-11-02',
+            'status':'success', 'error':None, 'checked_at':NOW.isoformat(),
+            'source':'https://example.test/current-game-schedule',
+            'expected_game_ids':['tonight'],
+            'games':self.master.games('2026-11-02')})
+        # This integration fixture declares its actual seeded final inventory;
+        # unknown/failed source checks are tested separately and must hold picks.
+        games = self.master.games('2026-11-01')
+        self.master.set_checkpoint('daily_nba:2026-11-01', {
+            'date':'2026-11-01', 'complete':True, 'source':'synthetic verified day inventory',
+            'last_checked_at':NOW.isoformat(), 'last_refresh_status':'success',
+            'last_refresh_error':None, 'publisher_retrieved_at':NOW.isoformat(),
+            'inventory_verified':True, 'inventory_verified_at':NOW.isoformat(),
+            'inventory_verification_source':'https://example.test/fixture-inventory',
+            'final_game_ids':[g['id'] for g in games],
+            'team_final_game_ids':{team:[g['id'] for g in games if team in (g['home_team'],g['away_team'])]
+                                   for team in ('NYK','BKN','BOS')}})
         for name in ('conversation._now', 'pick_discussion._now', 'research_discussion._now'):
             patcher = patch(name, return_value=NOW)
             patcher.start()

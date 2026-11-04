@@ -18,6 +18,18 @@ def assistant(text):
     return {'role': 'assistant', 'content': text}
 
 
+FOUR_OFFERS = ('My shortlist — NYK vs BKN · Nov 04\n'
+               '1. Jalen Brunson — More 19.5 points\n'
+               '2. Julius Randle — More 1.5 threes\n'
+               '3. Julius Randle — More 4.5 rebounds\n'
+               '4. Josh Hart — Less 22.5 PRA')
+FOUR_TARGETS = ('My projections — NYK vs BKN · Nov 05, 7:30 PM Eastern\n'
+                '1. Jalen Brunson · points: 25.5\nMore if line ≤19.5; Less if line ≥31.5.\n'
+                '2. Julius Randle · rebounds: 8\nMore if line ≤5.5; Less if line ≥10.5.\n'
+                '3. Josh Hart · PRA: 20\nMore if line ≤15.5; Less if line ≥24.5.\n'
+                '4. OG Anunoby · FG Attempted: 12\nMore if line ≤9.5; Less if line ≥14.5.')
+
+
 class ConversationTests(unittest.TestCase):
     def setUp(self):
         patcher = patch('conversation._players', return_value=NAMES)
@@ -377,6 +389,152 @@ class ConversationTests(unittest.TestCase):
         self.assertTrue(result['complete_prop'])
         self.assertEqual(result['slots']['stat'], 'tpm')
         self.assertEqual(result['slots']['line'], 1.5)
+
+    def test_ordinal_references_select_one_offer_and_preserve_full_list(self):
+        second = self.resolve('Why the second pick?', [assistant(FOUR_OFFERS)])
+        self.assertTrue(second['complete_prop'])
+        self.assertEqual(second['slots']['player'], 'Julius Randle')
+        self.assertEqual(second['slots']['stat'], 'tpm')
+        self.assertEqual(second['slots']['line'], 1.5)
+        self.assertEqual(len(second['recent_picks']), 1)
+        self.assertEqual(len(second['state']['recent_picks']), 4)
+        first = self.resolve('What about the first one?', state=second['state'])
+        self.assertEqual(first['slots']['player'], 'Jalen Brunson')
+        self.assertEqual(first['slots']['line'], 19.5)
+        for text in ['Why pick number 2?', 'Why #2?', 'Explain the 2nd pick']:
+            with self.subTest(text=text):
+                result = self.resolve(text, [assistant(FOUR_OFFERS)])
+                self.assertEqual(result['slots']['line'], 1.5)
+                self.assertEqual(result['slots']['stat'], 'tpm')
+
+    def test_named_offer_selects_market_when_one_player_has_two_picks(self):
+        ambiguous = self.resolve('Why Randle?', [assistant(FOUR_OFFERS)])
+        self.assertEqual(ambiguous['intent'], 'clarification')
+        self.assertFalse(ambiguous['complete_prop'])
+        selected = self.resolve('Randle threes', state=ambiguous['state'])
+        self.assertTrue(selected['complete_prop'])
+        self.assertEqual(selected['slots']['line'], 1.5)
+        self.assertEqual(selected['slots']['stat'], 'tpm')
+        hart = self.resolve('What about Josh Hart?', [assistant(FOUR_OFFERS)])
+        self.assertEqual(hart['slots']['line'], 22.5)
+        self.assertEqual(hart['slots']['game_date'], '2026-11-04')
+
+    def test_ordinal_and_named_research_targets_do_not_gain_an_offer_line(self):
+        for text, player, stat in [('Why the second pick?', 'Julius Randle', 'reb'),
+                                   ('What about the first one?', 'Jalen Brunson', 'pts'),
+                                   ('Why Josh Hart?', 'Josh Hart', 'pra')]:
+            with self.subTest(text=text):
+                result = self.resolve(text, [assistant(FOUR_TARGETS)])
+                self.assertEqual(result['intent'], 'explanation')
+                self.assertEqual(result['slots']['player'], player)
+                self.assertEqual(result['slots']['stat'], stat)
+                self.assertEqual(result['slots']['game_date'], '2026-11-05')
+                self.assertEqual(len(result['recent_picks']), 1)
+                self.assertNotIn('line', result['slots'])
+                self.assertNotIn('line', result['recent_picks'][0])
+                self.assertFalse(result['complete_prop'])
+
+    def test_collective_followup_restores_all_picks_after_selecting_one(self):
+        chosen = self.resolve('Why the second pick?', [assistant(FOUR_TARGETS)])
+        for text in ['Why all four picks?', 'Why those?', 'Explain both picks']:
+            with self.subTest(text=text):
+                result = self.resolve(text, state=chosen['state'])
+                self.assertEqual(result['intent'], 'explanation')
+                self.assertEqual(len(result['recent_picks']), 4)
+                self.assertNotIn('player', result['slots'])
+
+    def test_ambiguous_or_missing_list_references_do_not_choose_arbitrarily(self):
+        for text in ['Why his line?', 'Why the first or second picks?',
+                     'What about the seventh one?', 'Why Brunson in the second pick?']:
+            with self.subTest(text=text):
+                result = self.resolve(text, [assistant(FOUR_OFFERS)])
+                self.assertEqual(result['intent'], 'clarification')
+                self.assertFalse(result['complete_prop'])
+        result = self.resolve('What about the first one?')
+        self.assertEqual(result['intent'], 'clarification')
+        self.assertIn('numbered pick', result['clarification'])
+
+    def test_explicit_number_correction_replaces_only_the_rejected_threshold(self):
+        previous = self.resolve('Brunson more 19.5 points tonight')
+        for text in ['actually18.5 not19.5', '18.5 not 19.5', '18.5 instead of 19.5']:
+            with self.subTest(text=text):
+                result = self.resolve(text, state=previous['state'])
+                self.assertEqual(result['slots']['line'], 18.5)
+                self.assertEqual(result['slots']['stat'], 'pts')
+                self.assertEqual(result['slots']['player'], 'Jalen Brunson')
+                self.assertTrue(result['complete_prop'])
+        rejected = self.resolve('not19.5', state=previous['state'])
+        self.assertEqual(rejected['intent'], 'clarification')
+        self.assertNotIn('line', rejected['slots'])
+        ambiguous = self.resolve('Actually 18.5 not 19.5, or maybe 20.5', state=previous['state'])
+        self.assertEqual(ambiguous['intent'], 'clarification')
+        self.assertNotIn('line', ambiguous['slots'])
+
+    def test_new_date_clears_previous_opponent_and_line_but_keeps_known_market(self):
+        previous = self.resolve('Brunson more 19.5 points against Brooklyn Nov 4')
+        result = self.resolve('Nov 5', state=previous['state'])
+        self.assertEqual(result['intent'], 'clarification')
+        self.assertEqual(result['slots']['game_date'], '2026-11-05')
+        self.assertEqual(result['slots']['player'], 'Jalen Brunson')
+        self.assertEqual(result['slots']['stat'], 'pts')
+        self.assertNotIn('line', result['slots'])
+        self.assertNotIn('opponent', result['slots'])
+        supplied = self.resolve('Tomorrow against Philadelphia, more 20.5 points', state=previous['state'])
+        self.assertTrue(supplied['complete_prop'])
+        self.assertEqual(supplied['slots']['line'], 20.5)
+        self.assertEqual(supplied['slots']['opponent'], 'PHI')
+        self.assertEqual(supplied['slots']['game_date'], '2026-11-05')
+
+    def test_new_game_discards_list_focus_and_requests_an_actual_date(self):
+        previous = self.resolve('Why the second pick?', [assistant(FOUR_OFFERS)])
+        result = self.resolve('What about the next game?', state=previous['state'])
+        self.assertEqual(result['intent'], 'clarification')
+        self.assertIn('game date', result['clarification'])
+        self.assertEqual(result['recent_picks'], [])
+        self.assertIsNone(result['state']['selected_pick_index'])
+        for field in ('line', 'opponent', 'game_date'):
+            self.assertNotIn(field, result['slots'])
+
+    def test_new_opponent_does_not_reuse_an_old_offer(self):
+        previous = self.resolve('Brunson more 19.5 points against Brooklyn Nov 4')
+        result = self.resolve('What about against Philadelphia?', state=previous['state'])
+        self.assertNotIn('line', result['slots'])
+        self.assertNotIn('game_date', result['slots'])
+        self.assertEqual(result['slots']['opponent'], 'PHI')
+        self.assertFalse(result['complete_prop'])
+
+    def test_actual_board_reply_wrapper_retains_user_supplied_event_date(self):
+        history = [user('/board 2026-11-04\nJalen Brunson | points | more | 19.5\n'
+                        'Julius Randle | threes | more | 1.5\n'
+                        'Julius Randle | rebounds | more | 4.5\nJosh Hart | PRA | less | 22.5'),
+                   assistant('PrizePicks board saved: example-id\n4 uploaded lines. No placed entry recorded.\n\n'
+                             + FOUR_OFFERS.replace(' — NYK vs BKN · Nov 04', ''))]
+        result = self.resolve('Why Hart?', history)
+        self.assertTrue(result['complete_prop'])
+        self.assertEqual(result['slots']['line'], 22.5)
+        self.assertEqual(result['slots']['game_date'], '2026-11-04')
+
+    def test_corrected_offer_survives_selection_changes_without_editing_other_legs(self):
+        first = self.resolve('What about the first one?', [assistant(FOUR_OFFERS)])
+        corrected = self.resolve('actually18.5 not19.5', state=first['state'])
+        same = self.resolve('Why Brunson?', state=corrected['state'])
+        self.assertEqual(same['slots']['line'], 18.5)
+        second = self.resolve('Why the second pick?', state=same['state'])
+        self.assertEqual(second['slots']['line'], 1.5)
+        returned = self.resolve('What about the first one?', state=second['state'])
+        self.assertEqual(returned['slots']['line'], 18.5)
+        self.assertEqual(returned['state']['recent_picks'][3]['line'], 22.5)
+
+    def test_new_market_followup_does_not_restore_the_previous_board_market(self):
+        first = self.resolve('Why the first pick?', [assistant(FOUR_OFFERS)])
+        switched = self.resolve('What about his field goal attempts?', state=first['state'])
+        self.assertEqual(switched['intent'], 'clarification')
+        self.assertEqual(switched['slots']['stat'], 'fga')
+        self.assertEqual(switched['recent_picks'], [])
+        next_turn = self.resolve('Why Brunson?', state=switched['state'])
+        self.assertEqual(next_turn['slots']['stat'], 'fga')
+        self.assertNotIn('line', next_turn['slots'])
+        self.assertEqual(next_turn['recent_picks'], [])
 
     def test_stale_focus_expires_but_explicit_preferences_survive(self):
         previous = self.resolve('Josh Hart 22.5 PRA up or down')

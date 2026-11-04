@@ -8,6 +8,7 @@ import unittest
 from feeds import canonical_game, canonical_player
 from master import MasterStore
 from pick_discussion import build_pick_discussion, normalize_stat
+from test_pregame_discussion import record_fixture_refresh
 
 
 NOW = dt.datetime(2026, 11, 2, 21, 0, tzinfo=dt.timezone.utc)
@@ -18,6 +19,9 @@ class PickDiscussionTests(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.store = MasterStore(Path(self.folder.name) / 'fixture.sqlite')
+        self.store.upsert_game({'id': 'target', 'date': '2026-11-02', 'home_team': 'NYK',
+            'away_team': 'BKN', 'status': 'scheduled', 'start_time': '2026-11-03T00:30:00+00:00',
+            'source': 'synthetic scheduled-event fixture'})
 
     def add(self, player, values, *, stat='tpm', team='BKN', minutes=34,
             season='2026-27', phase='Regular Season', source='test observations',
@@ -37,6 +41,7 @@ class PickDiscussionTests(unittest.TestCase):
             else:
                 row[stat] = value
             self.store.upsert_player_game(row)
+        record_fixture_refresh(self.store)
 
     def assess(self, player='Julius Randle', stat='threes', line=1.5, **kwargs):
         return build_pick_discussion(self.store, {'player': player, 'stat': stat,

@@ -17,6 +17,7 @@ from contextual_projection import _quantile, _weighted
 from feeds import canonical_player, canonical_team
 from master import STAT_ALIASES, STAT_COMPONENTS, normalized_name
 from news_digest import _aware
+from pregame_freshness import assess_pregame_freshness
 from season_calendar import calendar_context, current_season
 
 EASTERN = ZoneInfo('America/New_York')
@@ -120,7 +121,8 @@ def _opponent_defense(store, opponent, season, phase, stat, day, now):
             coverage = None
     # Retrospective discussion must not bring a later published snapshot into
     # a pregame explanation. Unknown coverage cannot support backtesting.
-    if coverage and coverage >= day.isoformat():
+    if coverage and (coverage >= day.isoformat()
+                     or coverage > now.astimezone(EASTERN).date().isoformat()):
         return empty
     if day < now.astimezone(EASTERN).date() and (
             not coverage or not published or published.astimezone(EASTERN).date() >= day):
@@ -200,6 +202,10 @@ def build_pick_discussion(store, pick, now=None):
         result['reason'] = 'Saved player observations are not ready yet.'
         result['fallback_answer'] = result['reason']
         return result
+    if pick.get('date') and pick.get('game_date') and str(pick['date']) != str(pick['game_date']):
+        result['reason'] = 'The supplied game dates conflict; which date should I assess?'
+        result['fallback_answer'] = result['reason']
+        return result
     try:
         day = dt.date.fromisoformat(str(pick.get('date') or pick.get('game_date') or today))
     except ValueError:
@@ -224,9 +230,13 @@ def build_pick_discussion(store, pick, now=None):
                       if normalized_name(row['player']) == normalized_name(player)}
         identities.add(canonical_player(player))
         placeholders = ','.join('?' for _ in identities)
-        latest = db.execute('SELECT player,team,date FROM player_games WHERE player_id IN (' +
-            placeholders + ') AND date<? ORDER BY date DESC,updated_at DESC LIMIT 1',
-            (*sorted(identities), cutoff)).fetchone()
+        # Provider IDs are useful lookup keys, not permission to borrow another
+        # player's row if an upstream identity was reused or imported wrongly.
+        latest = next((row for row in db.execute(
+            'SELECT player,team,date FROM player_games WHERE player_id IN (' +
+            placeholders + ') AND date<? ORDER BY date DESC,updated_at DESC',
+            (*sorted(identities), cutoff))
+            if normalized_name(row['player']) == normalized_name(player)), None)
         if not latest:
             result['reason'] = f'I have no stored observations for {player} before this game.'
             result['fallback_answer'] = result['reason']
@@ -237,23 +247,45 @@ def build_pick_discussion(store, pick, now=None):
             'SELECT p.* FROM player_games p JOIN games g ON g.id=p.game_id '
             'WHERE p.player_id IN (' + placeholders + ') AND p.team=? AND p.season=? '
             'AND p.season_type=? AND p.date<? AND g.date=p.date AND g.status=? '
-            'AND lower(p.appearance_state)=? ORDER BY p.date DESC,p.game_id DESC LIMIT 30',
-            (*sorted(identities), team, season, phase, cutoff, 'final', 'played'))]
+            'AND lower(p.appearance_state)=? ORDER BY p.date DESC,p.game_id DESC,p.updated_at DESC LIMIT 100',
+            (*sorted(identities), team, season, phase, cutoff, 'final', 'played'))
+            if normalized_name(row['player']) == normalized_name(player)]
     result.update(player=player, team=team)
     if pick.get('team') and canonical_team(pick['team']) != team:
         result['reason'] = f'The requested team conflicts with {player}’s latest stored team ({team}).'
         result['fallback_answer'] = result['reason']
         return result
     components = STAT_COMPONENTS[stat]
-    valid, seen = [], set()
+    groups = {}
     for row in rows:
         identity = (row['game_id'], normalized_name(row['player']))
-        if identity in seen:
+        groups.setdefault(identity, []).append(row)
+    valid, conflicts, uncertain_workload = [], 0, 0
+    for candidates in list(groups.values())[:30]:
+        complete = []
+        for row in candidates:
+            values = [_number(row.get(component)) for component in components]
+            if any(value is None for value in values) or row.get('minutes') == 0:
+                continue
+            complete.append((row, tuple(values)))
+        if not complete:
             continue
-        seen.add(identity)
-        values = [_number(row.get(component)) for component in components]
-        if any(value is None for value in values) or row.get('minutes') == 0:
+        if len({values for _, values in complete}) > 1:
+            conflicts += 1
             continue
+        # A complete alias can supply an observation missing from the other
+        # import. Conflicting complete statistics cannot be cherry-picked.
+        row, values = complete[0]
+        row = dict(row)
+        known_minutes = {_number(item.get('minutes')) for item, _ in complete}
+        known_minutes.discard(None)
+        if len(known_minutes) > 1:
+            row['minutes'] = None
+            uncertain_workload += 1
+        elif known_minutes:
+            row['minutes'] = next(iter(known_minutes))
+        if len({item.get('opponent') for item, _ in complete}) > 1:
+            row['opponent'] = None
         row['value'] = sum(values)
         valid.append(row)
     if not valid:
@@ -270,9 +302,19 @@ def build_pick_discussion(store, pick, now=None):
               'mean': _round(mean), 'median': _round(median), 'stdev': _round(sd),
               'minimum': min(values), 'maximum': max(values),
               'first_date': min(row['date'] for row in valid), 'last_date': valid[0]['date'],
-              'excluded_incomplete': len(rows) - n, 'scope': 'Current-season same-team final played games only.'}
+              'excluded_incomplete': min(len(groups), 30) - n - conflicts,
+              'conflicting_games': conflicts, 'uncertain_workload_games': uncertain_workload,
+              'scope': 'Current-season same-team final played games only.'}
     result.update(available=True, sample=sample, confidence='low')
+    if conflicts:
+        result['cautions'].append('Conflicting duplicate game statistics were excluded from the sample.')
+    if uncertain_workload:
+        result['cautions'].append('Conflicting duplicate minutes were treated as unknown workload.')
     event = _event(store, day.isoformat(), team, now)
+    readiness = assess_pregame_freshness(store, day.isoformat(), team, now, player=player, stat=stat)
+    result['data_readiness'] = readiness
+    if not readiness.get('ready'):
+        result['cautions'].extend(readiness.get('reasons') or ['Current game-data readiness is unverified.'])
     opponent = canonical_team(pick.get('opponent')) if pick.get('opponent') else event.get('opponent')
     result.update(event=event, opponent=opponent)
     if opponent and event.get('opponent') and opponent != event['opponent']:
@@ -332,7 +374,7 @@ def build_pick_discussion(store, pick, now=None):
     if not all(sources):
         result['cautions'].append('Some sample observations have no recorded source.')
     if n < 10:
-        result['cautions'].append('This is a small early-season sample; hit counts are not tonight’s win probability.')
+        result['cautions'].append('This is a small early-season sample; hit counts are not this game’s win probability.')
     if not opponent:
         result['cautions'].append('The opponent is unresolved; no matchup adjustment was made.')
     elif len(opponents) < 3:
@@ -361,6 +403,10 @@ def build_pick_discussion(store, pick, now=None):
         blockers.append('unresolved game identity')
     if event.get('started_or_unavailable') or day < today:
         blockers.append('the game has started, passed, or is unavailable for pregame analysis')
+    elif not event.get('pregame'):
+        blockers.append('a saved upcoming game and tipoff have not been verified')
+    if not readiness.get('ready'):
+        blockers.extend((readiness.get('reasons') or ['current game-data readiness is unverified'])[:2])
     if blockers:
         result['reason'] = 'Pass for now: ' + '; '.join(blockers) + '.'
     elif not lean:
@@ -469,6 +515,6 @@ def format_pick_discussion(report):
         risk = ('Made threes depend on both attempts and shooting accuracy.' if report['stat'] == 'tpm'
                 else 'Reduced minutes or a role change could overturn this lean.')
     else:
-        risk = 'Those results describe the sample, not tonight’s win probability.'
+        risk = 'Those results describe the sample, not this game’s win probability.'
     return (first + '\n' + evidence + '\n' + risk +
             f" Source: stored player games through {sample['last_date']}; current availability is not fully verified.")

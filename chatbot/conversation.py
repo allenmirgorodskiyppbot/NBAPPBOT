@@ -33,7 +33,7 @@ _EXPLAIN = re.compile(r'\b(?:why|explain|reason\w*|clarif\w*|meaning|mean by|tel
                       r'how come|what makes|what if|risk\w*|blowout|benched|'
                       r'bench|minutes limit|revenge|old team)\b', re.I)
 _FOLLOWUP = re.compile(r'^\s*(?:and\b|but\b|why\b|how\b|what about\b|'
-                       r'actually\b|no\b|nah\b|instead\b|i mean\b|'
+                       r'actually\b|no\b|not\b|nah\b|instead\b|i mean\b|'
                        r'up or down\b|more or less\b|over or under\b)|'
                        r'\b(?:he|him|his|that|those|it|they|their|them|same|instead)\b', re.I)
 _PREFERENCE = re.compile(r'\b(?:i (?:like|liked|prefer|want|wanted)\s+'
@@ -207,6 +207,14 @@ def _line(text, date_spans, eligible):
                   r'\b\d+(?:\.\d+)?\s*(?:x|percent|%)|\b20\d{2}[-–]\d{2}\b', ' ', text, flags=re.I)
     numbers = re.findall(r'(?<![\w.])(' + _NUMBER + r')(?![\w.%])', text)
     values = list(dict.fromkeys(value for value in (_finite(x) for x in numbers) if value is not None))
+    correction = re.search(r'(?<![\w.])(' + _NUMBER + r')\s*,?\s*(?:not|instead of|rather than)\s+('
+                           + _NUMBER + r')(?![\w.])', text, re.I)
+    if correction and len(values) == 2:
+        replacement, rejected = (_finite(value) for value in correction.groups())
+        if replacement != rejected and set(values) == {replacement, rejected}:
+            return replacement, None
+    if len(values) == 1 and re.search(r'\bnot\s+' + re.escape(numbers[0]) + r'(?![\w.])', text, re.I):
+        return None, 'rejected_line'
     if len(values) > 1:
         return None, 'multiple_lines'
     return (values[0], None) if values else (None, None)
@@ -273,7 +281,36 @@ def _selection_preference(text, names):
 
 
 def _empty_state():
-    return {'version': 1, 'slots': {}, 'constraints': {}, 'recent_picks': [], 'ambiguous_players': []}
+    return {'version': 1, 'slots': {}, 'constraints': {}, 'recent_picks': [], 'ambiguous_players': [],
+            'selected_pick_index': None}
+
+
+def _pick_reference(text, cards):
+    """Resolve list ordinals, keeping their numbers out of prop thresholds."""
+    ordinals = {'first': 0, 'second': 1, 'third': 2, 'fourth': 3,
+                'fifth': 4, 'sixth': 5, 'seventh': 6, 'eighth': 7, 'last': len(cards) - 1}
+    token = r'(?:' + '|'.join(ordinals) + r'|\d{1,2}(?:st|nd|rd|th))'
+    pattern = (r'\b(' + token + r')\s+(?:picks?|legs?|ones?|selections?|cards?)\b|'
+               r'\b(?:picks?|legs?|selections?)\s*(?:number\s*|#\s*)?(\d{1,2})\b|'
+               r'#\s*(\d{1,2})\b|\b(' + token + r')\s*[?.!]*$')
+    indices, spans = set(), []
+    for match in re.finditer(r'\b(' + token + r')\s+(?:or|and)\s+(' + token + r')\b', text, re.I):
+        for word in match.groups():
+            word = word.casefold()
+            indices.add(ordinals[word] if word in ordinals else int(re.match(r'\d+', word).group()) - 1)
+        spans.append(match.span())
+    for match in re.finditer(pattern, text, re.I):
+        word = next(value for value in match.groups() if value is not None).casefold()
+        indices.add(ordinals[word] if word in ordinals else int(re.match(r'\d+', word).group()) - 1)
+        spans.append(match.span())
+    if not indices:
+        return None, None, spans
+    if len(indices) != 1:
+        return None, 'ambiguous_pick', spans
+    index = next(iter(indices))
+    if not 0 <= index < len(cards):
+        return None, 'missing_pick', spans
+    return index, None, spans
 
 
 def _clean_state(state, names, now):
@@ -329,6 +366,9 @@ def _clean_state(state, names, now):
                 pass
             result['recent_picks'].append(clean)
     result['ambiguous_players'] = [name for name in state.get('ambiguous_players', [])[:4] if name in names]
+    index = state.get('selected_pick_index')
+    if type(index) is int and 0 <= index < len(result['recent_picks']):
+        result['selected_pick_index'] = index
     return result
 
 
@@ -370,6 +410,8 @@ def _assistant_cards(text, names, now):
                 'line_kind': 'assistant_proposal'}
         if re.search(r'\b(?:if|target|projection)\b|[≤≥]', line, re.I):
             card['line_kind'] = 'research_target'
+            card.pop('line', None)
+            card.pop('side', None)
         cards.append(card)
     if game_date:
         for card in cards:
@@ -380,7 +422,7 @@ def _assistant_cards(text, names, now):
 def _apply_user(text, state, names, now):
     # Mobile dictation/typing commonly joins a comparison and its number.
     # Separate only known market syntax; never rewrite names or arbitrary prose.
-    text = re.sub(r'\b(more|less|over|under)(?=\d)', r'\1 ', text, flags=re.I)
+    text = re.sub(r'\b(more|less|over|under|actually|not)(?=\d)', r'\1 ', text, flags=re.I)
     text = re.sub(r'(?<=\d)(?=(?:points?|pts|rebounds?|rebs?|assists?|asts?|threes|pra)\b)',
                   ' ', text, flags=re.I)
     entities = _scan(text, names)
@@ -388,10 +430,16 @@ def _apply_user(text, state, names, now):
     ambiguous_names = _ambiguous_names(text, names, players)
     slots = state['slots']
     prior = dict(slots)
+    prior_pick_index = state.get('selected_pick_index')
     game_date, date_error, spans = _date(text, now)
+    pick_index, reference_error, reference_spans = _pick_reference(text, state['recent_picks'])
+    spans += reference_spans
     stat, market_error = _market(text)
+    new_game = bool(re.search(r'\b(?:next|different|new)\s+(?:game|matchup)\b', text, re.I))
     followup = bool(_FOLLOWUP.search(text) or (slots.get('player') and
-                    re.fullmatch(r'\s*' + _NUMBER + r'\s*[!?]?\s*', text)))
+                    (re.fullmatch(r'\s*' + _NUMBER + r'\s*[!?]?\s*', text)
+                     or re.search(_NUMBER + r'\s*,?\s*(?:not|instead of|rather than)\s+' + _NUMBER, text, re.I))) or reference_spans
+                    or game_date or date_error or new_game)
     explanation = bool(_EXPLAIN.search(text))
     preference = _selection_preference(text, names)
     social = bool(_SOCIAL.fullmatch(text))
@@ -415,6 +463,60 @@ def _apply_user(text, state, names, now):
     if social:
         return {'intent': intent, 'slots': {}, 'original_question': text, 'canonical_question': text,
                 'clarification': None, 'errors': [], 'inherited': [], 'entities': entities}
+    collective = bool(re.search(r'\b(?:all|both|these|those)\s+(?:the\s+)?'
+                                r'(?:(?:[2-8]|two|three|four|five|six|seven|eight)\s+)?(?:picks|legs|ones)\b|'
+                                r'\bwhy\s+(?:those|these|both|all|them)\b', text, re.I))
+    selected_card = None
+    if collective and not players and not reference_spans:
+        for field in ('player', 'stat', 'line', 'side'):
+            slots.pop(field, None)
+        state['selected_pick_index'] = None
+        state['ambiguous_players'] = list(dict.fromkeys(card['player'] for card in state['recent_picks']))[:4]
+    elif pick_index is not None:
+        selected_card = state['recent_picks'][pick_index]
+        if players and players != [selected_card['player']]:
+            reference_error = 'conflicting_pick'
+            selected_card = None
+        else:
+            players = [selected_card['player']]
+    elif (len(players) == 1 and (followup or explanation or not research)
+          and (players[0] != prior.get('player') or not prior.get('stat') or stat
+               or prior_pick_index is not None)):
+        candidates = [(index, card) for index, card in enumerate(state['recent_picks'])
+                      if card['player'] == players[0] and (not stat or card['stat'] == stat)]
+        if len(candidates) == 1:
+            pick_index, selected_card = candidates[0]
+        elif len(candidates) > 1:
+            focused = [item for item in candidates if item[0] == state.get('selected_pick_index')]
+            if len(focused) == 1 and not stat:
+                pick_index, selected_card = focused[0]
+            else:
+                reference_error = 'ambiguous_pick'
+    elif (state['ambiguous_players'] and not slots.get('player') and not collective
+          and re.search(r'\b(?:his|him|that (?:pick|line)|this (?:pick|line))\b', text, re.I)):
+        reference_error = 'ambiguous_pick'
+    opponent = _opponent(text)
+    saved_dates = {card.get('game_date') for card in state['recent_picks'] if card.get('game_date')}
+    prior_date = prior.get('game_date') or (next(iter(saved_dates)) if len(saved_dates) == 1 else None)
+    event_changed = bool(new_game or (game_date and (prior_date and game_date != prior_date
+                         or not prior_date and prior.get('line') is not None
+                         and game_date != now.astimezone(EASTERN).date().isoformat()))
+                         or (opponent and prior.get('opponent') and opponent != prior['opponent']))
+    if event_changed:
+        for field in ('line', 'side', 'opponent', 'game_date'):
+            slots.pop(field, None)
+        state['recent_picks'] = []
+        state['selected_pick_index'] = None
+    if reference_error:
+        for field in ('player', 'stat', 'line', 'side'):
+            slots.pop(field, None)
+        state['selected_pick_index'] = None
+        selected_card = None
+    if selected_card:
+        explanation = True
+        state['ambiguous_players'] = []
+        if not event_changed:
+            state['selected_pick_index'] = pick_index
     if both_teams is not None:
         state['constraints']['both_teams'] = both_teams
         if count is not None:
@@ -434,14 +536,22 @@ def _apply_user(text, state, names, now):
         if slots.get('player') != player:
             for field in ('stat', 'line', 'side', 'opponent'):
                 slots.pop(field, None)
-            # A named player can select one previously presented card, but a
-            # hypothetical target cannot silently become an actual quoted line.
-            candidates = [card for card in state['recent_picks'] if card['player'] == player
-                          and card.get('line_kind') != 'research_target']
-            if followup and len(candidates) == 1 and not stat and line is None:
-                slots.update({k: v for k, v in candidates[0].items() if k in {'stat', 'line', 'side'}})
+            if not selected_card:
+                state['selected_pick_index'] = None
         slots['player'] = player
         state['ambiguous_players'] = []
+        if selected_card:
+            slots['stat'] = selected_card['stat']
+            same_focus = (prior_pick_index == pick_index and prior.get('player') == player
+                          and prior.get('stat') == selected_card['stat'] and prior.get('line') is not None)
+            if not event_changed:
+                if selected_card.get('game_date'):
+                    slots['game_date'] = selected_card['game_date']
+                if selected_card.get('line_kind') != 'research_target' and line is None and not same_focus:
+                    slots.update({k: selected_card[k] for k in ('line', 'side') if k in selected_card})
+            if selected_card.get('line_kind') == 'research_target' and not same_focus:
+                slots.pop('line', None)
+                slots.pop('side', None)
     elif not (followup or asks or stat or line is not None or market_error):
         # Ordinary discussion does not destroy focus, but it also must not route
         # through an unrelated previous player's statistics.
@@ -467,9 +577,19 @@ def _apply_user(text, state, names, now):
         slots['side'] = side
     elif choosing:
         slots.pop('side', None)
+    focus_index = state.get('selected_pick_index')
+    if type(focus_index) is int and 0 <= focus_index < len(state['recent_picks']):
+        card = state['recent_picks'][focus_index]
+        if card['player'] != slots.get('player') or card['stat'] != slots.get('stat'):
+            state['selected_pick_index'] = None
+        elif line is not None and card.get('line_kind') != 'research_target':
+            # This edits dialogue context only. It does not update a saved
+            # board or entry, and it cannot turn a target into a current offer.
+            card['line'] = line
+            if slots.get('side'):
+                card['side'] = slots['side']
     if game_date:
         slots['game_date'] = game_date
-    opponent = _opponent(text)
     if opponent:
         slots['opponent'] = opponent
     if count is not None:
@@ -480,7 +600,7 @@ def _apply_user(text, state, names, now):
         if value == prior.get(key):
             inherited.append(key)
     is_prop = bool((slots.get('player') or state['ambiguous_players']) and
-                   (line is not None or slots.get('line') is not None or asks or choosing
+                   (line is not None or slots.get('line') is not None or line_error or asks or choosing or event_changed
                     or (followup and (market_error or (stat and prior.get('line') is not None)))))
     if preference:
         intent = 'preference'
@@ -492,13 +612,20 @@ def _apply_user(text, state, names, now):
         intent = 'prop'
     elif research or players or stat or entities['teams']:
         intent = 'research'
-    errors = [error for error in (date_error, market_error, line_error) if error]
+    errors = [error for error in (date_error, market_error, line_error, reference_error) if error]
     clarification = None
     # A request for "why" may also correct a market or introduce an ambiguous
     # threshold. Resolve that essential input before explaining a different bet.
-    changed_prop = bool(errors or line is not None or
-                        (stat and stat != prior.get('stat') and prior.get('line') is not None))
-    if intent == 'prop' or (intent == 'explanation' and changed_prop):
+    changed_prop = bool(errors or line is not None or event_changed or
+                        (stat and stat != prior.get('stat') and prior.get('line') is not None
+                         and not (selected_card and selected_card.get('line_kind') == 'research_target')))
+    if reference_error:
+        clarification = ('I don’t have that numbered pick in the current list. Which player and market do you mean?'
+                         if reference_error == 'missing_pick' else
+                         'Which pick do you mean? Give one list number or the player and statistic.')
+    elif new_game and not game_date:
+        clarification = 'Which game date should I use for the new matchup?'
+    elif intent == 'prop' or (intent == 'explanation' and changed_prop):
         if date_error:
             clarification = 'Which game date should I use? Please give one valid date.'
         elif len(players) > 1 or state['ambiguous_players']:
@@ -560,6 +687,7 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
                 cards = _assistant_cards(item['content'], names, now)
                 if cards:
                     current['recent_picks'] = cards
+                    current['selected_pick_index'] = None
                     # A multi-player proposal requires an explicit selection
                     # before "his" or "that line" can resolve to one leg.
                     if len({card['player'] for card in cards}) > 1:
@@ -571,6 +699,13 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
     current['updated_at'] = now.isoformat()
     result['constraints'] = dict(current['constraints'])
     result['recent_picks'] = list(current['recent_picks'])
+    index = current.get('selected_pick_index')
+    if type(index) is int and 0 <= index < len(current['recent_picks']):
+        result['recent_picks'] = [current['recent_picks'][index]]
+    elif result['slots'].get('player'):
+        result['recent_picks'] = [card for card in current['recent_picks']
+                                  if card['player'] == result['slots']['player']
+                                  and (not result['slots'].get('stat') or card['stat'] == result['slots']['stat'])]
     result['state'] = current
     result['complete_prop'] = bool(result['slots'].get('player') and result['slots'].get('stat')
                                    and result['slots'].get('line') is not None and not result['errors'])

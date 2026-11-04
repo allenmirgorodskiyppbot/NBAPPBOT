@@ -197,6 +197,7 @@ class GamedayDigest:
         self.lead = max(15, min(180, int(os.getenv('KNICKS_DIGEST_MINUTES_BEFORE', '60'))))
         self._lock = asyncio.Lock()
         self._using_saved = False
+        self._schedule_scope = 'published_season_calendar'
 
     def _fallback(self, snapshot, current):
         checked = _aware(snapshot.get('checked_at'))
@@ -213,6 +214,7 @@ class GamedayDigest:
     def _status(self, state, **values):
         report = {'mode': alert_mode(), 'state': state, 'minutes_before_tipoff': self.lead,
                   'schedule_mode': 'saved_calendar' if self._using_saved else 'live_checked',
+                  'schedule_scope': self._schedule_scope,
                   'timezone': 'America/New_York', 'checked_at': self.now().isoformat(), **values}
         self.store.set_checkpoint(STATUS_KEY, report)
         return report
@@ -260,11 +262,39 @@ class GamedayDigest:
                 return self._status('disabled')
             snapshot = await self.refresh_schedule()
             current = self.now()
+            self._schedule_scope = 'published_season_calendar'
+            today = current.astimezone(EASTERN).date().isoformat()
+            checked = _aware(snapshot.get('checked_at'))
+            fresh_full_schedule = bool(not snapshot.get('using_saved_calendar') and checked and
+                                       0 <= (current-checked).total_seconds() < 900)
+            today_saved = [game for game in snapshot.get('games', []) if game.get('date') == today]
+            if today_saved and not fresh_full_schedule:
+                from game_schedule_check import refresh_game_schedule
+                event_check = await refresh_game_schedule(self.store,self.worker,now=current)
+                observed = {game['id']:game for game in event_check.get('games', [])}
+                if (event_check.get('status') != 'success' or
+                        any(game['id'] not in observed for game in today_saved)):
+                    self._using_saved = True
+                    return self._status('schedule_unavailable', detail=
+                        'Current game timing could not be verified; the saved calendar is retained and no reminder was queued.')
+                snapshot = {**snapshot, 'games':[{**game, **observed[game['id']]} if game.get('date') == today else game
+                                                 for game in snapshot.get('games', [])],
+                            'checked_at':event_check['checked_at'], 'url':event_check['source'],
+                            'using_saved_calendar':False, 'schedule_scope':'current_day_events_only'}
+                self._schedule_scope = 'current_day_events_only'
+            # A cached calendar must not undo a later observed start/end/cancel
+            # even if its complete-season fetch was recently successful.
+            with self.store.connect() as db:
+                blocked = {row['id']:dict(row) for row in db.execute('SELECT * FROM games WHERE date=?', (today,))
+                           if row['status'] in {'live','final','postponed','canceled','suspended','past_schedule_only'}}
+            if blocked:
+                snapshot = {**snapshot, 'games':[{**game, **{key:value for key,value in blocked[game['id']].items()
+                                                           if value is not None}} if game['id'] in blocked else game
+                                                 for game in snapshot.get('games', [])]}
             self._using_saved = bool(snapshot.get('using_saved_calendar'))
             checked = _aware(snapshot.get('checked_at'))
             if not checked or (not self._using_saved and not 0 <= (current - checked).total_seconds() < 21600):
                 return self._status('schedule_unavailable', detail='No fresh verified schedule; no game time or off day assumed. See /status or /reminder.')
-            today = current.astimezone(EASTERN).date().isoformat()
             games = [g for g in snapshot.get('games', []) if g['date'] == today]
             future = [g for g in snapshot.get('games', []) if g['date'] >= today
                       and g['status'] == 'scheduled' and _aware(g.get('start_time'))

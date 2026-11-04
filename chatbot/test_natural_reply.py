@@ -42,6 +42,95 @@ class NaturalReplyTests(unittest.TestCase):
         self.assertNotIn('sample median', result['answer'])
         self.assertIn('sample median', result['sources'][0]['text'])
 
+    def correction_cards(self):
+        facts = [
+            {'entity': 'Jalen Brunson', 'metric': 'points', 'fact_type': 'line',
+             'text': 'Jalen Brunson: the user-provided line is 18.5 points.', 'values': [18.5]},
+            {'entity': 'Jalen Brunson', 'metric': 'points', 'fact_type': 'sample',
+             'text': 'Jalen Brunson: above 18.5 points in 7 of 7 stored games, below in 0, tied in 0.',
+             'values': [18.5, 7, 0]},
+            {'entity': 'Jalen Brunson', 'metric': 'points', 'fact_type': 'median',
+             'text': 'Jalen Brunson: the sample median is 23 points.', 'values': [23]},
+        ]
+        return [{'id': 'P1', 'kind': 'prop_sample', 'entity': 'Jalen Brunson',
+                 'text': ' '.join(f['text'] for f in facts), 'approved_facts': facts,
+                 'source': 'stored player games', 'data_through_date': '2026-11-02'}]
+
+    def test_explicit_line_correction_can_repeat_the_retired_user_number(self):
+        text = ('The line is now 18.5, not 19.5. Historical data shows Jalen Brunson scored above '
+                '18.5 in all 7 stored games, with a median of 23 points. This supports a tentative '
+                'More lean, though scoring depends on shot volume and opponent defense.')
+        result = self.render(text, cards=self.correction_cards(), question='Actually 18.5, not 19.5')
+        self.assertTrue(result['answer'].startswith(text))
+        for text in ('Line was corrected to 18.5, not 19.5.',
+                     'The line is now 18.5 points, not 19.5 points.'):
+            self.render(text, cards=self.correction_cards(), question='Actually 18.5, not 19.5')
+
+    def test_retired_line_number_cannot_become_a_statistic_or_new_claim(self):
+        cards = self.correction_cards()
+        for text in ('He averages 19.5 points.',
+                     'The line is now 18.5, not 19.5. He averages 19.5 points.',
+                     'The line is now 18.5, not 19.5 rebounds.',
+                     'The line is now 19.5, not 18.5.',
+                     'The line is now 18.5, not 20.5.',
+                     'The line is now 18.5, not 19.5 points per game.'):
+            with self.subTest(text=text):
+                self.assert_rejected(text, cards=cards, question='Actually 18.5, not 19.5')
+
+    def test_line_correction_requires_both_latest_user_pair_and_approved_current_line(self):
+        for question in ('How about 18.5?', 'Actually 18.5, not 20.5',
+                         'Actually he averages 18.5, not 19.5', 'If the line is 18.5, not 19.5'):
+            with self.subTest(question=question):
+                self.assert_rejected('The line is now 18.5, not 19.5.',
+                    cards=self.correction_cards(), question=question)
+        cards = self.correction_cards()
+        cards[0]['approved_facts'] = cards[0]['approved_facts'][1:]
+        self.assert_rejected('The line is now 18.5, not 19.5.', cards=cards,
+            question='Actually 18.5, not 19.5')
+
+    def research_cards(self):
+        common = {'entity': 'Karl-Anthony Towns', 'metric': 'PTS+REB+AST',
+                  'scope': 'Same-team regular-season observations, seasons 2025-26, 2026-27; hypothetical research only'}
+        facts = [
+            {**common, 'fact_type': 'projection', 'text':
+             'Karl-Anthony Towns: experimental reference 38.9 PTS+REB+AST from 20 stored games.',
+             'values': [38.9, 20]},
+            {**common, 'fact_type': 'workload', 'metric': 'minutes', 'text':
+             'Karl-Anthony Towns: workload reference 32.88 minutes.', 'values': [32.88]},
+            {**common, 'fact_type': 'context', 'text':
+             'Karl-Anthony Towns: hypothetical targets; no current offer or betting edge is verified.',
+             'values': []},
+        ]
+        return [{'id': 'R1', 'kind': 'research_projection', 'entity': 'Karl-Anthony Towns',
+                 'text': ' '.join(f['text'] for f in facts), 'approved_facts': facts,
+                 'source': 'Experimental workload model', 'data_through_date': '2026-11-02'}]
+
+    def test_research_reference_does_not_establish_current_production_consistency(self):
+        captured = ('Karl-Anthony Towns has an experimental reference of 38.9 PTS+REB+AST from '
+                    '20 stored games, with a workload of 32.88 minutes. This indicates a consistent '
+                    'production level under current conditions. The target is hypothetical, not a confirmed edge.')
+        self.assert_rejected(captured, 'unsupported_metric', cards=self.research_cards())
+        self.assert_rejected('Towns has a stable role.', 'unsupported_metric',
+                             cards=self.research_cards(), ids=[])
+        for text in ('Towns has a stable role.',
+                     'His production is consistent.',
+                     'The projection demonstrates production stability.',
+                     'The reference describes his output under current conditions.'):
+            with self.subTest(text=text):
+                self.assert_rejected(text, 'unsupported_metric', cards=self.research_cards())
+
+    def test_research_reference_allows_measured_facts_and_conditional_variation(self):
+        cards = self.research_cards()
+        for text in ('The experimental reference is 38.9 PRA at 32.88 minutes; both come from stored observations.',
+                     'His production could vary if his minutes or role change.',
+                     'If his role stays stable, the workload reference could remain relevant.',
+                     'The projection does not establish consistent production or current role stability.',
+                     'We do not know whether his production is consistent.',
+                     'Consistent production is not established by this reference.',
+                     'The workload reference is consistent with the calculation, not proof of a stable role.'):
+            with self.subTest(text=text):
+                self.render(text, cards=cards)
+
     def test_spelled_counts_and_threshold_mechanics_are_grounded(self):
         result = self.render('More than 1.5 made threes requires two made threes. That is possible, not guaranteed.')
         self.assertIn('requires two', result['answer'])
@@ -182,6 +271,34 @@ class NaturalReplyTests(unittest.TestCase):
                   'source':'stored research'}]
         self.assert_rejected('I lean More on Randle.', 'unsupported_recommendation',cards=cards)
         self.render('I would hold until his availability is confirmed. More could be worth revisiting if his minutes are confirmed.',cards=cards)
+
+    def test_mixed_priced_research_and_unavailable_cards_keep_each_hold(self):
+        cards = [{'id':'P1','kind':'prop_sample','entity':'Jalen Brunson','decision':'less',
+                  'text':'Jalen Brunson: tentative Less lean.', 'source':'computed research'},
+                 {'id':'R1','kind':'research_projection','entity':'OG Anunoby',
+                  'text':'OG Anunoby: research target only. No current offer is verified.', 'source':'computed research'},
+                 {'id':'R2','kind':'research_unavailable','entity':'Julius Randle','decision':'pass',
+                  'text':'Julius Randle: Hold. Insufficient current-season observations. No current offer or recommendation is verified.',
+                  'source':'computed research'}]
+        for kind in ('research_unavailable','prop_unavailable'):
+            with self.subTest(kind=kind):
+                cards[-1]['kind']=kind
+                self.assert_rejected('I lean More on Randle.', 'unsupported_recommendation',cards=cards,ids=['P1','R1'])
+                self.assert_rejected('I lean Less on Randle.', 'unsupported_recommendation',cards=cards)
+                self.render('I lean Less on Brunson. Anunoby remains a research target. I would hold Randle because his observations are insufficient.',cards=cards)
+
+    def test_prompt_compaction_preserves_explicit_held_legs(self):
+        cards = [{'id':'P1','kind':'prop_sample','entity':'Jalen Brunson','text':'Approved evidence. '*6},
+                 {'id':'P2','kind':'prop_sample','entity':'OG Anunoby','text':'Approved evidence. '*6},
+                 {'id':'R2','kind':'research_unavailable','entity':'Julius Randle','decision':'pass',
+                  'text':'Julius Randle: Hold. No current offer or recommendation is verified.'}]
+        for kind in ('research_unavailable','prop_unavailable','research_projection'):
+            with self.subTest(kind=kind):
+                cards[-1]['kind']=kind
+                kept=compact_natural_evidence(cards,max_chars=500)
+                self.assertIn('R2',[card['id'] for card in kept])
+                self.assertLess(len(kept),len(cards))
+                self.assert_rejected('I lean More on Randle.','unsupported_recommendation',cards=kept)
 
     def test_supported_mean_and_median_are_not_interchangeable(self):
         self.render('His average is 2 made threes; his median is 2.5 made threes.')

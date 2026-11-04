@@ -92,7 +92,7 @@ class CalendarFeatureTests(IsolatedMaster):
             import_calendar(self.store, invalid)
         self.assertEqual(len(saved_schedule(self.store, NOW)['games']), 80)
 
-    def test_saved_calendar_can_send_one_labeled_prizepicks_reminder_without_live_access(self):
+    def test_saved_calendar_retained_but_reminder_held_without_current_event_verification(self):
         seed_calendar(self.store)
         now = dt.datetime(2026, 10, 30, 22, 30, tzinfo=UTC)  # 6:30pm ET.
         class BlockedWorker:
@@ -116,14 +116,13 @@ class CalendarFeatureTests(IsolatedMaster):
                 return first
         import asyncio
         result = asyncio.run(run())
-        self.assertEqual(result['state'], 'queued')
+        self.assertEqual(result['state'], 'schedule_unavailable')
         self.assertEqual(result['schedule_mode'], 'saved_calendar')
-        notify.assert_awaited_once()
-        text = notify.await_args.args[0]
-        self.assertIn('saved published season calendar', text)
-        self.assertIn('PrizePicks reminder', text)
-        self.assertIn('7:30 PM Eastern', text)
-        self.assertEqual(notify.await_args.kwargs['expires_at'], dt.datetime(2026, 10, 30, 23, 30, tzinfo=UTC).timestamp())
+        notify.assert_not_awaited()
+        self.assertIn('no reminder was queued', result['detail'])
+        self.assertEqual(len(saved_schedule(self.store, now)['games']),80)
+        self.assertEqual(self.store.get_checkpoint('nba_schedule_today')['status'],'failed')
+        self.assertFalse(self.store.get_checkpoint('knicks-gameday:2026-10-30'))
 
 
 class ProjectionFeatureTests(IsolatedMaster):

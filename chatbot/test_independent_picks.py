@@ -18,6 +18,12 @@ DATE = '2026-10-30'
 
 class IndependentPickTests(unittest.TestCase):
     def setUp(self):
+        # These tests isolate projection/selection behavior. Daily publication
+        # readiness has real-store integration coverage in pregame tests.
+        readiness = patch('independent_picks.assess_pregame_freshness', return_value={
+            'ready': True, 'reasons': [], 'current_player_stat_coverage': ['pts', 'reb', 'ast', 'pra', 'fga']})
+        readiness.start()
+        self.addCleanup(readiness.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')

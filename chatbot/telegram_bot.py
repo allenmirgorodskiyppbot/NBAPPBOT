@@ -35,7 +35,7 @@ MAX_UPLOAD = 8 * 1024 * 1024
 TYPING_INTERVAL_SECONDS = 4
 MAX_ACTIVE_COMMANDS = 10
 RESPONSIVE_COMMANDS = {'/start', '/help', '/status', '/ai_status', '/clear', '/newboard',
-                       '/reminder', '/usage'}
+                       '/reminder', '/usage', '/freshness'}
 
 
 class TelegramAPIError(RuntimeError):
@@ -89,6 +89,7 @@ HELP = '''Knicks Research bot
 /reminder — next Knicks game-day digest time and schedule health
 /usage — AI work counters and how hosting credits are charged
 /status — feed freshness and bot status
+/freshness — daily import coverage and next game’s data readiness, without AI
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
@@ -132,6 +133,85 @@ Use 2–6 legs and copy the actual entry type and displayed multiplier from your
 
 def utcnow():
     return datetime.now(timezone.utc).isoformat()
+
+
+def freshness_report(store, now=None):
+    """Summarize saved collection evidence; never fetch, infer, or mark it fresh."""
+    from independent_picks import _select_game
+    from pregame_freshness import assess_pregame_freshness
+
+    now = now or datetime.now(timezone.utc)
+    eastern = ZoneInfo('America/New_York')
+
+    def day(value):
+        try:
+            value = str(value)
+            return datetime.strptime(value, '%Y-%m-%d').date().isoformat() if re.fullmatch(r'\d{4}-\d{2}-\d{2}', value) else None
+        except (ValueError, TypeError):
+            return None
+
+    def stamp(value):
+        try:
+            parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+            if parsed.tzinfo is None:
+                return 'not recorded'
+            return parsed.astimezone(eastern).strftime('%b %d, %I:%M %p Eastern').replace(', 0', ', ')
+        except (ValueError, TypeError):
+            return 'not recorded'
+
+    status = store.status()
+    status = status if isinstance(status, dict) else {}
+    refresh = status.get('nightly_nba_refresh') or {}
+    refresh = refresh if isinstance(refresh, dict) else {}
+    target = day(refresh.get('target_game_date')) or 'not recorded'
+    through = day(refresh.get('source_data_through_date')) or 'unknown'
+    lines = ['Data freshness — saved checks', f'Daily import target: {target}; covered through: {through}.']
+    feeds = status.get('feeds') or []
+    last_success = next((feed.get('last_success') for feed in feeds if isinstance(feed, dict)
+                         and feed.get('name') == 'nba_daily_refresh'), None)
+    lines.append('Last successful import: ' + stamp(last_success or refresh.get('last_success')) + '.')
+    pending = refresh.get('pending_dates')
+    if isinstance(pending, list):
+        dates = sorted({value for raw in pending if (value := day(raw))})
+        detail = ', '.join(dates[:3]) + (f' (+{len(dates) - 3} more)' if len(dates) > 3 else '')
+        lines.append('Pending import dates: ' + (detail if dates else 'none queued' if not pending else 'unknown') + '.')
+    else:
+        lines.append('Pending import dates: not recorded.')
+    tracking = status.get('tracking_refresh') or {}
+    coverage = tracking.get('coverage') if isinstance(tracking, dict) else None
+    if isinstance(coverage, list) and coverage:
+        collected = [row for row in coverage if isinstance(row, dict) and row.get('status') == 'collected']
+        unknown = sum(not day(row.get('source_data_through_date')) for row in collected)
+        unavailable = sum(not isinstance(row, dict) or row.get('status') != 'collected' for row in coverage)
+        lines.append(f'Tracking: {unknown} collected categories have unknown covered-game dates; {unavailable} unavailable.')
+    else:
+        lines.append('Tracking coverage: not recorded; freshness unknown.')
+    try:
+        game, error = _select_game(store, None, 'NYK', now)
+    except (sqlite3.Error, ValueError, TypeError, AttributeError):
+        game, error = None, 'The saved schedule is unavailable.'
+    if game:
+        teams = list(dict.fromkeys([game['home_team'], game['away_team']]))
+        lines.append(f"Next saved game: {game['away_team']} at {game['home_team']} — {stamp(game.get('start_time'))}.")
+        reports = [assess_pregame_freshness(store, game['date'], team, now) for team in teams]
+        ready = all(report.get('ready') is True for report in reports)
+        lines.append('Game-stat readiness: ' + ('current for both teams.' if ready else 'waiting for verified coverage.'))
+        if not ready:
+            reasons = list(dict.fromkeys(str(reason).replace('\n', ' ').strip()[:220]
+                           for report in reports for reason in report.get('reasons', []) if reason))
+            lines.extend('Needs: ' + reason for reason in reasons[:3])
+            if not reasons:
+                lines.append('Needs: current game-stat coverage has not been verified.')
+    else:
+        lines.append('Next game: ' + str(error or 'No upcoming saved game is available.')[:220])
+        lines.append('Game-stat readiness: not verified without a saved upcoming game.')
+    if refresh.get('enabled') is False:
+        lines.append('Automatic refresh is disabled. Configured schedule: 11:30 AM Eastern daily, with hourly retries.')
+    elif refresh.get('enabled') is True:
+        lines.append('Automatic refresh: 11:30 AM Eastern for the previous day; hourly retries while waiting.')
+    else:
+        lines.append('Refresh schedule: 11:30 AM Eastern for the previous day; hourly retries. Worker state not recorded.')
+    return '\n'.join(lines)
 
 
 def chunks(text: str, size: int = 3500):
@@ -833,6 +913,10 @@ class TelegramBot:
             return 'Recent conversation context cleared. Your dataset and picks remain saved.'
         if command == '/status':
             return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
+        if command == '/freshness':
+            if argument:
+                return 'Use /freshness alone to check saved daily imports and the next game’s data readiness without AI.'
+            return await asyncio.to_thread(freshness_report, self.store)
         if command == '/playerlog':
             if not argument:
                 return 'Use /playerlog Jalen Brunson | points | 5 (optional fourth field: 2026-27).'

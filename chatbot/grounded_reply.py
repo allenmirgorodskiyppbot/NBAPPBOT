@@ -801,9 +801,11 @@ def compact_natural_evidence(cards, question='', max_chars=2600):
     # Application-computed prop assessments precede optional historical records.
     ranked = sorted(enumerate(cards), key=lambda pair: (
         0 if pair[1].get('id') in required else
-        1 if pair[1].get('kind') == 'prop_assessment' else
-        2 if str(pair[1].get('kind','')).startswith('prop_') else
-        3 if pair[1].get('matches_resolved_player') else 4, pair[0]))
+        1 if pair[1].get('kind') in {'research_unavailable','prop_unavailable'} or
+             (pair[1].get('kind')=='research_projection' and pair[1].get('decision')=='pass') else
+        2 if pair[1].get('kind') == 'prop_assessment' else
+        3 if str(pair[1].get('kind','')).startswith('prop_') else
+        4 if pair[1].get('matches_resolved_player') else 5, pair[0]))
     by_id = {c['id']: c for c in cards}
     return [by_id[value['id']] for value in natural_prompt_evidence([c for _,c in ranked], max_chars=max_chars)]
 
@@ -918,6 +920,50 @@ def _unsupported_sample_equality(text, cards):
     return False
 
 
+def _retired_line_correction_span(clause, facts, question):
+    """Allow an old user line only while explicitly correcting that same line.
+
+    The old number never becomes an approved value. Its single occurrence in
+    a pure correction clause may be repeated when the new value is a supplied
+    application-authored line fact and the latest user message gives the same
+    correction pair. Statistics, forecasts and other clauses remain checked.
+    """
+    question = _number_text(question)
+    if not re.search(r'\b(?:actually|correction|corrected|line|i mean|i meant)\b', question, re.I):
+        return None
+    if re.search(r'\b(?:averag\w*|median|scored|recorded|forecast|projection|if|assuming)\b', question, re.I):
+        return None
+    number = r'\d+(?:\.\d+)?'
+    unit = '(?:' + '|'.join('(?:' + value + ')' for value in _UNITS.values()) + ')'
+    pair = (r'(?P<new>' + number + r')(?:\s+' + unit + r')?\s*[,—-]?\s*'
+            r'(?:not|rather than|instead of)\s+(?P<old>' + number + r')')
+    requested = {(float(match['new']), float(match['old']))
+                 for match in re.finditer(pair, question, re.I)}
+    if not requested:
+        return None
+    pattern = (r'\s*(?:(?:the|your|that|this|corrected)\s+)?line\s+'
+               r'(?:(?:is|was)\s+)?(?:(?:now|corrected to|updated to)\s+)?'
+               r'(?P<new>' + number + r')(?:\s+(?P<new_unit>' + unit + r'))?\s*[,—-]?\s*'
+               r'(?:not|rather than|instead of)\s+(?P<old>' + number + r')'
+               r'(?:\s+(?P<old_unit>' + unit + r'))?\s*[.!?]?\s*')
+    correction = re.fullmatch(pattern, clause, re.I)
+    if not correction:
+        return None
+    new, old = float(correction['new']), float(correction['old'])
+    if new == old or (new, old) not in requested:
+        return None
+    line_facts = [fact for fact in facts if fact.get('fact_type') == 'line' and
+                  re.search(r'\buser[- ]provided line is\s+' + re.escape(correction['new']) +
+                            r'(?![\d.])', fact.get('text', ''), re.I)]
+    if not line_facts:
+        return None
+    for label in (correction['new_unit'], correction['old_unit']):
+        if label and (re.search(r'\b(?:per|PPG|RPG|APG|MPG|games?|percent)\b|%', label, re.I) or
+                      not any(_quantity_supported(new, _metric_for_unit(label), fact) for fact in line_facts)):
+            return None
+    return correction.span('old')
+
+
 def _validate_natural_numbers(text, selected, all_cards, question=''):
     if _unsupported_sample_equality(text,selected):
         raise ReplyValidationError('unsupported_metric')
@@ -980,7 +1026,10 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
                 raise ReplyValidationError('unsupported_metric')
         allowed = set().union(*(_numbers(f.get('text', '')) | {float(n) for n in f.get('values', []) if _finite(n)}
                                for f in candidates)) if candidates else set()
+        correction_span = _retired_line_correction_span(normalized, candidates, question)
         for match in _NUMBER.finditer(normalized):
+            if match.span() == correction_span:
+                continue
             value = float(match.group())
             if value not in allowed:
                 raise ReplyValidationError('unsupported_number')
@@ -1038,13 +1087,58 @@ def _unsupported_probability(text, cards):
     return not any(c.get('kind') == 'calibrated_probability' and c.get('verified_calibration') is True for c in cards)
 
 
+def _unsupported_research_stability(text, cards):
+    """A reference level and workload mean do not measure player stability."""
+    research = {card.get('entity') for card in cards if card.get('kind') == 'research_projection'}
+    research.discard(None)
+    if not research:
+        return False
+    entities, active = _entities(cards), set()
+    facts = [fact for card in cards for fact in _card_facts(card)]
+    production = r'(?:production|output|performance|workload|minutes|role|volume|baseline)(?:\s+level)?'
+    stability = re.compile(
+        r'\b(?:consistent|steady|stable|reliable)\s+(?:(?:scoring|statistical|recent|current|historical)\s+)?' + production + r'\b|'
+        r'\b' + production + r'\s+(?:is|has been|looks|appears|remains)\s+(?:consistent|steady|stable|reliable)\b|'
+        r'\b(?:shows?|indicates?|reflects?|demonstrates?|establishes?|proves?|confirms?|suggests?|implies)'
+        r'[^.;]{0,50}\b(?:consistency|stability)\b', re.I)
+    current = re.compile(r'\b(?:under|in|reflects?|describes?|captures?|represents?|based on)\s+'
+                         r'(?:the\s+)?current\s+(?:conditions|role|workload|minutes|lineup)\b', re.I)
+    for clause in re.split(r'(?<=[.!?;])\s+|\b(?:whereas|while|and|but)\b', text):
+        mentioned = _entity_mentions(clause, entities)
+        if mentioned:
+            active = mentioned
+        subjects = mentioned or active or research
+        if not subjects & research:
+            continue
+        candidates = [fact for fact in facts if fact.get('entity') in subjects & research]
+        for kind, pattern in (('stability', stability), ('current_conditions', current)):
+            for match in pattern.finditer(clause):
+                prefix, suffix = clause[:match.start()], clause[match.end():]
+                # Keep uncertainty and mechanisms discussable; a later risk
+                # sentence does not undo an earlier empirical stability claim.
+                if re.search(r'\b(?:if|assuming|could|may|might|would|not|no|never|unknown|unclear|unconfirmed|'
+                             r'cannot|can[’\x27]t|don[’\x27]t|doesn[’\x27]t)\b', prefix, re.I):
+                    continue
+                if re.match(r'\s+(?:is|are|has been)\s+(?:not|never|unconfirmed|unknown)\b', suffix, re.I):
+                    continue
+                if kind == 'stability':
+                    supported = any(fact.get('fact_type') in {'stability', 'dispersion', 'workload_stability'}
+                                    for fact in candidates)
+                else:
+                    supported = any(fact.get('fact_type') == 'current_conditions' and
+                                    fact.get('verified_current') is True for fact in candidates)
+                if not supported:
+                    return True
+    return False
+
+
 def _unsupported_recommendation(text, cards):
     # Formatting must not change whether a recommendation contradicts the
     # computed assessment (for example, "lean toward **down**").
     text = re.sub(r'[*_`]+', '', text)
     decisions_by_entity = {}
     for card in cards:
-        if (str(card.get('kind','')).startswith('prop_') or card.get('kind')=='research_projection') and card.get('decision') in {'more','less','pass'}:
+        if (str(card.get('kind','')).startswith('prop_') or card.get('kind') in {'research_projection','research_unavailable'}) and card.get('decision') in {'more','less','pass'}:
             decisions_by_entity.setdefault(card.get('entity'),set()).add(card['decision'])
     if not decisions_by_entity:
         return False
@@ -1220,6 +1314,8 @@ def render_natural_reply(document, cards, required=(), question=''):
         raise ReplyValidationError('unsupported_availability')
     if _unsupported_certainty(text) or _unsupported_probability(text, selected):
         raise ReplyValidationError('unsupported_certainty')
+    if _unsupported_research_stability(text, cards):
+        raise ReplyValidationError('unsupported_metric')
     if _unsupported_recommendation(text, cards):
         raise ReplyValidationError('unsupported_recommendation')
     footer = _natural_footer(selected)

@@ -8,6 +8,7 @@ from unittest.mock import patch
 from feeds import canonical_game, canonical_player
 from master import MasterStore
 from research_discussion import build_research_discussion
+from test_pregame_discussion import record_fixture_refresh
 
 NOW = dt.datetime(2026, 11, 2, 21, tzinfo=dt.timezone.utc)
 
@@ -31,6 +32,7 @@ class ResearchDiscussionTests(unittest.TestCase):
                     'appearance_state': 'Played', 'minutes': 32 + i % 3,
                     'pts': 22 + i % 4, 'reb': 6 + i % 2, 'ast': 4 + i % 2, 'tpm': 2,
                     'source': 'test observations'})
+        record_fixture_refresh(self.master)
         self.picks = [{'player': 'Jalen Brunson', 'stat': 'pts', 'line_kind': 'research_target'},
                       {'player': 'Julius Randle', 'stat': 'reb', 'line_kind': 'research_target'}]
 

@@ -8,11 +8,12 @@ from __future__ import annotations
 import datetime as dt
 import json
 import math
+import re
 import statistics
 from zoneinfo import ZoneInfo
 
-from feeds import canonical_player
-from master import STAT_COMPONENTS
+from feeds import canonical_game, canonical_player, canonical_team
+from master import STAT_COMPONENTS, normalized_name
 from news_digest import _aware, material_categories
 from season_calendar import calendar_context
 
@@ -34,6 +35,104 @@ def _weighted(values):
     return sum(v*w for v,w in zip(values,weights))/sum(weights)
 
 
+def _nonnegative(value):
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) and number >= 0 else None
+
+
+def _comparable_observations(store, player, player_id, team, cutoff, components):
+    """Resolve exact-name ID aliases and count one agreeing observation per game.
+
+    Provider IDs are lookup keys, not proof of identity. Keep complete aliases
+    together before imposing the game window so a duplicate cannot inflate the
+    sample or hide a conflicting value just beyond a row limit.
+    """
+    quality = {'duplicate_rows': 0, 'conflicting_games': 0, 'incomplete_games': 0,
+               'invalid_event_rows': 0, 'invalid_season_rows': 0}
+    with store.connect() as db:
+        names = [dict(row) for row in db.execute(
+            'SELECT DISTINCT player,player_id FROM player_games WHERE date<?', (cutoff,))
+            if normalized_name(row['player']) == normalized_name(player)]
+        if not names:
+            return [], quality
+        identities = {row['player_id'] for row in names if row['player_id']}
+        identities.update(value for value in (player_id, canonical_player(player)) if value)
+        exact_names = {row['player'] for row in names}
+        filters = ['p.player_id IN (' + ','.join('?' for _ in identities) + ')',
+                   'p.player IN (' + ','.join('?' for _ in exact_names) + ')',
+                   'p.date<?', 'g.date=p.date', "g.status='final'",
+                   "LOWER(p.appearance_state)='played'", "p.season_type='Regular Season'"]
+        args = [*sorted(identities), *sorted(exact_names), cutoff]
+        if team:
+            filters.append('p.team=?')
+            args.append(team)
+        rows = [dict(row) for row in db.execute(
+            'WITH eligible AS (SELECT p.*,g.home_team,g.away_team FROM player_games p '
+            'JOIN games g ON g.id=p.game_id WHERE ' + ' AND '.join(filters) + '), '
+            'recent_games AS (SELECT game_id,MAX(date) AS game_date FROM eligible GROUP BY game_id '
+            'ORDER BY game_date DESC,game_id DESC LIMIT 100) '
+            'SELECT e.* FROM eligible e JOIN recent_games r ON r.game_id=e.game_id '
+            'ORDER BY e.date DESC,e.game_id DESC,e.updated_at DESC,e.player_id', args)]
+    groups = {}
+    for original in rows:
+        row = dict(original)
+        try:
+            game_day = dt.date.fromisoformat(row['date'])
+        except (TypeError, ValueError):
+            quality['invalid_event_rows'] += 1
+            continue
+        home, away, actual_team = (canonical_team(row.get(field))
+                                   for field in ('home_team', 'away_team', 'team'))
+        actual_opponent = away if actual_team == home else home if actual_team == away else None
+        stated_opponent = canonical_team(row.get('opponent'))
+        if (not home or not away or home == away or not actual_opponent or
+                (stated_opponent and stated_opponent != actual_opponent)):
+            quality['invalid_event_rows'] += 1
+            continue
+        season = re.fullmatch(r'(\d{4})-(\d{2})', str(row.get('season') or ''))
+        if (not season or int(season[2]) != (int(season[1]) + 1) % 100 or
+                game_day.year not in {int(season[1]), int(season[1]) + 1}):
+            quality['invalid_season_rows'] += 1
+            continue
+        # The joined final game supplies its actual opponent when an imported
+        # player alias omits that field. This is an event identity, not a guess.
+        row['team'], row['opponent'] = actual_team, actual_opponent
+        key = (canonical_game(row['date'], home, away), normalized_name(player))
+        groups.setdefault(key, []).append(row)
+    valid = []
+    for aliases in groups.values():
+        quality['duplicate_rows'] += max(0, len(aliases) - 1)
+        observed = [{field: _nonnegative(row.get(field)) for field in (*components, 'minutes')}
+                    for row in aliases]
+        # Known partial values also participate in conflict detection. Missing
+        # data may be filled by a complete alias; a contradictory value may not.
+        if any(len({value[field] for value in observed if value[field] is not None}) > 1
+               for field in (*components, 'minutes')) or len({row['season'] for row in aliases}) > 1:
+            quality['conflicting_games'] += 1
+            continue
+        complete = [(row, values) for row, values in zip(aliases, observed)
+                    if values['minutes'] is not None and values['minutes'] > 0 and
+                    all(values[field] is not None for field in components)]
+        if not complete:
+            quality['incomplete_games'] += 1
+            continue
+        original, values = next(((row, values) for row, values in complete if row.get('source')), complete[0])
+        row = {**original, **values}
+        # Shot volume is an optional explanatory statistic. Conflicting aliases
+        # must not let an arbitrary FGA value leak into that explanation.
+        volume = {_nonnegative(alias.get('fga')) for alias in aliases} - {None}
+        row['fga'] = next(iter(volume)) if len(volume) == 1 else None
+        valid.append(row)
+        if len(valid) == 40:
+            break
+    return valid, quality
+
+
 def projection_for_leg(store,leg,now):
     components=STAT_COMPONENTS.get(leg.get('stat'))
     date=str(leg.get('date') or '')[:10]
@@ -42,20 +141,11 @@ def projection_for_leg(store,leg,now):
     today=now.astimezone(ZoneInfo('America/New_York')).date().isoformat()
     cutoff=min(date,today)
     player=leg['player'];team=leg.get('team');player_id=leg.get('player_id') or canonical_player(player)
-    filters=['p.player_id=?','p.date<?',"g.status='final'","LOWER(p.appearance_state)='played'",
-             "p.season_type='Regular Season'"]
-    args=[player_id,cutoff]
-    if team:
-        filters.append('p.team=?');args.append(team)
-    with store.connect() as db:
-        rows=[dict(r) for r in db.execute('SELECT p.*,g.home_team,g.away_team FROM player_games p '
-            'JOIN games g ON g.id=p.game_id WHERE '+' AND '.join(filters)+' ORDER BY p.date DESC LIMIT 100',args)]
-    valid=[r for r in rows if r.get('minutes') is not None and r['minutes']>0
-           and all(r.get(key) is not None for key in components)]
-    valid=valid[:40]
+    valid, quality = _comparable_observations(store, player, player_id, team, cutoff, components)
     if len(valid)<8:
         return {'available':False,'reason':'Fewer than eight comparable regular-season observations have both minutes and the requested statistic.',
-                'observations':len(valid),'missing_policy':'No missing minutes/statistic is imputed.'}
+                'observations':len(valid),'sample_quality':quality,
+                'missing_policy':'No missing minutes/statistic is imputed; conflicting duplicate games are excluded.'}
     recent=valid[:20];last5=valid[:5]
     rates=[sum(float(r[k]) for k in components)/r['minutes'] for r in recent]
     minutes=_weighted([r['minutes'] for r in last5])
@@ -66,6 +156,8 @@ def projection_for_leg(store,leg,now):
              f'Recency-weighted production per minute uses {len(recent)} observations; other seasons/phases are not silently combined as one current-season average.']
     limitations=['Experimental scenario model; no calibrated win probability or validated betting advantage.',
                  'Overall team pace, current coaching assignments and unreported availability are not inferred from a partial player subset.']
+    if quality['conflicting_games']:
+        limitations.append('Conflicting duplicate game statistics or minutes were excluded from this projection.')
     factor=1.0;signals=[];cohorts=[]
     if opponent:
         matched=[r for r in valid if r.get('opponent')==opponent]
@@ -143,7 +235,7 @@ def projection_for_leg(store,leg,now):
     confidence='moderate experimental' if len(recent)>=15 and sample_lag<=7 and not source_news else 'low'
     aggressive=bool(edge is not None and edge>0 and standardized is not None and standardized>=.15 and signals
                     and high-low>max(1,.15*expected) and not source_news and sample_lag<=7)
-    return {'available':True,'method':'contextual-scenarios-v2','reference_projection':round(expected,2),
+    return {'available':True,'method':'contextual-scenarios-v2','sample_quality':quality,'reference_projection':round(expected,2),
             'projected_minutes':round(minutes,2),'per_minute_baseline':round(baseline_rate,4),
             'minutes_scenarios':{'lower_workload':round(low,2),'reference':round(expected,2),'higher_workload':round(high,2)},
             'empirical_scenario_range':{'p10':round(_quantile(scenario_values,.1),2),'p90':round(_quantile(scenario_values,.9),2),

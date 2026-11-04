@@ -527,6 +527,7 @@ async def lifespan(application):
     state.board_news_lock = asyncio.Lock()
     state.board_news_attempt = 0.0
     async def refresh_board_news():
+        await refresh_pregame_schedule(state.master)
         # Photos in an album share one refresh. The normal collector already
         # polls frequently, so a recently successful collection is reused.
         from news_digest import _aware
@@ -848,6 +849,7 @@ async def generated_evidence_reply(request, progress, master, cards, *, natural=
             'guarding direction does not establish who defends whom. '
             'A lean is a cautious interpretation, not a guaranteed result or calibrated probability. '
             'Averages and historical hit counts alone do not prove a betting advantage. '
+            'An experimental projection does not establish consistent production or current playing conditions. '
             'Explain unmeasured mechanisms such as blowout minutes conditionally. Do not invent '
             'defenders, injuries, current availability, bookmaker offers, or expected payouts. '
             'Use only the most relevant facts. Do not name internal evidence IDs, list every source, '
@@ -1076,6 +1078,15 @@ async def finish_retrieved_reply(request,progress,master,cards):
     return result if result is not None else unverified_reply(cards,required_evidence(request.message,cards))
 
 
+async def refresh_pregame_schedule(master):
+    """Refresh current event status without asking the language model or grading."""
+    worker = getattr(app.state, 'worker', None)
+    if master is None or master is not getattr(app.state, 'master', None) or worker is None:
+        return
+    from game_schedule_check import refresh_game_schedule
+    await refresh_game_schedule(master, worker)
+
+
 async def answer_question(store, request, progress, master=None):
     from basketball_research import (resolve_question, canonical_history,
                                      answer_assignment_question, research_context, ScopedNewsStore)
@@ -1088,6 +1099,9 @@ async def answer_question(store, request, progress, master=None):
         from conversation import resolve_conversation
         from chat_flow import answer_conversation
         conversation_turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history)
+        if (not conversation_turn.get('clarification') and
+                (conversation_turn.get('complete_prop') or conversation_turn.get('recent_picks'))):
+            await refresh_pregame_schedule(master)
         conversational = await answer_conversation(store, master, request, progress, generated_evidence_reply,
                                                    turn=conversation_turn)
         if conversational is not None:

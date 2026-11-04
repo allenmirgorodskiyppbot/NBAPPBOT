@@ -10,6 +10,7 @@ from feeds import canonical_team
 from independent_picks import _select_game, _targets
 from master import normalized_name
 from pick_discussion import EASTERN, _now, normalize_stat
+from pregame_freshness import assess_pregame_freshness
 
 
 def _finite(value):
@@ -63,8 +64,19 @@ def _card(item, index):
             **({'decision': 'pass'} if item['status'] == 'held' else {})}
 
 
+def _held_card(item, index, date):
+    """A failed leg stays visible alongside the legs we can still explain."""
+    text = f"{item['player']}: Hold. {item['reason']} No current offer or recommendation is verified."
+    fact = {'text': text, 'entity': item['player'], 'fact_type': 'context', 'values': [],
+            'scope': f'Research discussion for {date}; unavailable source evidence'}
+    return {'id': f'R{index}', 'kind': 'research_unavailable', 'entity': item['player'],
+            'text': text, 'approved_facts': [fact], 'decision': 'pass',
+            'source': 'Saved research input checks', 'data_through_date': None,
+            'line_kind': 'research_target', 'offer_verified': False, 'research_only': True}
+
+
 def build_research_discussion(store, picks, slots=None, now=None):
-    """Recompute explanation evidence for supplied identities, at most four.
+    """Recompute explanation evidence for supplied identities, at most six.
 
     Never uses an old model's numerical prose as evidence, selects new players,
     saves a board, or upgrades a conditional target to a verified offered line.
@@ -80,6 +92,15 @@ def build_research_discussion(store, picks, slots=None, now=None):
     picks = [dict(pick) for pick in (picks or []) if isinstance(pick, dict)]
     if slots.get('player'):
         picks = [pick for pick in picks if normalized_name(pick.get('player')) == normalized_name(slots['player'])]
+        if slots.get('stat'):
+            stat = normalize_stat(slots['stat'])
+            picks = [pick for pick in picks if stat and normalize_stat(pick.get('stat')) == stat]
+    if slots.get('season_type') not in (None, '', 'Regular Season'):
+        result['fallback_answer'] = 'This research model uses regular-season observations; it cannot silently substitute those for the requested season phase.'
+        return result
+    if slots.get('date') and slots.get('game_date') and str(slots['date']) != str(slots['game_date']):
+        result['fallback_answer'] = 'The supplied game dates conflict; which date should I explain?'
+        return result
     explicit_date = slots.get('game_date') or slots.get('date')
     saved_dates = {str(pick.get('date') or pick.get('game_date')) for pick in picks
                    if pick.get('date') or pick.get('game_date')}
@@ -105,10 +126,14 @@ def build_research_discussion(store, picks, slots=None, now=None):
         if not name or key in seen:
             continue
         seen.add(key)
-        if len(seen) > 4:
-            break
+        if len(seen) > 6:
+            result['held'].append({'player': name, 'reason': 'Only six selections can be recomputed in one discussion.'})
+            continue
         if not stat:
             result['held'].append({'player': name, 'reason': 'The full statistic is missing or unsupported.'})
+            continue
+        if pick.get('season_type') not in (None, '', 'Regular Season'):
+            result['held'].append({'player': name, 'reason': 'This research model supports regular-season observations only.'})
             continue
         player = _latest_player(store, name, cutoff)
         if not player:
@@ -152,18 +177,23 @@ def build_research_discussion(store, picks, slots=None, now=None):
             result['held'].append({'player': name, 'reason': 'The projection or source dates could not be validated.'})
             continue
         availability = player_availability(store.recent_news(150), player['player'], day.isoformat(), now)
-        cautions = []
+        readiness = assess_pregame_freshness(store, day.isoformat(), team, now, player=player['player'], stat=stat)
+        cautions = ([] if readiness.get('ready') else
+                    readiness.get('reasons') or ['Current game-data readiness is unverified.'])
+        cautions = list(cautions)
         if age > 7:
             cautions.append('The observations are more than seven days behind the requested game.')
         source_games = projection.get('source_games') or []
         if not source_games or any(not item.get('source') for item in source_games):
             cautions.append('Source provenance is incomplete.')
         if availability.get('blocked') or availability.get('note'):
-            cautions.append(availability.get('note') or 'Availability requires checking.')
+            # A stale feed must not hide a current out/minutes report when the
+            # compact card has room for only the most important hold reason.
+            cautions.insert(0, availability.get('note') or 'Availability requires checking.')
         item = {'player': player['player'], 'stat': stat, 'team': team, 'opponent': opponent,
                 'date': day.isoformat(), 'status': 'held' if cautions else 'research_only',
                 'projection': projection, 'targets': targets, 'line_kind': 'research_target',
-                'offer_verified': False, 'cautions': cautions,
+                'offer_verified': False, 'cautions': cautions, 'data_readiness': readiness,
                 'reason': ('The shortlist used recorded workload and production per minute, with only supported '
                            'opponent/rest adjustments. Its buffered targets are conditional research thresholds.'),
                 'supporting_reasons': projection.get('supporting_reasons', [])[:3]}
@@ -171,6 +201,12 @@ def build_research_discussion(store, picks, slots=None, now=None):
         result['cards'].append(_card(item, len(result['cards']) + 1))
         result['sources'].extend(item['source'] for item in source_games if item.get('source'))
     result['sources'] = list(dict.fromkeys(result['sources']))
+    if result['assessments']:
+        # If every leg failed, the caller uses the full deterministic fallback.
+        # With mixed outcomes, also give the model the missing players' reasons
+        # so a successful first card cannot hide an incomplete shortlist.
+        for item in result['held']:
+            result['cards'].append(_held_card(item, len(result['cards']) + 1, day.isoformat()))
     result['evidence_cards'] = result['cards']
     if result['assessments']:
         explanations = []
@@ -181,6 +217,7 @@ def build_research_discussion(store, picks, slots=None, now=None):
                 f"through {p['last_date']}." + (' ' + item['cautions'][0] if item['cautions'] else ''))
         result['fallback_answer'] = ('These were research targets, not confirmed PrizePicks offers.\n'
             + '\n'.join(explanations)
+            + ''.join(f"\n{item['player']}: Hold. {item['reason']}" for item in result['held'])
             + '\nThe reference combines observed production and workload; actual lines, current availability and payout still need checking.')
     else:
         reasons = '; '.join(f"{item['player']}: {item['reason']}" for item in result['held'][:2])

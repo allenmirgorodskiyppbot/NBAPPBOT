@@ -6,6 +6,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 from feeds import canonical_game, canonical_team, TEAM_WORDS
@@ -14,6 +15,46 @@ from news_digest import _aware
 
 EASTERN=ZoneInfo('America/New_York')
 DEFAULT_BASE='https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/main/data/live'
+
+
+def _daily_check(store, day, now, *, error=None):
+    """A recent fetch check never overwrites the original imported coverage."""
+    prior=store.get_checkpoint('daily_nba:'+day,{})
+    checked={**prior,'date':day,'last_checked_at':now.isoformat(),
+             'last_refresh_status':'failed' if error else 'success',
+             'last_refresh_error':error}
+    # A failed first check is an attempt record, not a fabricated empty game day.
+    if not prior:
+        checked['complete']=False
+    store.set_checkpoint('daily_nba:'+day,checked)
+    return checked
+
+
+def _pregame_recheck_days(store, imported, target, now):
+    """Relevant last-game publications fit beside the target in one small batch."""
+    complete={r['date']:r for r in imported if r.get('complete') is True
+              and isinstance(r.get('date'),str) and r['date']<=target}
+    with store.connect() as db:
+        upcoming=[dict(row) for row in db.execute("SELECT * FROM season_schedule WHERE date>=? "
+                  "AND (home_team='NYK' OR away_team='NYK')",(now.astimezone(EASTERN).date().isoformat(),))]
+        upcoming=[row for row in upcoming if row.get('status')=='scheduled'
+                  and _aware(row.get('start_time')) and _aware(row['start_time'])>now]
+        game=min(upcoming,key=lambda row:_aware(row['start_time']),default=None)
+        teams={game['home_team'],game['away_team']} if game else set()
+        relevant=[]
+        for team in sorted(teams):
+            dates=[day for day,report in complete.items() if report.get('team_final_game_ids',{}).get(team)]
+            # Older imported checkpoints predate explicit inventory metadata.
+            # Use only their known final source games; this is not proof of a
+            # complete independent schedule or permission to invent an off day.
+            dates.extend(row[0] for row in db.execute('SELECT DISTINCT date FROM games '
+                "WHERE status='final' AND date<=? AND (home_team=? OR away_team=?)",(target,team,team))
+                if row[0] in complete)
+            if dates:relevant.append(max(dates))
+    nonempty=[day for day,report in complete.items() if report.get('final_game_ids') or report.get('games',0)>0]
+    if nonempty:relevant.append(max(nonempty))
+    elif complete:relevant.append(max(complete))
+    return list(dict.fromkeys(day for day in relevant if day!=target))
 
 
 def import_daily_snapshot(store, document, day, now):
@@ -76,13 +117,37 @@ def import_daily_snapshot(store, document, day, now):
               and not document.get('pending_game_ids') and not document.get('errors'))
     if bool(document.get('complete'))!=complete:
         raise ValueError('Daily NBA completeness claim does not match its records.')
+    inventory={'inventory_verified':False}
+    if document.get('inventory_verified') is True:
+        verified_at=_aware(document.get('inventory_verified_at'))
+        source=urlparse(str(document.get('inventory_verification_source') or ''))
+        ids=document.get('inventory_game_ids')
+        if (not complete or not verified_at or verified_at>now+dt.timedelta(minutes=5)
+                or source.scheme!='https' or not source.hostname or source.username or source.password
+                or not isinstance(ids,list) or not all(isinstance(value,str) for value in ids)
+                or len(ids)!=expected or len(set(ids))!=len(ids) or set(ids)!=seen
+                or expected==0 and document.get('inventory_off_day_verified') is not True):
+            raise ValueError('Independent NBA inventory verification does not match this completed day.')
+        inventory={'inventory_verified':True,'inventory_verified_at':verified_at.isoformat(),
+                   'inventory_verification_source':source.geturl(),'inventory_game_ids':sorted(ids),
+                   'inventory_off_day_verified':bool(expected==0)}
     digest=hashlib.sha256(json.dumps(document,sort_keys=True,default=str).encode()).hexdigest()
     prior=store.get_checkpoint('daily_nba:'+day,{})
     if prior.get('sha256')==digest:
-        return {**prior,'unchanged':True}
+        checked=_daily_check(store,day,now)
+        # Backfill inventory metadata for unchanged legacy snapshots after the
+        # complete source document has passed the validation above.
+        final_games=[g for g in games if g['status']=='final']
+        checked.update(final_game_ids=sorted(g['id'] for g in final_games),
+                       team_final_game_ids={team:sorted(g['id'] for g in final_games
+                             if team in {g['home_team'],g['away_team']})
+                             for team in sorted({t for g in final_games for t in (g['home_team'],g['away_team'])})},**inventory)
+        store.set_checkpoint('daily_nba:'+day,checked)
+        return {**checked,'unchanged':True}
     prior_publication=_aware(prior.get('publisher_retrieved_at'))
     if prior_publication and published<prior_publication:
-        return {**prior,'unchanged':True,'ignored_older_publication':True}
+        checked=_daily_check(store,day,now,error='OlderPublicationIgnored')
+        return {**checked,'unchanged':True,'ignored_older_publication':True}
     count=0
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
@@ -99,10 +164,16 @@ def import_daily_snapshot(store, document, day, now):
                     continue
                 count+=bool(store.upsert_player_game(row,db=db))
             store.upsert_game(game,db=db)
+        final_games=[g for g in games if g['status']=='final']
         record={'date':day,'complete':complete,'games':len(games),'expected_games':expected,
                 'player_rows':len(rows),'changed_player_rows':count,'source':document['source'],
                 'inventory_scope':document.get('inventory_scope','published snapshot inventory; full league schedule not independently verified'),
-                'publisher_retrieved_at':published.isoformat(),'imported_at':now.isoformat(),'sha256':digest}
+                'publisher_retrieved_at':published.isoformat(),'imported_at':now.isoformat(),'sha256':digest,
+                'last_checked_at':now.isoformat(),'last_refresh_status':'success','last_refresh_error':None,
+                'final_game_ids':sorted(g['id'] for g in final_games),
+                'team_final_game_ids':{team:sorted(g['id'] for g in final_games
+                    if team in {g['home_team'],g['away_team']})
+                    for team in sorted({t for g in final_games for t in (g['home_team'],g['away_team'])})},**inventory}
         db.execute('INSERT INTO checkpoints VALUES (?,?) ON CONFLICT(name) DO UPDATE SET value_json=excluded.value_json',
                    ('daily_nba:'+day,json.dumps(record)))
     return record
@@ -126,6 +197,10 @@ class NightlyNBARefresh:
             target_day=today-dt.timedelta(days=1 if local>=deadline else 2)
             target=target_day.isoformat()
             status=self.store.get_checkpoint('nightly_nba_refresh',{})
+            # Event timing is independent of the morning statistics deadline.
+            # The helper has its own cache, timeout and source refusal cooldown.
+            from game_schedule_check import refresh_game_schedule
+            await refresh_game_schedule(self.store,self.worker,now=now)
             if not self.enabled:
                 self.store.set_checkpoint('nightly_nba_refresh',{'enabled':False});return
             if not self.store.get_checkpoint('dataset_refresh_scope'):
@@ -154,6 +229,11 @@ class NightlyNBARefresh:
             elif local>=deadline and not self.store.get_checkpoint('daily_nba:'+target,{}).get('complete'):
                 pending=[target,*pending]
             last=_aware(status.get('last_attempt'))
+            # A completed target can receive scorer corrections or additional
+            # published inventory later in the day. Recheck it hourly instead
+            # of stopping game imports until tomorrow's new target is due.
+            if local>=deadline and (not last or (now-last).total_seconds()>=3600):
+                pending=[target,*pending]
             # Repair legacy status that may have borrowed the tracking/source
             # file's newest date even though that game day was never imported.
             with self.store.connect() as db:
@@ -161,6 +241,22 @@ class NightlyNBARefresh:
                     "SELECT value_json FROM checkpoints WHERE name LIKE 'daily_nba:%'")]
             through=max((r['date'] for r in imported if r.get('complete') is True
                          and isinstance(r.get('date'),str) and r['date']<=target),default=None)
+            if pending:
+                # Verified off days have no player rows. Also check each upcoming
+                # team's last actual game today. Once checked, let older pending
+                # imports advance instead of starving them behind routine rechecks.
+                recheck_days=_pregame_recheck_days(self.store,imported,target,now)
+                reports={r.get('date'):r for r in imported}
+                needs_today=[]
+                for day in recheck_days:
+                    report=reports.get(day,{})
+                    checked=_aware(report.get('last_checked_at'))
+                    # Failed checks stay in the durable queue and rotate with
+                    # other failures; repeatedly failing sources cannot consume
+                    # all remaining batch slots ahead of untouched dates.
+                    if not checked or checked.astimezone(EASTERN).date()!=today:
+                        needs_today.append(day)
+                pending=list(dict.fromkeys([target,*needs_today,*pending,*recheck_days]))
             game_attempt=bool(pending and (due or not last or (now-last).total_seconds()>=3600))
             tracking_last=_aware(status.get('last_tracking_attempt'))
             tracking_attempt=bool((local>=deadline or game_attempt) and
@@ -174,7 +270,11 @@ class NightlyNBARefresh:
                     try:
                         document=await self.worker.request(self.base+'/'+day+'.json')
                         report=await asyncio.to_thread(import_daily_snapshot,self.store,document,day,now)
-                        if report['complete']:
+                        if report.get('ignored_older_publication'):
+                            pending.append(day)
+                            self.store.feed_failure('nba_daily_refresh','Older publication ignored for '+day+
+                                '; prior verified values retained; hourly retry is automatic.')
+                        elif report['complete']:
                             # Only this validated date was imported. The upstream
                             # file may also contain later games or tracking data.
                             through=max(str(through or ''),day)
@@ -185,6 +285,8 @@ class NightlyNBARefresh:
                     except Exception as error:
                         pending.append(day)
                         code=getattr(getattr(error,'response',None),'status_code',None)
+                        check_error=type(error).__name__+(f': HTTP {code}' if code else '')
+                        await asyncio.to_thread(_daily_check,self.store,day,now,error=check_error)
                         self.store.feed_failure('nba_daily_refresh',type(error).__name__+(f': HTTP {code}' if code else '')+
                             '; previous-day data not available for '+day+'. Prior verified values retained; hourly retry is automatic.')
                 status['last_attempt']=now.isoformat()
@@ -223,12 +325,20 @@ class NightlyNBARefresh:
                     detail+=f' {len(older_pending)} older dates remain pending; hourly catch-up is automatic. See pending_dates.'
                 self.store.feed_success('nba_daily_refresh',detail)
             next_run=deadline if local<deadline else dt.datetime.combine(today+dt.timedelta(days=1),dt.time(11,30),EASTERN)
+            target_inventory=self.store.get_checkpoint('daily_nba:'+target,{})
+            inventory_verified=target_inventory.get('inventory_verified') is True
             status.update(enabled=True,phase='waiting_for_publication' if waiting else 'updated',timezone='America/New_York',
                           daily_time='11:30',target_game_date=target,next_daily_run=next_run.isoformat(),
                           pending_dates=pending,source_data_through_date=through,retry_seconds=3600,
                           older_pending_dates=[day for day in pending if day<target],
                           game_refresh_phase='waiting_for_publication' if waiting else 'updated',
-                          completeness_scope='Published game inventory processed; all NBA games and every tracking metric are not independently verified by this status.',
+                          completed_day_recheck_seconds=3600,
+                          target_inventory_verified=inventory_verified,
+                          target_inventory_checked_at=target_inventory.get('inventory_verified_at'),
+                          target_inventory_source=target_inventory.get('inventory_verification_source'),
+                          completeness_scope=('Independent day inventory matched; player rows are limited to existing workbook entities. '
+                              'Every tracking metric is not verified by this status.' if inventory_verified else
+                              'Published game inventory processed; all NBA games and every tracking metric are not independently verified by this status.'),
                           tracking_retry_seconds=3600,
                           source='Independently published public NBA extracts; existing workbook entities only',
                           note='Game refresh status covers imported game observations only. Tracking metrics and tentative assignments have separate coverage and source dates; rebuilding Excel does not make every field current.')

@@ -22,6 +22,61 @@ from nba_cdn import SCHEDULE_URL, BOX_URL, parse_game as nba_game, parse_players
 EASTERN=ZoneInfo('America/New_York')
 
 
+def verified_day_inventory(document, day, checked_at):
+    """Validate an independent day inventory, including explicit calendar offdays."""
+    day = dt.date.fromisoformat(day).isoformat()
+    leagues = document.get('leagues')
+    if not isinstance(leagues, list):
+        raise ValueError('Independent NBA calendar is unavailable.')
+    league = next((x for x in leagues if isinstance(x, dict) and x.get('abbreviation') == 'NBA'), None)
+    if not league or not isinstance(document.get('events'), list):
+        raise ValueError('Independent NBA event inventory is unavailable.')
+    def local_day(value):
+        instant = dt.datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        if instant.tzinfo is None:
+            raise ValueError('Independent calendar date needs a timezone.')
+        return instant.astimezone(EASTERN).date().isoformat()
+    start, end = local_day(league.get('calendarStartDate')), local_day(league.get('calendarEndDate'))
+    if not start <= day <= end or day >= checked_at.astimezone(EASTERN).date().isoformat():
+        raise ValueError('Daily inventory must be a completed calendar date inside the current NBA calendar.')
+    calendar = league.get('calendar')
+    if not isinstance(calendar, list) or not calendar:
+        raise ValueError('Independent calendar does not establish scheduled dates.')
+    scheduled_days = {local_day(value) for value in calendar}
+    games = [parse_game(raw) for raw in document['events']]
+    if len(games) > 30 or len({g['id'] for g in games}) != len(games) or any(g['date'] != day for g in games):
+        raise ValueError('Independent event identities do not match the requested date.')
+    if not games and day in scheduled_days:
+        raise ValueError('Empty scoreboard conflicts with a scheduled game date.')
+    return {'inventory_verified':True, 'inventory_verified_at':checked_at.isoformat(),
+            'inventory_verification_source':ESPN+'scoreboard?dates='+day.replace('-',''),
+            'inventory_game_ids':sorted(g['id'] for g in games),
+            'inventory_off_day_verified':not games and day not in scheduled_days,
+            'inventory_scope':'Independent ESPN NBA day inventory; existing workbook player rows only',
+            'games':games}
+
+
+def reconcile_day_inventory(snapshot, inventory, day, scope):
+    """Match published game identities to an independent schedule without inventing rows."""
+    metadata = {k:v for k,v in inventory.items() if k != 'games'}
+    if snapshot is None:
+        if not inventory.get('inventory_off_day_verified'):
+            return None
+        return {'schema_version':1, 'date':day, 'source':'espn',
+                'published_at':inventory['inventory_verified_at'], 'expected_games':0,
+                'games':[], 'player_games':[], 'pending_game_ids':[], 'errors':[], 'complete':True,
+                'scope_revision':scope['revision'], 'upstream_full_game_validated':True, **metadata}
+    expected = {g['id']:g for g in inventory['games']}
+    actual = {g['id']:g for g in snapshot.get('games', [])}
+    if (set(actual) != set(expected) or snapshot.get('expected_games') != len(expected)
+            or any(actual[key].get('status') != expected[key].get('status') for key in actual)):
+        # An incomplete extract still has useful historical observations; it
+        # cannot acquire independent full-day coverage just because it is new.
+        return {**snapshot, 'inventory_verified':False,
+                'inventory_verification_error':'Published games do not match the independent day inventory.'}
+    return {**snapshot, **metadata}
+
+
 def validate_final(game, rows):
     from feeds import canonical_player
     if game.get('status')!='final':
@@ -100,6 +155,10 @@ class PublicCollector:
             raise ValueError('Scoreboard event date differs from the requested day.')
         return await self.boxes(day,games,'espn')
 
+    async def inventory(self, day):
+        document = await self.request(ESPN+'scoreboard?dates='+day.replace('-',''))
+        return verified_day_inventory(document, day, self.now)
+
     async def boxes(self,day,games,source):
         published=[]; observations=[]; pending=[]; errors=[]
         for game in games:
@@ -161,16 +220,21 @@ async def main_async(args):
         for offset in range(args.days-1,-1,-1):
             day=(today-dt.timedelta(days=offset)).isoformat()
             path=output/(day+'.json')
-            old=json.loads(path.read_text()) if path.exists() else {}
-            # Retry incomplete games and revisit the last two completed days for
-            # stat corrections. Older complete snapshots avoid repeated requests.
-            if old.get('complete') and offset>2:
-                continue
+            # The mirror loads one season extract per run. Revisit this bounded
+            # window for corrections and current inventory checks, including
+            # teams whose most recent game preceded a multi-day rest interval.
             try:
                 result=await mirror.day(day)
             except Exception as error:
                 print('Published data source:',type(error).__name__,flush=True)
                 result=None
+            try:
+                inventory = await collector.inventory(day)
+                result = reconcile_day_inventory(result, inventory, day, mirror.scope)
+            except Exception as error:
+                # A refused or incomplete inventory source cannot establish an
+                # offday or turn a published subset into verified full coverage.
+                print(day, 'independent inventory unavailable:', type(error).__name__, flush=True)
             if result is None:
                 # Direct endpoints were tested and are optional; do not hammer a
                 # known unavailable source just because a public mirror is late.

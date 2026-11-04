@@ -2,6 +2,7 @@ import datetime as dt
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from analysis_engine import analyze_board
 from board_shortlist import enrich_shortlist, format_shortlist, player_availability
@@ -34,6 +35,12 @@ def report(*items):
 
 class ShortlistTests(unittest.TestCase):
     def setUp(self):
+        # Candidate fixtures deliberately isolate shortlist gates; publication
+        # readiness is exercised against actual stores in pregame tests.
+        readiness = patch('board_shortlist.assess_pregame_freshness', return_value={
+            'ready': True, 'reasons': [], 'current_player_stat_coverage': ['pts', 'reb', 'ast', 'pra', 'fga']})
+        readiness.start()
+        self.addCleanup(readiness.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')

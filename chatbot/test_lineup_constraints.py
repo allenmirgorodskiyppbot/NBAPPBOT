@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from board_shortlist import enrich_shortlist, format_shortlist
 from feeds import canonical_game, canonical_player
@@ -64,6 +65,12 @@ class LineupSelectionTests(unittest.TestCase):
 
 class LineupCoverageIntegrationTests(unittest.TestCase):
     def setUp(self):
+        # Keep these lineup-composition fixtures independent of daily feeds.
+        for name in ('board_shortlist', 'independent_picks'):
+            readiness = patch(name + '.assess_pregame_freshness', return_value={
+                'ready': True, 'reasons': [], 'current_player_stat_coverage': ['pts', 'reb', 'ast', 'pra', 'fga']})
+            readiness.start()
+            self.addCleanup(readiness.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')

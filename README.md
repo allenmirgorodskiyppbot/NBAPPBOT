@@ -72,6 +72,30 @@ started job nor a newly downloaded older file is labeled as today's completed da
 GitHub scheduling and upstream publication can be delayed; this is a morning update
 with catch-up, not a guaranteed live feed.
 
+Completed-day publications are also rechecked hourly for corrections. The relay
+checks the bounded recent-day window against an independent ESPN NBA inventory;
+an empty publication is created only when its league calendar establishes an off
+day. Original statistic publication dates remain separate from verification and
+download times. Evening relay checks continue through 10/11 PM Eastern across
+daylight saving time.
+
+Use `/freshness` for a concise game-day readiness report. Current picks require a
+successful current-day publication check, coverage of the latest completed team
+game, and a complete played/DNP observation for the selected player. A played
+observation must include the requested statistic. Intervening game dates require
+verified inventories or complete published team-calendar coverage; unknown gaps
+hold the affected pick. Rest days do not become zero-stat games. Future-date
+targets remain historical research until that game's daily checks are current.
+Tracking fields, injuries and tentative defenders keep their own coverage limits;
+a fresh Excel export or game-stat check does not establish that every field is current.
+
+Current selections also require an independent event-status check within fifteen
+minutes, matching the saved game and confirming a future tipoff. The bounded
+ESPN check runs independently of the morning statistics import and before pick
+research; it updates timing/state for existing games only. A scoreboard final
+without imported statistics cannot grade an entry. Missing, failed or conflicting
+event checks hold current recommendations and prevent an unverified reminder.
+
 Available extracts support player production, shooting, team totals/opponent
 statistics, passing, rebounding, touches/possession and rim-related measurements.
 The current publication does **not** provide current overall player defended-FG or
@@ -181,6 +205,12 @@ player, market and line: “Josh Hart 22.5” prompts for the missing statistic;
 market clears the old threshold. A genuinely ambiguous player, statistic or line
 gets a short clarification. The bot also distinguishes preferences and lineup
 instructions from requests for team statistics. `/clear` removes this context.
+Ordinal questions such as “why the second one?” select that player and market.
+Corrections such as “18.5, not 19.5” update the discussion, and switching game dates
+clears the earlier offer. Explanations keep held and unavailable legs visible,
+including mixed lists of hypothetical targets and user-provided lines. Larger
+lineups receive a complete computed summary when they exceed the AI's bounded
+evidence budget.
 
 Both-team coverage is enforced when building complete multi-player lineups; missing
 qualified opponents produce a clearly labeled partial draft. Recent explicit team
