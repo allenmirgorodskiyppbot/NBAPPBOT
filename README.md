@@ -373,6 +373,27 @@ live master, or establish the quality/speed of a generated AI answer. Checks wit
 mocked transports are distinct from verified publisher access and actual Akash
 message delivery.
 
+## November 4 conversation validation
+
+The conversational update passed **703 automated tests** in
+[GitHub Actions](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41911945699).
+Actual local-model tests covered the Hart market clarification and follow-ups,
+Randle three-point explanations, both-team instructions, ordinary conversation,
+and a sourced Brunson matchup question. Corrected outputs from earlier iterations
+were also replayed through the final checks, alongside the inaccurate drafts that
+must be rejected. The final two Telegram-answer-path smoke tests used the finished
+code and actual model responses.
+
+See the [validation record](docs/validation-conversation-2026-11-04.json) for the
+tested cases, timing, revision and limits. Testing used temporary database copies
+and the local Qwen 4B model on four CPUs and 8 GiB RAM. It did not send Telegram
+messages or contact the user's Akash deployment. Generated research replies took
+roughly one to two minutes in the slower tested cases, including a repair when
+needed; simple chat and missing-market clarification were much quicker. These
+checks establish the tested conversational behavior, not universal accuracy or
+betting performance. Deployment still requires updating `SOURCE_REF` and checking
+the actual provider.
+
 ## October 30 reliability validation
 
 The preceding chat-reliability release passed **368 automated tests**, **14 isolated PrizePicks workflow

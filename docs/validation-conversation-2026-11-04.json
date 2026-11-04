@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-11-04T21:04:09.686694+00:00",
+  "source_ref": "68c2427e998918f7c649c5c0c6349f005b54d17f",
+  "scope": "Conversational basketball research acceptance. This record summarizes reviewed results; it does not contain raw prompts, chat histories, or database records.",
+  "ci": {
+    "run_url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41911945699",
+    "job_id": 126861540394,
+    "conclusion": "success",
+    "tests_passed": 703,
+    "test_log_elapsed_seconds": 51.115,
+    "verification": "Detailed job log reported 703 tests and OK; all job steps succeeded."
+  },
+  "method": {
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "runtime": "Ollama 0.40.13",
+    "hardware": {
+      "cpu_limit": 4,
+      "memory_gib": 8,
+      "gpu": false
+    },
+    "model_setup": "Existing locally imported Q4_K_M weights; the local template may differ from the provider deployment.",
+    "execution": "Real local model requests through application answer_question and telegram_answer paths. Database fixtures were copied into temporary directories.",
+    "external_telegram_messages_sent": false,
+    "production_writes": false,
+    "provider_connectivity_tested": false
+  },
+  "final_current_code_smoke": {
+    "transport": "telegram_answer",
+    "source_files_unchanged_during_run": true,
+    "cases": [
+      {
+        "case": "Named-player matchup research with a request for brevity",
+        "status": "passed_manual_review",
+        "elapsed_seconds": 56.362,
+        "model_calls": 2,
+        "repair_attempts": 1,
+        "final_fallback": false,
+        "review": "Retrieved source evidence; retained tentative pairing and guarding uncertainty; kept the all-opponent scoring baseline separate from the named-opponent sample; did not infer shooting efficiency from scoring volume."
+      },
+      {
+        "case": "Why followup about a previously discussed made-threes line",
+        "status": "passed_manual_review",
+        "elapsed_seconds": 66.948,
+        "model_calls": 2,
+        "repair_attempts": 1,
+        "final_fallback": false,
+        "review": "Retained player, market and line; explained the computed assessment and relevant workload risks; distinguished made shots from attempts and avoided unsupported workload claims."
+      }
+    ]
+  },
+  "accepted_behavior_coverage_across_iterations": {
+    "interpretation": "These accepted examples were collected across development iterations, not one final-version end-to-end run. Captured generated drafts were revalidated against the final renderer as described below. The two smoke cases above were actual requests using the final source files.",
+    "cases": [
+      {
+        "case": "Ask for the missing statistic rather than guess a line market",
+        "elapsed_seconds": 0.067,
+        "model_used": false
+      },
+      {
+        "case": "Apply a PRA correction while retaining player and line",
+        "elapsed_seconds": 74.123,
+        "model_used": true
+      },
+      {
+        "case": "Keep a computed Pass when pressed to choose up or down",
+        "elapsed_seconds": 109.998,
+        "model_used": true
+      },
+      {
+        "case": "Explain the prior assessment in a why followup",
+        "elapsed_seconds": 51.081,
+        "model_used": true
+      },
+      {
+        "case": "Discuss hypothetical blowout minutes without forecasting a blowout",
+        "elapsed_seconds": 63.509,
+        "model_used": true
+      },
+      {
+        "case": "Resolve a player surname typo in a made-threes question",
+        "elapsed_seconds": 41.246,
+        "model_used": true
+      },
+      {
+        "case": "Discuss old-team motivation without treating it as measured shot-attempt evidence",
+        "elapsed_seconds": 99.069,
+        "model_used": true
+      },
+      {
+        "case": "Clarify field-goal versus three-point attempts and request the new line",
+        "elapsed_seconds": 0.033,
+        "model_used": false
+      },
+      {
+        "case": "Recognize a both-team lineup instruction despite a typo",
+        "elapsed_seconds": 28.079,
+        "model_used": true
+      },
+      {
+        "case": "Retain the clarified requirement for at least one player from each team",
+        "elapsed_seconds": 15.012,
+        "model_used": true
+      },
+      {
+        "case": "Respond naturally to thanks",
+        "elapsed_seconds": 6.263,
+        "model_used": true
+      },
+      {
+        "case": "Respond naturally to a request to ask followup questions",
+        "elapsed_seconds": 7.045,
+        "model_used": true
+      }
+    ]
+  },
+  "final_captured_output_replay": {
+    "checks": 17,
+    "passed": 17,
+    "supported_drafts_accepted": 12,
+    "unsupported_drafts_rejected": 5,
+    "method": "Replayed captured real-model JSON and its source cards through the final factual renderer. This is deterministic revalidation, not 17 new model generations.",
+    "coverage": "Accepted correct prior explanations and structural lineup discussion; rejected contradictory recommendations, made-shot-to-attempt or usage substitutions, and scoring-volume-to-efficiency claims."
+  },
+  "errors_discovered_and_fixed": [
+    {
+      "category": "Conversation routing",
+      "fix": "A brevity instruction no longer diverts a named-player research question into an empty-evidence preference response; named-player factual requests retain a retrieval path."
+    },
+    {
+      "category": "Decision consistency",
+      "fix": "A supplied computed decision is anchored in structured output; checks reject the tested contradictory recommendations, including Markdown and phrasing variants."
+    },
+    {
+      "category": "Source selection",
+      "fix": "Supplied computed prop evidence is retained for validation when the model omits an evidence ID; valid lineup cardinal wording no longer triggers a false numeric rejection."
+    },
+    {
+      "category": "Metric integrity",
+      "fix": "Checks reject the tested made-shot-to-attempt or usage substitutions and scoring-volume-to-efficiency claims."
+    },
+    {
+      "category": "Scope integrity",
+      "fix": "All-opponent baselines and explicit comparisons that distinguish them from a named opponent retain their scope; relabeling a baseline as opponent-specific remains rejected."
+    },
+    {
+      "category": "Presentation",
+      "fix": "Replies use a concise response budget, hide internal evidence labels, and provide short source context instead of repeating raw evidence dumps."
+    }
+  ],
+  "limits": [
+    "No external Telegram delivery or Akash provider connectivity was tested by this local acceptance run.",
+    "Local hardware, imported model template and source fixtures may differ from the deployed provider.",
+    "Both final smoke cases required one repair and took about 56 and 67 seconds. These are observed timings, not speed guarantees.",
+    "Some accepted replies remain cautious or wordier than ideal. The suite does not prove perfect accuracy or eliminate future failures.",
+    "Historical samples and generated explanations are not calibrated betting probabilities or guaranteed outcomes."
+  ],
+  "source_file_sha256": {
+    "app.py": "386ea5e2f8e054ebc338b3b06ab526278d8c86bee940cbc9ec1ef4c5677da210",
+    "chat_flow.py": "fd94bf93c50d82dafba59b4b59dfea4cd8934f6d5b40f84cfac6680ca507fbc1",
+    "conversation.py": "d0f70e84ccbf88beeb87881f47f72680cf5865d3f91c02931d1dc220c4b73af4",
+    "grounded_reply.py": "96346a70b90f65eb9ceb2cd84ae58232cc70c58e69531427ecf1e249eba0b7a8",
+    "pick_discussion.py": "22529ad49ed428ecfa408882d416c578c6d354085f368868518a9b83e53c9a0d",
+    "research_discussion.py": "e5922d3db8e8d15b945bb5b707d9da23f818296883399c117bd0c96f2d39805e",
+    "telegram_bot.py": "0b6a267da2207293cb8683e3714a76ecd7590f5cdd2267831cde259fb5aaed28"
+  }
+}
