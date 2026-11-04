@@ -39,7 +39,7 @@
   "final_transport_replay": {
     "checked_at": "2026-11-04T23:04:06.106633+00:00",
     "new_model_calls": 0,
-    "path": "telegram_answer \u2192 application/chat_flow \u2192 current-source-card validation \u2192 post-generation readiness recheck",
+    "path": "telegram_answer → application/chat_flow → current-source-card validation → post-generation readiness recheck",
     "captured_model_output_returned_unchanged": true,
     "caught_errors": 0,
     "schedule_check_time_preserved": "2026-11-04T22:54:02.259039+00:00"
@@ -77,7 +77,7 @@
       "matched_existing_events": 1,
       "candidate_count": 4,
       "two_team_coverage": false,
-      "result": "Current schedule matched the existing upcoming NYK\u2013CHI event. The research list remained partial."
+      "result": "Current schedule matched the existing upcoming NYK–CHI event. The research list remained partial."
     }
   ],
   "source_provenance": {
@@ -172,5 +172,33 @@
     "source": "espn",
     "upstream_full_game_validated": true,
     "publication_note": "Independently fetched from ESPN in the validation environment and published with its actual verification timestamp; no player statistics invented."
+  },
+  "startup_followup": {
+    "application_commit": "8367d100abd39f9f032f601e9348d0eec7f48553",
+    "ci": {
+      "passed": 860,
+      "failed": 0,
+      "seconds": 61.086,
+      "run_id": 41932919415,
+      "job_id": 126934079490,
+      "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41932919415",
+      "conclusion": "success"
+    },
+    "changes": [
+      "Missing per-date checks run once immediately after the daily deadline when upgrading from an old worker; failed checks retain the hourly cooldown.",
+      "Freshness output shows safe current schedule failure categories without requiring a full status dump."
+    ],
+    "source_file_sha256": {
+      "nightly_data.py": "06bf2dadfb9833e4019ad874bcd1706744b0deb43600b540b699fb84c8e8d7fe",
+      "telegram_bot.py": "ebcea9571a4ada307e9ff11ba65e8c90b6b2ea4bd8e1efbc90860136d7fb0c5b",
+      "test_pregame_refresh.py": "32d4abcdba599bce4aa8b137e1ae40a8a34982737d543b24bb7aba47b00eff7b",
+      "test_pregame_freshness_command.py": "be58294c0d7ae3e2b4cc1c5a06b64dca0d85046147102cd3c87f5dfc504a3a8b"
+    },
+    "verification_published": {
+      "date": "2026-11-02",
+      "inventory_verified_at": "2026-11-04T22:46:50.698598+00:00",
+      "note": "Existing published inventory matched all 15 final games from the independently fetched ESPN scoreboard. Original source statistics and publication timestamps are preserved."
+    },
+    "deployment_note": "Actual Akash current schedule access remains unverified; CI success does not establish production source readiness."
   }
 }

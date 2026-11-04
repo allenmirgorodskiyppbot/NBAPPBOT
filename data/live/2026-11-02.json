@@ -186,7 +186,7 @@
       "status": "final"
     }
   ],
-  "inventory_scope": "Games present in the published extract; complete NBA schedule not independently verified.",
+  "inventory_scope": "Independent ESPN NBA day inventory; existing workbook player rows only",
   "pending_game_ids": [],
   "player_games": [
     {
@@ -1042,7 +1042,7 @@
       "minutes": 23,
       "opponent": "DET",
       "oreb": 1,
-      "player": "Dennis Schr\u00f6der",
+      "player": "Dennis Schröder",
       "player_id": "name:dennisschroder",
       "plus_minus": -30,
       "provider_player_id": "3032979",
@@ -2375,7 +2375,7 @@
       "minutes": 14,
       "opponent": "WAS",
       "oreb": 1,
-      "player": "Nikola Vu\u010devi\u0107",
+      "player": "Nikola Vučević",
       "player_id": "name:nikolavucevic",
       "plus_minus": -1,
       "provider_player_id": "6478",
@@ -3987,7 +3987,7 @@
       "minutes": 22,
       "opponent": "MIN",
       "oreb": 1,
-      "player": "Kasparas Jaku\u010dionis",
+      "player": "Kasparas Jakučionis",
       "player_id": "name:kasparasjakucionis",
       "plus_minus": -8,
       "provider_player_id": "5214640",
@@ -5413,7 +5413,7 @@
       "minutes": 36,
       "opponent": "POR",
       "oreb": 1,
-      "player": "Nikola Joki\u0107",
+      "player": "Nikola Jokić",
       "player_id": "name:nikolajokic",
       "plus_minus": -3,
       "provider_player_id": "3112335",
@@ -6715,7 +6715,7 @@
       "minutes": 36,
       "opponent": "MIA",
       "oreb": 0,
-      "player": "Luka Don\u010di\u0107",
+      "player": "Luka Dončić",
       "player_id": "name:lukadoncic",
       "plus_minus": 26,
       "provider_player_id": "3945274",
@@ -6894,5 +6894,26 @@
   "source": "espn",
   "source_data_through_date": "2026-11-02",
   "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.csv",
-  "upstream_full_game_validated": true
+  "upstream_full_game_validated": true,
+  "inventory_verified": true,
+  "inventory_verified_at": "2026-11-04T22:46:50.698598+00:00",
+  "inventory_verification_source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261102",
+  "inventory_game_ids": [
+    "nba:2026-11-02:ATL:IND",
+    "nba:2026-11-02:BKN:NYK",
+    "nba:2026-11-02:BOS:HOU",
+    "nba:2026-11-02:CHA:DET",
+    "nba:2026-11-02:CHI:PHI",
+    "nba:2026-11-02:CLE:OKC",
+    "nba:2026-11-02:DAL:SAC",
+    "nba:2026-11-02:DEN:POR",
+    "nba:2026-11-02:GSW:PHX",
+    "nba:2026-11-02:LAC:TOR",
+    "nba:2026-11-02:LAL:MIA",
+    "nba:2026-11-02:MEM:NOP",
+    "nba:2026-11-02:MIL:MIN",
+    "nba:2026-11-02:ORL:WAS",
+    "nba:2026-11-02:SAS:UTA"
+  ],
+  "inventory_off_day_verified": false
 }

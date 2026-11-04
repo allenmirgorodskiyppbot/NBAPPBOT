@@ -405,6 +405,13 @@ message delivery.
 
 ## November 4 conversation validation
 
+The startup follow-up passed **860 automated tests** on its
+[tested application commit](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41932919415).
+Missing per-date checks now run once immediately after the daily deadline when
+upgrading from an older worker; actual failures retain the hourly cooldown.
+`/freshness` also shows the safe current schedule error category. These checks do
+not establish successful schedule access from the actual deployment.
+
 The subsequent pregame/freshness update passed **856 automated tests** on its
 [final application commit](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41930748027),
 including a clean downloaded-package import and checks for all local runtime
