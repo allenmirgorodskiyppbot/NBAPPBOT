@@ -35,7 +35,7 @@ def _changed_readiness(master, checks):
     """A model may take long enough for a tipoff or source status to change."""
     from pick_discussion import _now
     from pregame_freshness import assess_pregame_freshness
-    now = _now()
+    now = _now(None)
     held = []
     for item in checks:
         current = assess_pregame_freshness(master, item['date'], item['team'], now,

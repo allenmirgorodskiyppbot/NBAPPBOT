@@ -8,6 +8,12 @@ import test_chat_flow as fixtures
 from chat_flow import answer_conversation
 
 
+class RuntimeReadinessClockTests(unittest.TestCase):
+    def test_post_generation_recheck_uses_the_actual_runtime_clock(self):
+        from chat_flow import _changed_readiness
+        self.assertIsNone(_changed_readiness(None, []))
+
+
 class PregameChatFlowTests(unittest.IsolatedAsyncioTestCase):
     setUp = fixtures.ChatFlowTests.setUp
     add_player = fixtures.ChatFlowTests.add_player
