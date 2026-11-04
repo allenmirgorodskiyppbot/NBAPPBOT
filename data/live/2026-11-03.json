@@ -1,0 +1,20 @@
+{
+  "complete": true,
+  "date": "2026-11-03",
+  "errors": [],
+  "expected_games": 0,
+  "games": [],
+  "inventory_game_ids": [],
+  "inventory_off_day_verified": true,
+  "inventory_scope": "Independent ESPN NBA day inventory; existing workbook player rows only",
+  "inventory_verification_source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261103",
+  "inventory_verified": true,
+  "inventory_verified_at": "2026-11-04T23:06:48.552628+00:00",
+  "pending_game_ids": [],
+  "player_games": [],
+  "published_at": "2026-11-04T23:06:48.552628+00:00",
+  "schema_version": 1,
+  "scope_revision": "6b49a4f7df12f3d309d16860b0da458bcbc49f11eccf4965bf3fca89e4a67148",
+  "source": "espn",
+  "upstream_full_game_validated": true
+}

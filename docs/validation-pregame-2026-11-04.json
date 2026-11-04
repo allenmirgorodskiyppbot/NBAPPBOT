@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "validation_date": "2026-11-04",
+  "method": {
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "runtime": "Local Ollama0.40.13; existing imported Q4_K_M weights",
+    "cpu_limit": 4,
+    "memory_gib": 8,
+    "gpu": false,
+    "storage": "Disposable copies of saved database and workbook fixtures",
+    "external_telegram_messages_sent": false,
+    "production_writes": false,
+    "provider_connectivity_tested": false,
+    "iteration_scope": "Model cases and freshness-boundary checks were collected across development iterations. Final source parity was checked by deterministic renderer replay and by replaying the actual ordinal model JSON through the final Telegram/application delivery path with verified publications and a current schedule checkpoint; that last replay was not a new model generation."
+  },
+  "actual_model_cases": [
+    {
+      "case": "Correct a previously discussed threshold from 19.5 to 18.5",
+      "elapsed_seconds": 21.636,
+      "model_calls": 1,
+      "repairs": 0,
+      "manual_review": "Passed. Retained player, points market, side and game date; acknowledged the new and superseded user thresholds without treating the superseded value as a statistic."
+    },
+    {
+      "case": "Explain the second item from a real generated research list",
+      "elapsed_seconds": 37.716,
+      "model_calls": 1,
+      "repairs": 0,
+      "manual_review": "Passed after the narrow consistency guard. Selected Karl-Anthony Towns/PRA rather than the second conditional threshold; retained hypothetical research status and did not claim measured consistency or current performance."
+    },
+    {
+      "case": "Explain a mixed user-priced line and unpriced research target",
+      "elapsed_seconds": 63.907,
+      "model_calls": 2,
+      "repairs": 1,
+      "manual_review": "Passed. Kept both players and markets, distinguished a user-provided points line from a hypothetical PRA research projection, and did not invent a verified offer or betting edge."
+    }
+  ],
+  "final_transport_replay": {
+    "checked_at": "2026-11-04T23:04:06.106633+00:00",
+    "new_model_calls": 0,
+    "path": "telegram_answer \u2192 application/chat_flow \u2192 current-source-card validation \u2192 post-generation readiness recheck",
+    "captured_model_output_returned_unchanged": true,
+    "caught_errors": 0,
+    "schedule_check_time_preserved": "2026-11-04T22:54:02.259039+00:00"
+  },
+  "renderer_replays": {
+    "pregame_checks_passed": 4,
+    "pregame_checks_total": 4,
+    "supported_outputs_accepted": 3,
+    "unsupported_consistency_output_rejected": 1,
+    "retired_threshold_acknowledgment_drafts_accepted": 2,
+    "note": "These are deterministic checks of previously captured real-model outputs, not additional generations."
+  },
+  "freshness_boundary_checks": [
+    {
+      "inputs": "Cached publications with no verified current-day source check",
+      "ready": false,
+      "candidate_count": 0,
+      "result": "Held: latest completed team game lacks a current publication check."
+    },
+    {
+      "inputs": "Same stale latest-game publication plus an independently verified prior-day off day",
+      "ready": false,
+      "candidate_count": 0,
+      "result": "Still held. A verified off day does not make the earlier game publication current."
+    },
+    {
+      "inputs": "Actually fetched and independently verified latest-game publication plus verified prior-day off day",
+      "game_observation_check_passed": true,
+      "phase": "This intermediate check preceded the independent current-schedule requirement.",
+      "result": "Latest game-observation readiness passed. Under the final implementation, recommendations additionally require the current schedule check described in the next case."
+    },
+    {
+      "inputs": "Those verified observations plus an actual current-day schedule response replayed at its original check time",
+      "schedule_status": "success",
+      "matched_existing_events": 1,
+      "candidate_count": 4,
+      "two_team_coverage": false,
+      "result": "Current schedule matched the existing upcoming NYK\u2013CHI event. The research list remained partial."
+    }
+  ],
+  "source_provenance": {
+    "latest_game_publication": {
+      "game_date": "2026-11-02",
+      "published_at": "2026-11-03T13:28:29+00:00",
+      "actually_fetched_at": "2026-11-04T22:46:50.698598+00:00",
+      "publication_url": "https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/main/data/live/2026-11-02.json",
+      "independent_inventory_url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261102",
+      "inventory_verified_at": "2026-11-04T22:46:50.698598+00:00",
+      "final_games_matched": 15
+    },
+    "prior_day_off_day": {
+      "date": "2026-11-03",
+      "verified_at": "2026-11-04T22:44:33.238069+00:00",
+      "verified_event_count": 0,
+      "source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261103"
+    },
+    "current_schedule": {
+      "date": "2026-11-04",
+      "actually_fetched_at": "2026-11-04T22:54:02.259039+00:00",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261104",
+      "method": "Parsed the captured actual HTTP body with its original fetched_at; did not advance the timestamp to make it fresh."
+    }
+  },
+  "issues_discovered_and_corrected": [
+    "Retired user thresholds in correction acknowledgments were falsely rejected as unsupported statistics.",
+    "Ordinal followups needed explicit selected-player context to avoid choosing a conditional threshold instead.",
+    "Projection summaries must not be promoted to observed consistency or current-condition facts.",
+    "Mixed priced and research explanations must keep all requested identities and their separate meanings.",
+    "Readiness required actual current publication coverage, independent schedule freshness, and another check after generation.",
+    "Real SQLite row access and the real-clock call in the post-generation check needed runtime fixes."
+  ],
+  "limits": [
+    "No live Akash deployment or external Telegram delivery was exercised.",
+    "A completed readiness check concerns game observations and the checked game schedule; injuries, tracking metrics and tentative defenders retain separate source dates and uncertainty.",
+    "The available research list lacked a supported CHI selection, so it was not a complete two-team entry.",
+    "Observed local timings ranged from about 22 to 64 seconds for these accepted cases and do not guarantee provider latency.",
+    "The tests do not establish perfect future accuracy, calibrated probabilities or guaranteed results."
+  ],
+  "source_file_sha256": {
+    "app.py": "9de671774665f332f24769a5b5ed19d1525d6874583f244a415a1ea28e631182",
+    "chat_flow.py": "bb7c243003157f5b4a6d2164f6623cfff2a0e6b1cd0d31bc0411f12e6b719de6",
+    "conversation.py": "34dd80559e65ba5dfae75cc4261ae906ee2db208cf16eb42094036fee7f1b1e8",
+    "grounded_reply.py": "8730833a204dad005f329691d5adbb84f34f5ead20d53dc0dcea8641858ab8b7",
+    "pick_discussion.py": "b1da013366ee2117c31010d832a957de699895294771d20147d92d3ff5a20df2",
+    "research_discussion.py": "b6d78381d192a3fe25a673ea127e12b31c9edec2e4bdc01fc96a4530e731e119",
+    "pregame_freshness.py": "0dfe96a126746b48e9e0b533067e586cbf3f6c50827161cb7fbdad2dac7b680a",
+    "game_schedule_check.py": "8c834ebe88845088ac639a45bb9294d0f95bfb16763a2da67b9e7b95584d99e4",
+    "independent_picks.py": "3b28e72a23a963fb79c0225b19fd738dda778f73478d844a00e23dbb7102c5c4",
+    "board_shortlist.py": "e19990e62789ca82f9772088d2c4f8b79568ab47bad8d3a93acbd2b91a1d8a7c",
+    "nightly_data.py": "6a296923b997333cdbad03fb60b6f735e98bee865b8585ef3298bb3a19045d4e",
+    "bootstrap.py": "7abc85bbd849da0d27bc8d4c4c9a27b8c1abc6c2b8f20bf5b3d40ef57d4901b2"
+  },
+  "application_commit": "78fe2f33789804a1e53410d77fa8badc31e5194f",
+  "ci": {
+    "passed": 856,
+    "failed": 0,
+    "seconds": 53.882,
+    "run_id": 41930748027,
+    "job_id": 126926700519,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41930748027",
+    "conclusion": "success"
+  },
+  "deployment_package": {
+    "clean_isolated_import": "passed",
+    "local_module_dependency_closure": "passed",
+    "new_modules_downloaded_by_bootstrap": true
+  },
+  "data_relay_run": {
+    "run_id": 41930490211,
+    "conclusion": "success",
+    "note": "Existing statistics and tracking publications were refreshed. Independent ESPN inventory access failed on this GitHub runner; a successful job does not establish complete independent inventory verification."
+  },
+  "verified_offday_publication": {
+    "complete": true,
+    "date": "2026-11-03",
+    "errors": [],
+    "expected_games": 0,
+    "games": [],
+    "inventory_game_ids": [],
+    "inventory_off_day_verified": true,
+    "inventory_scope": "Independent ESPN NBA day inventory; existing workbook player rows only",
+    "inventory_verification_source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261103",
+    "inventory_verified": true,
+    "inventory_verified_at": "2026-11-04T23:06:48.552628+00:00",
+    "pending_game_ids": [],
+    "player_games": [],
+    "published_at": "2026-11-04T23:06:48.552628+00:00",
+    "schema_version": 1,
+    "scope_revision": "6b49a4f7df12f3d309d16860b0da458bcbc49f11eccf4965bf3fca89e4a67148",
+    "source": "espn",
+    "upstream_full_game_validated": true,
+    "publication_note": "Independently fetched from ESPN in the validation environment and published with its actual verification timestamp; no player statistics invented."
+  }
+}

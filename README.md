@@ -405,6 +405,22 @@ message delivery.
 
 ## November 4 conversation validation
 
+The subsequent pregame/freshness update passed **856 automated tests** on its
+[final application commit](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41930748027),
+including a clean downloaded-package import and checks for all local runtime
+dependencies. Real local-model checks covered threshold corrections, ordinal
+follow-ups and mixed priced/unpriced explanations; accepted replies took roughly
+22–64 seconds. The final delivery replay also exercised the post-generation
+readiness check, which can hold a pick if tipoff or source readiness changes while
+the model answers. See [pregame validation](docs/validation-pregame-2026-11-04.json).
+
+The data workflow updated source publications, but its independent ESPN inventory
+request was unavailable on the GitHub runner. The verified November 3 off-day
+document was fetched separately from ESPN and published with its real check time.
+Provider access remains environment-dependent; `/freshness` reports the actual
+deployment's readiness instead of interpreting a successful workflow or AI startup
+as proof that every source is current.
+
 The conversational update passed **703 automated tests** in
 [GitHub Actions](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41911945699).
 Actual local-model tests covered the Hart market clarification and follow-ups,
