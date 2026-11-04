@@ -937,15 +937,34 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
                 bool(re.search(r'\b(?:allowed|allows?|conced\w*|opponent FG|defended)\b', fact.get('text',''), re.I)) == defensive_claim
                 or (defensive_claim and fact.get('opponent'))]
         # Broad season averages cannot be relabeled as opponent-specific results.
-        historical = re.search(r'\b(?:averag\w*|scored|recorded|had|made|shot|grabbed|collected)\b', clause, re.I)
-        opponent_claim = re.search(r'\b(?:against|versus|vs\.?|facing)\s+([A-Za-z][A-Za-z -]{1,30})', clause, re.I)
-        if historical and opponent_claim:
-            matching = [fact for fact in candidates if fact.get('opponent') and
-                        re.search(r'\b'+re.escape(str(fact['opponent']))+r'\b', clause, re.I)]
-            # A source's own explicit full opponent name is also acceptable.
-            matching.extend(f for f in candidates if opponent_claim.group(0).casefold() in f.get('text', '').casefold())
-            candidates = matching
+        historical = re.search(r'\b(?:averag\w*|scor(?:ed|ing)|recorded|had|made|shot|grabbed|collected)\b', clause, re.I)
+        if historical:
+            for opponent_claim in re.finditer(r'\b(?:against|versus|vs\.?|facing)\s+([A-Za-z][A-Za-z -]{1,60})', clause, re.I):
+                target = opponent_claim.group(1)
+                if re.match(r'(?:all|every|any)\s+(?:opponents?|teams?)\b',target,re.I):
+                    continue  # This explicitly preserves the broad population.
+                scope_prefix = clause[:opponent_claim.start()]
+                if re.search(r'\bnot\s+(?:reflect|represent|predict|forecast|establish|describe|measure|isolate)\b[^.;]{0,70}$|'
+                             r'\bnot\s+(?:a|an)\s+(?:measure|forecast|prediction|estimate)\b[^.;]{0,70}$',scope_prefix,re.I):
+                    continue  # A baseline disclaimer is not an opponent average.
+                from basketball_research import TEAM_NAMES
+                matching = []
+                for fact in candidates:
+                    opponent = str(fact.get('opponent') or '')
+                    aliases = (opponent,*TEAM_NAMES.get(opponent,())) if opponent else ()
+                    if any(re.search(r'\b'+re.escape(alias)+r'\b',target,re.I) for alias in aliases):
+                        matching.append(fact)
+                    elif opponent_claim.group(0).casefold() in fact.get('text','').casefold():
+                        matching.append(fact)
+                candidates = matching
         normalized = _construction_numbers(clause, question)
+        efficiency = re.search(r'\b(?:suggests?|indicates?|shows?|demonstrates?|reflects?|establishes?|proves?)\s+'
+                               r'(?:high|good|great|strong|poor|low|weak|excellent|elite)\s+(?:(?:shooting|scoring)\s+)?efficiency\b',normalized,re.I)
+        if efficiency and not re.search(r'\b(?:not|never|cannot|can[’\x27]t)\b',normalized[:efficiency.start()],re.I):
+            efficiency_metrics = r'FG\s*%|FG[_ ]?PCT|(?:e?FG|TS)%|shooting percentage|true[- ]shooting|effective field[- ]goal|points per (?:shot|possession)|efficiency rating'
+            if not any(re.search(efficiency_metrics,str(f.get('metric',''))+' '+f.get('text',''),re.I)
+                       and _numbers(f.get('text','')) for f in candidates):
+                raise ReplyValidationError('unsupported_metric')
         # A list of made-shot outcomes does not describe usage or attempts.
         # Keep qualitative possibilities available, but bind empirical workload
         # descriptions to actual workload measurements when numbers are given.

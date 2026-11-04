@@ -233,6 +233,29 @@ class NaturalReplyTests(unittest.TestCase):
         self.assert_rejected('OG Anunoby averaged 17.6 points against CHA.', 'unsupported_number', cards=cards, ids=[selected['id']])
         self.assert_rejected('OG Anunoby averaged 17.6 points against Charlotte.', 'unsupported_number', cards=cards, ids=[selected['id']])
 
+    def test_all_opponent_scope_and_negated_matchup_comparison_preserve_baseline(self):
+        cards = evidence_cards(context(), 'Explain OG points')
+        baseline = next(c for c in cards if c['kind']=='player_all_opponent_averages')
+        self.render('OG Anunoby averages 17.6 PPG against all opponents.',cards=cards,ids=[baseline['id']])
+        self.render('His average of 17.6 PPG across all opponents may not reflect performance specifically against Charlotte.',cards=cards,ids=[baseline['id']])
+        self.render('His average of 17.6 PPG against all opponents is not a forecast of scoring against Charlotte.',cards=cards,ids=[baseline['id']])
+        self.assert_rejected('His average against Charlotte is 17.6 PPG.','unsupported_number',cards=cards,ids=[baseline['id']])
+        opponent = {'id':'O1','kind':'player_opponent_sample','entity':'OG Anunoby','opponent':'CHA',
+                    'text':'OG Anunoby versus CHA: 19 PPG in 1 stored game.', 'source':'stored games'}
+        self.render('OG Anunoby averaged 19 points against Charlotte.',cards=[opponent])
+        self.assert_rejected('OG Anunoby averaged 19 points against Boston.','unsupported_number',cards=[opponent])
+
+    def test_scoring_volume_cannot_establish_shooting_efficiency(self):
+        cards = [{'id':'E1','kind':'player_all_opponent_averages','entity':'Jalen Brunson',
+                  'text':'Jalen Brunson: 24.57 PPG; all opponents.', 'source':'stored games'}]
+        self.assert_rejected('His average against all opponents (24.57 PPG) suggests high efficiency.','unsupported_metric',cards=cards)
+        self.render('His 24.57 PPG does not establish high efficiency; shot accuracy needs separate evidence.',cards=cards)
+        cards.append({'id':'E2','kind':'player_shooting','entity':'Jalen Brunson',
+                      'text':'Jalen Brunson: 60% field goal percentage.',
+                      'approved_facts':[{'text':'Jalen Brunson: 60% field goal percentage.',
+                                         'entity':'Jalen Brunson','metric':'FG%','values':[60]}]})
+        self.render('His 60% field goal percentage suggests high shooting efficiency.',cards=cards)
+
     def test_qualitative_basketball_terms_are_not_numeric_claims(self):
         text = 'The 76ers could alter their three-point defense. Shot opportunities and playing time matter.'
         self.assertIn(text, self.render(text)['answer'])
