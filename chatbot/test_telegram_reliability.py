@@ -152,7 +152,9 @@ class TelegramReliabilityTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn('Data and worker status:', replies)
                 self.assertIn('Knicks Research bot', replies)
                 self.assertIn('Local AI status:', replies)
-                self.assertEqual(len(pending_answers), 2)
+                # Both requests occupy bounded command capacity, but one chat's
+                # follow-up waits so it can see the preceding answer.
+                self.assertEqual(pending_answers, ['Slow request one'])
                 self.assertEqual(self.store.entries_data, [])
                 self.assertEqual(bot.status()['offset'], 3006)
                 self.assertFalse(await bot.process_update(update(3002, entry)))
@@ -160,6 +162,36 @@ class TelegramReliabilityTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
+
+    async def test_followup_waits_for_answer_and_receives_completed_context(self):
+        started, release = asyncio.Event(), asyncio.Event()
+        calls = []
+
+        async def answer(text, history):
+            calls.append((text, history))
+            if len(calls) == 1:
+                started.set()
+                await release.wait()
+                return 'Is the 22.5 line for points or PRA?'
+            return 'Understood: Josh Hart, 22.5 PRA.'
+
+        bot = self.bot(answer)
+        first = asyncio.create_task(bot.process_update(update(3100, 'Josh Hart 22.5')))
+        await asyncio.wait_for(started.wait(), 1)
+        second = asyncio.create_task(bot.process_update(update(3101, 'I mean PRA')))
+        await asyncio.sleep(0)
+        self.assertEqual(len(calls), 1)
+        await bot.process_update(update(3102, '/help'))
+        self.assertIn('Knicks Research bot', self.outbox(bot)[0]['text'])
+        release.set()
+        await asyncio.wait_for(asyncio.gather(first, second), 2)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1][1], [
+            {'role': 'user', 'content': 'Josh Hart 22.5'},
+            {'role': 'assistant', 'content': 'Is the 22.5 line for points or PRA?'},
+        ])
+        self.assertEqual(bot._conversation(USER_ID)[-1]['content'],
+                         'Understood: Josh Hart, 22.5 PRA.')
 
     async def test_delivery_worker_recovers_when_failure_diagnostic_cannot_be_written(self):
         recovered = asyncio.Event()

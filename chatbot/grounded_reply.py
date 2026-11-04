@@ -16,7 +16,9 @@ class ReplyValidationError(ValueError):
     """A safe reason code, never the rejected model text or source payload."""
     REASONS = frozenset({'invalid_json', 'invalid_schema', 'invalid_evidence',
                          'analysis_too_long', 'retrieval_with_analysis',
-                         'empty_reply', 'numerical_prose', 'unsupported_assignment', 'unsupported_scope'})
+                         'empty_reply', 'numerical_prose', 'unsupported_assignment', 'unsupported_scope',
+                         'unsupported_number', 'unsupported_metric', 'unsupported_availability',
+                         'unsupported_certainty', 'unsupported_recommendation'})
 
     def __init__(self, reason):
         self.reason = reason if reason in self.REASONS else 'invalid_schema'
@@ -692,3 +694,517 @@ def unverified_reply(cards,required=(),failure_message=None):
     return {'answer':(failure_message or 'I could not verify the AI explanation.')+(' Here is the saved evidence:\n\n'+'\n\n'.join(c['text'] for c in selected) if selected else ''),
             'sources':[{'tool':'scoped_evidence','source':c.get('source')} for c in selected],
             'ai_used':False,'ai_failure_category':'grounding_error'}
+
+
+# Conversational answers use the exact retrieved facts, rather than the older
+# qualitative-only prompt. These checks are deliberately bounded: they catch
+# unsupported values, entity/metric swaps and known scope errors; they are not a
+# proof of every English sentence or of the quality of a betting recommendation.
+_NUMBER_WORDS = dict(zip(
+    'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty'.split(),
+    range(21)))
+_NUMBER_WORDS.update(thirty=30, forty=40, fifty=50, sixty=60, seventy=70, eighty=80, ninety=90)
+_NUMBER = re.compile(r'(?<![\w.])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)')
+_UNITS = {
+    'pra': r'PRA\b|(?:PTS|points?)\s*\+\s*(?:REBS?|rebounds?)\s*\+\s*(?:ASTS?|assists?)\b',
+    'pr': r'(?:PTS|points?)\s*\+\s*(?:REBS?|rebounds?)\b',
+    'pa': r'(?:PTS|points?)\s*\+\s*(?:ASTS?|assists?)\b',
+    'ra': r'(?:REBS?|rebounds?)\s*\+\s*(?:ASTS?|assists?)\b',
+    'fga': r'(?:FG|field[- ]goal)\s*(?:attempts?|attempted)\b|FGA\b|shots?\s+attempted\b',
+    'tpa': r'3PTA\b|three[- ]point\s+attempts?\b',
+    'tpm': r'3P(?:T)?M\b|(?:made\s+)?threes\b|(?:3|three)[- ]pointers?(?:\s+made)?\b',
+    'pts': r'PPG\b|points?(?:\s+(?:per\s+game|a\s+game))?\b',
+    'reb': r'RPG\b|rebounds?(?:\s+(?:per\s+game|a\s+game))?\b',
+    'ast': r'APG\b|assists?(?:\s+(?:per\s+game|a\s+game))?\b',
+    'minutes': r'minutes?\b|mins?\b|MPG\b',
+    'games': r'games?\b|appearances?\b|observations?\b',
+    'tov': r'turnovers?\b', 'stl': r'steals?\b', 'blk': r'blocks?\b',
+    'percent': r'%|percent(?:age)?\b',
+}
+_UNIT_AFTER = re.compile(r'^\s*(?:(?:made|stored|observed|completed)\s+)?(' + '|'.join('(?:'+p+')' for p in _UNITS.values()) + ')', re.I)
+
+
+def _number_text(text):
+    # Preserve basketball vocabulary before converting spelled-out quantities.
+    text = re.sub(r'\b([23])[- ]point(?:ers?)?\b',
+                  lambda m: m.group().replace(m.group(1), 'two' if m.group(1)=='2' else 'three', 1), str(text), flags=re.I)
+    value = re.sub(r'\b(?:two|three)[- ]point(?:ers?)?\b',
+                   lambda m: m.group().replace('two', 'two~').replace('three', 'three~'), str(text), flags=re.I)
+    value = re.sub(r'\b(?:one[- ]on[- ]one|two[- ]way)\b', 'basketball-term', value, flags=re.I)
+    value = re.sub(r'\b('+'|'.join(_NUMBER_WORDS)+r')\b(?!~)',
+                   lambda m: str(_NUMBER_WORDS[m.group().casefold()]), value, flags=re.I)
+    return value.replace('~', '')
+
+
+def _numbers(text):
+    return {float(match.group()) for match in _NUMBER.finditer(_number_text(text))}
+
+
+def _entities(cards):
+    return {str(c['entity']) for c in cards if c.get('entity')}
+
+
+def _entity_mentions(text, entities):
+    found = set()
+    for entity in entities:
+        parts = entity.split()
+        aliases = [entity]
+        if len(parts) > 1:
+            aliases.append(parts[-1])
+            if parts[-1].casefold() in {'jr.', 'jr', 'iii', 'ii'} and len(parts) > 2:
+                aliases.append(parts[-2])
+        if any(re.search(r'(?<!\w)'+re.escape(alias)+r'(?!\w)', text, re.I) for alias in aliases):
+            found.add(entity)
+    return found
+
+
+def _card_facts(card):
+    explicit = card.get('approved_facts')
+    if isinstance(explicit, list) and explicit:
+        return [dict(fact, entity=fact.get('entity') or card.get('entity'),
+                     opponent=fact.get('opponent') or card.get('opponent'))
+                for fact in explicit if isinstance(fact, dict) and isinstance(fact.get('text'), str)]
+    return [{'text': str(card.get('text', '')), 'entity': card.get('entity'),
+             'opponent': card.get('opponent'), 'scope': card.get('scope', ''),
+             'fact_type': 'average' if card.get('kind') in
+                 {'player_all_opponent_averages', 'player_observed_sample', 'player_opponent_sample'} else None}]
+
+
+def natural_prompt_evidence(cards, max_chars=3000):
+    """Return whole exact facts that fit the prompt, with scope and no mutation.
+
+    The caller should validate against the returned card IDs only. Omission is
+    explicit in its diagnostics; a truncated numeric fact is never supplied.
+    """
+    result = []
+    for card in cards:
+        facts = _card_facts(card)
+        text = ' '.join(f['text'] for f in facts)
+        # Tentative names remain source records, never confirmed guarding roles.
+        value = {'id': card['id'], 'kind': card.get('kind'), 'text': text}
+        if card.get('entity'):
+            value['entity'] = card['entity']
+        scopes = list(dict.fromkeys(str(f.get('scope')) for f in facts if f.get('scope')))
+        if scopes:
+            value['scope'] = '; '.join(scopes)
+        if card.get('data_through_date'):
+            value['through'] = str(card['data_through_date'])[:10]
+        if len(json.dumps(result+[value], ensure_ascii=False, separators=(',', ':'))) <= max_chars:
+            result.append(value)
+    return result
+
+
+def compact_natural_evidence(cards, question='', max_chars=2600):
+    """Select the same intact records that the natural prompt actually includes."""
+    required = set(required_evidence(question, cards))
+    # Application-computed prop assessments precede optional historical records.
+    ranked = sorted(enumerate(cards), key=lambda pair: (
+        0 if pair[1].get('id') in required else
+        1 if pair[1].get('kind') == 'prop_assessment' else
+        2 if str(pair[1].get('kind','')).startswith('prop_') else
+        3 if pair[1].get('matches_resolved_player') else 4, pair[0]))
+    by_id = {c['id']: c for c in cards}
+    return [by_id[value['id']] for value in natural_prompt_evidence([c for _,c in ranked], max_chars=max_chars)]
+
+
+def _metric_for_unit(text):
+    for metric, pattern in _UNITS.items():
+        if re.match(pattern, text, re.I):
+            return metric
+    return None
+
+
+def _quantity_supported(value, unit, fact):
+    text = _number_text(fact.get('text', ''))
+    explicit_units = set()
+    for match in _NUMBER.finditer(text):
+        if float(match.group()) != value:
+            continue
+        following = _UNIT_AFTER.match(text[match.end():])
+        if following:
+            explicit_units.add(_metric_for_unit(following.group(1)))
+    if unit in explicit_units:
+        return True
+    if unit == 'games' and fact.get('fact_type') in {'sample','sample_counts','counts'}:
+        # A numerator in "3 of 7 games" is itself a count of games, even
+        # though the noun follows the denominator in the source sentence.
+        count = re.escape(number(value))
+        if re.search(r'\b'+count+r'\s+(?:out\s+of|of|/)\s*\d+\s+(?:(?:stored|observed)\s+)?games?\b',text,re.I):
+            return True
+        if re.search(r'\b(?:above|below|over|under|tied)\s+in\s+'+count+r'\b',text,re.I):
+            return True
+    if explicit_units:
+        return False
+    # Structured facts may use a list of values followed by one shared label.
+    metric = str(fact.get('metric', '')).casefold()
+    metric_key = _metric_for_unit(metric) or {'points':'pts', 'rebounds':'reb', 'assists':'ast',
+                  'threes':'tpm', '3pm':'tpm', '3ptm':'tpm', 'fg_attempted':'fga'}.get(metric, metric)
+    if metric_key == unit and value in {float(n) for n in fact.get('values', []) if _finite(n)}:
+        # Count denominators must not become a scoring or projection value.
+        return fact.get('fact_type') in {'recent_values', 'projection', 'median', 'average', 'line'}
+    return False
+
+
+def _construction_numbers(text, question=''):
+    """Card-composition counts are instructions, not measured player statistics."""
+    normalized = _number_text(text)
+    requested = _numbers(question)
+    normalized = re.sub(r'(?<!\w)([1-6])\s+(?:separate\s+)?(?:legs?|picks?|selections?)(?!\w)',
+        lambda m: 'requested selections' if float(m.group(1)) in requested else m.group(), normalized, flags=re.I)
+    normalized = re.sub(r'\b1\s+(?:pick|player|selection)?\s*(?:from|for|on)\s+each\s+(?:team|side)\b',
+                        'a selection from each team', normalized, flags=re.I)
+    normalized = re.sub(r'\b(?:players?|picks?|selections?|legs?)\s+'
+                        r'(?:(?:are|come|coming|drawn|chosen|selected)\s+)?from\s+(?:at least\s+)?2\s+(?:different\s+)?teams?\b',
+                        'selections from both teams',normalized,flags=re.I)
+    return normalized
+
+
+def _sample_direction_claims(text):
+    value = _number_text(text)
+    patterns = (
+        r'\b(?P<direction>above|over|more|exceeded|cleared|below|under|less)\b[^;\n]{0,65}?\bin\s+(?P<hits>\d+)\s+(?:out\s+of|of|/)\s*(?P<n>\d+)\b',
+        r'\b(?P<hits>\d+)\s+(?:out\s+of|of|/)\s*(?P<n>\d+)\s+(?:(?:stored|observed)\s+)?(?:games?\s+)?'
+        r'(?:(?:were|finished|ended|landed)\s+)?(?P<direction>above|over|more|exceeded|cleared|below|under|less)\b',
+    )
+    result = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, value, re.I):
+            direction = 'less' if match['direction'].casefold() in {'below','under','less'} else 'more'
+            result.append((direction,int(match['hits']),int(match['n'])))
+    if result:
+        denominator = result[0][2]
+        for match in re.finditer(r'\b(?P<direction>below|under|less|above|over|more)\s+in\s+(?P<hits>\d+)\s*(?=[,.]|$)',value,re.I):
+            direction = 'less' if match['direction'].casefold() in {'below','under','less'} else 'more'
+            result.append((direction,int(match['hits']),denominator))
+    for match in re.finditer(r'(?<![\w.])(?P<hits>\d+)\s+(?:(?:(?:stored|observed)\s+)?games?\s+)?(?P<direction>above|over|below|under)\b',value,re.I):
+        # In "3 of 7 games above", seven is the sample denominator,
+        # not a second assertion that seven games cleared the line.
+        if re.search(r'(?:\bof|/)\s*$',value[:match.start()],re.I):
+            continue
+        direction = 'less' if match['direction'].casefold() in {'below','under'} else 'more'
+        result.append((direction,int(match['hits']),None))
+    return result
+
+
+def _unsupported_sample_equality(text, cards):
+    """Check explicit equal hit-count claims, not qualitative balance language."""
+    facts = [fact for card in cards for fact in _card_facts(card)
+             if fact.get('fact_type') in {'sample','sample_counts','counts'}]
+    entities = {fact.get('entity') for fact in facts if fact.get('entity')}
+    active_entities = set()
+    for sentence in re.split(r'(?<=[.!?;])\s+',text):
+        mentioned = _entity_mentions(sentence,entities)
+        if mentioned:
+            active_entities = mentioned
+        equality = re.search(r'\b(?:equal|identical|same)\s+(?:numbers?|counts?|frequenc(?:y|ies))\b|'
+                             r'\b(?:numbers?|counts?|frequencies)\b[^.!?;]{0,80}?\b(?:are|were|is|was)\s+(?:equal|identical|the same)\b|'
+                             r'\b(?:evenly split|split evenly)\b',sentence,re.I)
+        if not equality or not re.search(r'\b(?:above|over|more)\b',sentence,re.I) or not re.search(r'\b(?:below|under|less)\b',sentence,re.I):
+            continue
+        if re.search(r'\b(?:if|assuming|not|never)\b',sentence[:equality.start()],re.I):
+            continue
+        selected_entities = mentioned or active_entities or entities
+        if len(selected_entities)>1:
+            continue  # Comparing several players is a different claim.
+        for fact in facts:
+            if selected_entities and fact.get('entity') not in selected_entities:
+                continue
+            claims = _sample_direction_claims(fact['text'])
+            above = {hits for direction,hits,_ in claims if direction=='more'}
+            below = {hits for direction,hits,_ in claims if direction=='less'}
+            if len(above)==len(below)==1 and above!=below:
+                return True
+    return False
+
+
+def _validate_natural_numbers(text, selected, all_cards, question=''):
+    if _unsupported_sample_equality(text,selected):
+        raise ReplyValidationError('unsupported_metric')
+    facts = [fact for card in selected for fact in _card_facts(card)]
+    entities = _entities(all_cards)
+    active_entities = set()
+    for clause in re.split(r'(?<=[.!?;])\s+|\b(?:whereas|while|and|but)\b', text):
+        mentioned = _entity_mentions(clause, entities)
+        if mentioned:
+            active_entities = mentioned
+        elif active_entities:
+            mentioned = active_entities
+        candidates = [fact for fact in facts if not mentioned or fact.get('entity') in mentioned]
+        defensive_claim = bool(re.search(r'\b(?:allowed|allows?|conced\w*|opponent|defended)\b', clause, re.I))
+        if _numbers(clause):
+            candidates = [fact for fact in candidates if
+                bool(re.search(r'\b(?:allowed|allows?|conced\w*|opponent FG|defended)\b', fact.get('text',''), re.I)) == defensive_claim
+                or (defensive_claim and fact.get('opponent'))]
+        # Broad season averages cannot be relabeled as opponent-specific results.
+        historical = re.search(r'\b(?:averag\w*|scored|recorded|had|made|shot|grabbed|collected)\b', clause, re.I)
+        opponent_claim = re.search(r'\b(?:against|versus|vs\.?|facing)\s+([A-Za-z][A-Za-z -]{1,30})', clause, re.I)
+        if historical and opponent_claim:
+            matching = [fact for fact in candidates if fact.get('opponent') and
+                        re.search(r'\b'+re.escape(str(fact['opponent']))+r'\b', clause, re.I)]
+            # A source's own explicit full opponent name is also acceptable.
+            matching.extend(f for f in candidates if opponent_claim.group(0).casefold() in f.get('text', '').casefold())
+            candidates = matching
+        normalized = _construction_numbers(clause, question)
+        allowed = set().union(*(_numbers(f.get('text', '')) | {float(n) for n in f.get('values', []) if _finite(n)}
+                               for f in candidates)) if candidates else set()
+        for match in _NUMBER.finditer(normalized):
+            value = float(match.group())
+            if value not in allowed:
+                raise ReplyValidationError('unsupported_number')
+            unit = _UNIT_AFTER.match(normalized[match.end():])
+            if unit and not any(_quantity_supported(value, _metric_for_unit(unit.group(1)), f) for f in candidates):
+                raise ReplyValidationError('unsupported_metric')
+        for claim in _sample_direction_claims(clause):
+            if not any(any(claim[:2]==other[:2] and (claim[2] is None or claim[2]==other[2])
+                           for other in _sample_direction_claims(f.get('text',''))) for f in candidates):
+                raise ReplyValidationError('unsupported_metric')
+        # Forecast, average and median are different measurements even if a
+        # coincidentally equal number appears in another fact's sample count.
+        for claim_type, pattern in [('median', r'\bmedian\b'), ('projection', r'\b(?:project(?:ion|ed)|forecast)\b'),
+                                    ('average', r'\b(?:averag\w*|mean)\b')]:
+            if not re.search(pattern, clause, re.I) or not _numbers(clause):
+                continue
+            typed = [f for f in candidates if f.get('fact_type') == claim_type or re.search(pattern, f.get('text', ''), re.I)]
+            for term in re.finditer(pattern, normalized, re.I):
+                if re.search(r'\b(?:no|not|without|unsupported|unavailable|unknown)\b',normalized[:term.start()],re.I):
+                    continue
+                if not typed:
+                    raise ReplyValidationError('unsupported_metric')
+                after = _NUMBER.search(normalized[term.end():term.end()+24])
+                before = list(_NUMBER.finditer(normalized[max(0,term.start()-30):term.start()]))
+                claimed = float(after.group()) if after else float(before[-1].group()) if before else None
+                comparison = (re.search(r'\b(above|below|over|under|exceed\w*|less than|more than|equal to)\b',
+                                        normalized[term.end():term.end()+after.start()],re.I) if after else None)
+                if comparison:
+                    centers = [float(f['values'][0]) for f in typed if f.get('values') and _finite(f['values'][0])]
+                    if centers:
+                        operator = comparison.group().casefold()
+                        supported = (any(n<claimed for n in centers) if operator in {'below','under','less than'} else
+                                     any(n==claimed for n in centers) if operator=='equal to' else any(n>claimed for n in centers))
+                        if not supported:
+                            raise ReplyValidationError('unsupported_metric')
+                    continue
+                if claimed is not None and not any(claimed in _numbers(f.get('text','')) for f in typed):
+                    raise ReplyValidationError('unsupported_metric')
+
+
+def _unsupported_certainty(text):
+    for clause in re.split(r'(?<=[.!?;])\s+|\bbut\b', text):
+        match = re.search(r'\b(?:guaranteed(?:\s+win|\s+profit)?|sure[- ]?fire|risk[- ]free|cannot lose|can[’\x27]t lose|'
+                          r'(?:will|must|definitely)\s+(?:hit|cash|win|score|make|record|attempt)|(?:a|the)\s+lock)\b', clause, re.I)
+        if match and not re.search(r'\b(?:not|no|never|isn[’\x27]t|aren[’\x27]t|isnt|arent|without)\b', clause[:match.start()], re.I):
+            return True
+    return False
+
+
+def _unsupported_probability(text, cards):
+    if not re.search(r'\b(?:chance|probabilit\w*|win\s*rate|likely\s+to\s+hit)\b', text, re.I):
+        return False
+    if not re.search(r'\d\s*%|\bpercent\b', text, re.I):
+        return False
+    return not any(c.get('kind') == 'calibrated_probability' and c.get('verified_calibration') is True for c in cards)
+
+
+def _unsupported_recommendation(text, cards):
+    # Formatting must not change whether a recommendation contradicts the
+    # computed assessment (for example, "lean toward **down**").
+    text = re.sub(r'[*_`]+', '', text)
+    decisions_by_entity = {}
+    for card in cards:
+        if (str(card.get('kind','')).startswith('prop_') or card.get('kind')=='research_projection') and card.get('decision') in {'more','less','pass'}:
+            decisions_by_entity.setdefault(card.get('entity'),set()).add(card['decision'])
+    if not decisions_by_entity:
+        return False
+    pattern = re.compile(
+        r'\b(?:I|we)(?:[’\x27]d|\s+would)?\s+(?:lean|choose|prefer|recommend|take|pick|go\s+with)\s+'
+        r'(?:(?:toward|towards|the)\s+)?(?P<first>more|less|over|under|up|down)\b|'
+        r'\b(?:my|the)\s+(?:pick|lean|recommendation|assessment)\s+(?:is|would\s+be)\s+(?P<second>more|less|over|under|up|down)\b|'
+        r'\b(?:lean(?:s|ing)?|recommend(?:s|ing)?|prefer(?:s|ring)?|favor(?:s|ing)?)\s+'
+        r'(?:(?:slightly|cautiously|tentatively)\s+)?(?:(?:towards?|to|on)\s+)?(?:the\s+)?'
+        r'(?P<direction>more|less|over|under|up|down)\b|'
+        r'^\s*(?:lean\s*[:—-]?\s*)?(?P<heading>more|less|over|under|up|down)\s*(?:[.,:;—-]|on\b|$)|'
+        r'^\s*(?:take|choose|pick)\s+(?P<imperative>more|less|over|under|up|down)\b', re.I)
+    active_entities = set()
+    for clause in re.split(r'(?<=[.!?;])\s+|\n|\b(?:but|and)\b', text):
+        mentioned = _entity_mentions(clause,{e for e in decisions_by_entity if e})
+        if mentioned:
+            active_entities = mentioned
+        for match in pattern.finditer(clause):
+            prefix = clause[:match.start()]
+            if re.search(r'\b(?:if|assuming|provided|previously|earlier|not|never)\b|\bdon[’\x27]t\b', prefix, re.I):
+                continue
+            if re.search(r'\bno\s+(?:(?:strong|clear|good|sufficient|compelling)\s+)?'
+                         r'(?:justification|reason|basis|support|evidence)(?:\s+(?:exists|is available))?\s+(?:to|for)\s*$|'
+                         r'\bno\s+(?:(?:strong|clear|definite|decisive)\s+)?$',prefix,re.I):
+                continue
+            if re.search(r'\bonly\s+if\b',clause[match.end():],re.I):
+                continue
+            entities = mentioned or active_entities
+            if len(entities)>1:
+                # References to another player in an explanation must not
+                # lend that player's decision to the recommended selection.
+                target = re.split(r'\b(?:because|since|with|whereas)\b',clause[match.end():],maxsplit=1,flags=re.I)[0]
+                entities = _entity_mentions(target,entities)
+            if not entities and len(decisions_by_entity)==1:
+                entities = set(decisions_by_entity)
+            decisions = set().union(*(decisions_by_entity[e] for e in entities)) if entities else set()
+            if len(decisions)!=1:
+                continue  # An ambiguous referent is not a verified contradiction.
+            decision = next(iter(decisions))
+            side = next(value for value in match.groupdict().values() if value)
+            side = 'more' if side.casefold() in {'more','over','up'} else 'less'
+            if side != decision:
+                return True
+    return False
+
+
+def _unsupported_availability(text, cards):
+    verified = any(c.get('kind') == 'verified_availability' and c.get('verified_current') is True for c in cards)
+    if verified:
+        return False
+    for clause in re.split(r'(?<=[.!?;])\s+|\bbut\b', text):
+        match = re.search(r'\b(?:he|she|they|[A-Z][a-z]+)\s+(?:is|are|will be|has been)\s+'
+                          r'(?:healthy|available|out|ruled out|starting|cleared|playing tonight)\b', clause)
+        if match and not re.search(r'\b(?:if|whether|unknown|unclear|unconfirmed|not|cannot confirm|can[’\x27]t confirm|reported|report says)\b',
+                                   clause[:match.start()], re.I):
+            return True
+    return False
+
+
+def _natural_sources(cards):
+    return [{'tool':'scoped_evidence', 'evidence_id':c['id'], 'population_kind':c.get('kind'),
+             'source':c.get('source'), 'data_through_date':c.get('data_through_date'),
+             'published_at':c.get('published_at'), 'text':c.get('text', ''),
+             **({'query':c['query'], 'excerpt':c.get('excerpt',False)} if c.get('query') else {})}
+            for c in cards]
+
+
+def _natural_footer(cards):
+    if not cards:
+        return ''
+    labels = []
+    for card in cards:
+        source = str(card.get('source') or 'saved records')
+        if source.startswith(('http://', 'https://')):
+            from urllib.parse import urlsplit
+            source = urlsplit(source).netloc.removeprefix('www.')
+        # Source values can be long query/source payloads; cite stable labels,
+        # while retaining their original detail in structured sources.
+        labels.append(source if len(source) <= 70 else 'saved records')
+    dates = sorted({str(c['data_through_date'])[:10] for c in cards if c.get('data_through_date')})
+    suffix = ('; stored coverage '+('–'.join([dates[0],dates[-1]]) if len(dates)>1 else dates[0])) if dates else ''
+    unknown = any(not c.get('data_through_date') and c.get('kind') in
+                  {'player_all_opponent_averages','player_observed_sample','tracking_Team defense',
+                   'tracking_Team totals','opponent_team_context'} for c in cards)
+    if unknown:
+        suffix += '; some covered-game dates unknown'
+    tentative = [c for c in cards if c.get('kind') == 'tentative_assignment'
+                 and c.get('verified_game_day_assignment') is not True]
+    if tentative:
+        asof = sorted({str(c.get('assignment_date'))[:10] for c in tentative
+                       if c.get('assignment_date') and c.get('assignment_date') != 'unknown'})
+        suffix += '; pairing tentative'+(' as of '+', '.join(asof) if asof else '')+'; guarding direction unconfirmed'
+    if any(c.get('kind') == 'availability_coverage' for c in cards):
+        suffix += '; current availability unverified'
+    if any(c.get('kind') == 'publisher_report' for c in cards):
+        suffix += '; publisher reports unverified'
+    return 'Sources: '+', '.join(dict.fromkeys(labels))+suffix+'.'
+
+
+def _brief_source_fact(card):
+    """Shorten presentation only when the fact's scope and uncertainty survive."""
+    if card.get('kind') == 'tentative_assignment':
+        entity = str(card.get('entity') or 'the player')
+        opponent = ' vs '+str(card['opponent']) if card.get('opponent') else ''
+        primary = str(card.get('primary') or 'unavailable')
+        alternate = ' (alternate '+str(card['alternate'])+')' if card.get('alternate') else ''
+        asof = str(card.get('assignment_date') or 'unknown')
+        text = f'Saved tentative pairing for {entity}{opponent}: {primary}{alternate}. Dated {asof}; guarding direction unconfirmed.'
+        if card.get('assignment_refresh_state') == 'needs_review':
+            text += ' Current roster or availability evidence conflicts with this saved pairing.'
+        elif card.get('assignment_refresh_state') == 'recheck_overdue':
+            text += ' Its roster and availability recheck is overdue.'
+        return text
+    text = str(card.get('brief_text') or _card_facts(card)[0].get('text', ''))
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    first = sentences[0].strip()
+    # A first sentence can be a factual number while the next carries the
+    # indispensable sample/publication qualifier. Never silently drop it.
+    qualifiers = [part.strip() for part in sentences[1:] if re.search(
+        r'\b(?:coverage (?:may be incomplete|is incomplete)|covered-game date is unknown|'
+        r'not independently verified|guarding direction unconfirmed|tentative as of)\b', part, re.I)]
+    if card.get('kind') == 'availability_coverage':
+        qualifiers.append('Player health and game-day availability cannot be confirmed from these records.')
+    return ' '.join(dict.fromkeys([first,*qualifiers]))
+
+
+def render_natural_reply(document, cards, required=(), question=''):
+    """Render a concise explanation with scoped numerical checks and citations.
+
+    `approved_facts` may be supplied by deterministic analysis tools. It must
+    contain application-authored facts, never values taken from model output.
+    The question is reserved for context; user-stated statistics are not silently
+    promoted to verified facts. Legacy rendering retains its original contract.
+    """
+    if isinstance(document, dict) and 'reply' in document and 'analysis' not in document:
+        document = {('analysis' if k == 'reply' else k):v for k,v in document.items()}
+    if not isinstance(document, dict) or set(document) != {'evidence_ids','analysis','needs_more_data'}:
+        raise ReplyValidationError('invalid_schema')
+    ids, text, more = document['evidence_ids'], document['analysis'], document['needs_more_data']
+    by_id = {c['id']:c for c in cards}
+    if (not isinstance(ids,list) or any(not isinstance(i,str) or i not in by_id for i in ids)
+            or any(not isinstance(i,str) or i not in by_id for i in required)):
+        raise ReplyValidationError('invalid_evidence')
+    if not isinstance(text,str) or type(more) is not bool:
+        raise ReplyValidationError('invalid_schema')
+    if len(text)>1600:
+        raise ReplyValidationError('analysis_too_long')
+    if more:
+        if text.strip():
+            raise ReplyValidationError('retrieval_with_analysis')
+        return None
+    inline = re.findall(r'\[([A-Z]\d+)\]', text)
+    if any(i not in by_id for i in inline):
+        raise ReplyValidationError('invalid_evidence')
+    ids = list(dict.fromkeys([*required,*ids,*inline]))
+    if len(ids)>4:
+        raise ReplyValidationError('invalid_evidence')
+    selected = [by_id[i] for i in ids]
+    text = re.sub(r'\s*\[[A-Z]\d+\]', '', text).strip()
+    if not text:
+        raise ReplyValidationError('empty_reply')
+    _validate_natural_numbers(text, selected, cards, question)
+    if has_unsupported_assignment(text, cards):
+        raise ReplyValidationError('unsupported_assignment')
+    if has_unscoped_absence(text, cards):
+        raise ReplyValidationError('unsupported_scope')
+    if _unsupported_availability(text, selected):
+        raise ReplyValidationError('unsupported_availability')
+    if _unsupported_certainty(text) or _unsupported_probability(text, selected):
+        raise ReplyValidationError('unsupported_certainty')
+    if _unsupported_recommendation(text, cards):
+        raise ReplyValidationError('unsupported_recommendation')
+    footer = _natural_footer(selected)
+    return {'answer': text+('\n\n'+footer if footer else ''), 'sources':_natural_sources(selected),
+            'grounding':'Retrieved facts with entity, metric and numeric checks; generated interpretation is not a calibrated forecast.'}
+
+
+def natural_fallback_reply(cards, required=(), failure_message=None):
+    """Preserve useful source facts without returning several raw evidence cards."""
+    selected = [c for c in cards if c['id'] in required]
+    selected.extend(c for c in cards if c not in selected)
+    facts = []
+    used = []
+    for card in selected:
+        sentence = _brief_source_fact(card)
+        if sentence and len(sentence)<=500 and sentence not in facts:
+            facts.append(sentence)
+            used.append(card)
+        if len(facts)==2:
+            break
+    message = '\n'.join(facts) or 'I need a clearer player, statistic or line to give a useful assessment.'
+    if facts:
+        message += '\nI could not complete the explanation, so these are saved facts rather than a pick recommendation.'
+    footer = _natural_footer(used)
+    return {'answer':message+('\n\n'+footer if footer else ''), 'sources':_natural_sources(used),
+            'ai_used':False, 'ai_failure_category':'grounding_error'}

@@ -164,27 +164,43 @@ averages, player-versus-team samples, team production, team defense and tentativ
 assignments. Coverage dates, source publication dates and assignment dates remain
 separate. A newer season average never substitutes for an older measured matchup.
 
-The model receives concise descriptions of the available evidence and its limits,
-selects relevant source records, and writes its own qualitative interpretation.
-Supported comparisons are calculated only within matching player/season scopes;
-a team total does not imply an individual defender's ability. The application
-renders numerical facts and their scope directly
-from those records, and rejects unverified numerical prose or invalid citations.
-This is a general evidence format, not a table of answers for individual players
-or questions. Qualitative interpretation can still be wrong and requires review.
-Model-written query filters/calculations are explicitly marked for review.
+The model receives scoped evidence and writes a short explanation first, followed
+by compact source citations. For a stated prop, the application calculates the
+observed distribution, mean, median, workload and source limits before the model
+explains a qualified More, Less or Pass assessment. Supported numbers can appear
+in the explanation; checks reject unsupported quantities, conflicting metrics,
+opponent-scope changes and invented availability or defender assignments. A team
+total does not establish an individual defender's ability. These checks are bounded,
+not a guarantee that every generated interpretation is correct. Deeper model-written
+query filters/calculations remain explicitly marked for review.
+
+Private conversation retains up to twelve question/answer pairs for twelve hours,
+including recent pick reports and uploaded-board replies. Follow-ups keep the
+player, market and line: “Josh Hart 22.5” prompts for the missing statistic;
+“I mean PRA,” “up or down?” and “why?” continue the same discussion. Changing the
+market clears the old threshold. A genuinely ambiguous player, statistic or line
+gets a short clarification. The bot also distinguishes preferences and lineup
+instructions from requests for team statistics. `/clear` removes this context.
+
+Both-team coverage is enforced when building complete multi-player lineups; missing
+qualified opponents produce a clearly labeled partial draft. Recent explicit team
+constraints and market preferences carry into subsequent Telegram research.
+Hypothetical `/picks` targets remain distinct from uploaded sportsbook lines.
+Conversational answers do not create entries or modify the financial ledger.
 
 When the needed evidence is available, one compact model request supplies the
 explanation. Simple conversation is also model-generated, with a small prompt;
 there are no canned greeting or thank-you responses. Questions needing additional
 data retain the retrieval tools and use the same final source contract. Invalid
-explanations get one bounded repair attempt, then return labeled saved evidence
-if still invalid. Rejected replies are never reused from the cache.
-Timeouts and model-server failures state the actual failure before showing saved
-evidence. Compact prompts carry each selected fact once, with full source metadata
+explanations get one bounded repair attempt, then return a concise computed
+assessment or labeled saved facts if still invalid. `/ai_status` retains the actual
+failure and timing information. Rejected replies are never reused from the cache.
+Compact prompts carry each selected fact once, with full source metadata
 retained for rendering. Short explanations have a smaller output budget and a
 180-second total request limit including any repair, with no automatic retry
 after a timeout. Telegram displays a typing indicator while generating a reply.
+Follow-up messages in the same chat wait for the preceding answer so they receive
+completed context; health commands remain available while it works.
 Clearing chat history during a request cannot restore the deleted conversation
 when that request completes.
 `/ai_status` includes active-job elapsed time and timings for the latest compact

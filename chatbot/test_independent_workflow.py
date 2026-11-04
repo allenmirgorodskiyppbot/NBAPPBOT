@@ -168,7 +168,7 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_bare_month_day_runs_real_research_without_ai_or_recording_entry(self):
         before = self.counts()
-        with patch('telegram_bot.parse_picks_request', side_effect=lambda text: parse_picks_request(text, NOW)), \
+        with patch('telegram_bot.parse_picks_request', side_effect=lambda text, **kw: parse_picks_request(text, NOW, **kw)), \
                 patch('independent_picks._now', return_value=NOW):
             response = await self.bot._handle_message(self.message('Oct 30'), 20)
         self.assertIn('My target lines', response)
@@ -179,7 +179,7 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_short_date_after_tipoff_is_held_instead_of_choosing_another_game(self):
         after_tip = NOW + dt.timedelta(hours=2)
-        with patch('telegram_bot.parse_picks_request', side_effect=lambda text: parse_picks_request(text, after_tip)), \
+        with patch('telegram_bot.parse_picks_request', side_effect=lambda text, **kw: parse_picks_request(text, after_tip, **kw)), \
                 patch('independent_picks._now', return_value=after_tip):
             response = await self.bot._handle_message(self.message('10/30'), 21)
         self.assertIn('started', response)

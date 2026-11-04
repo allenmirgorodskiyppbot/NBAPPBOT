@@ -289,10 +289,10 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(restarted._conversation(USER_ID + 1))
 
     async def test_conversation_history_is_bounded_and_unauthorized_messages_are_not_saved(self):
-        for number in range(180, 185):
+        for number in range(180, 195):
             await self.bot.process_update(update(number, 'Question ' + str(number)))
-        self.assertLessEqual(len(self.rows('telegram_conversation')), 3)
-        await self.bot.process_update(update(186, 'Private injection', user=999))
+        self.assertEqual(len(self.rows('telegram_conversation')), 12)
+        await self.bot.process_update(update(196, 'Private injection', user=999))
         self.assertNotIn('Private injection', str(self.rows('telegram_conversation')))
         with self.bot._db() as db:
             db.execute("UPDATE telegram_conversation SET created_at='2000-01-01T00:00:00+00:00'")

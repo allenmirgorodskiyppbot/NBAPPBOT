@@ -91,13 +91,13 @@ $('chat-form').addEventListener('submit',async event=>{
   busy=true;$('send').disabled=true;$('chat-error').textContent='';$('working').hidden=false;$('working').textContent='Reading your question…';
   addMessage('user',question);$('question').value='';$('welcome').hidden=true;
   try{
-    const job=await api('/api/chat',{method:'POST',body:JSON.stringify({message:question,history:history.slice(-6)})});
+    const job=await api('/api/chat',{method:'POST',body:JSON.stringify({message:question,history:history.slice(-24)})});
     const deadline=Date.now()+16*60*1000;
     while(true){
       if(Date.now()>deadline)throw new Error('This answer is taking too long. Try a shorter question.');
       await pause(2000);const result=await api('/api/jobs/'+encodeURIComponent(job.job_id));
       if(result.status==='error')throw new Error(result.error);
-      if(result.status==='done'){addMessage('assistant',result.answer,result.sources);history.push({role:'user',content:question},{role:'assistant',content:result.answer.slice(0,4000)});history=history.slice(-6);break;}
+      if(result.status==='done'){addMessage('assistant',result.answer,result.sources);history.push({role:'user',content:question},{role:'assistant',content:result.answer.slice(0,4000)});history=history.slice(-24);break;}
       $('working').textContent=result.detail+'… CPU answers can take a few minutes.';
     }
   }catch(error){$('chat-error').textContent=error.message;$('question').value=question;}

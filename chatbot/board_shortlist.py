@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 from feeds import TEAM_WORDS, canonical_player, canonical_team
 from news_digest import _aware, _clean, _metadata, is_promotion
 from season_calendar import calendar_context, current_season
+from lineup_selection import select_lineup
 
 EASTERN = ZoneInfo('America/New_York')
 MARKET_NAMES = {
@@ -329,9 +330,12 @@ def _watchlist(store, original_legs, news, now):
     return result
 
 
-def enrich_shortlist(store, report, now=None):
+def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
     """Apply presentation/risk gates to engine output without changing saved data."""
     now = _now(now)
+    # Validate caller preferences before any optional lookup. Eligibility gates
+    # below remain identical regardless of the requested lineup size.
+    select_lineup([], count, constraints=constraints)
     original = list(report.get('original_legs') or [item.get('leg', {}) for item in report.get('legs', [])])
     news = store.recent_news(200)
     thresholds = defaultdict(set)
@@ -392,15 +396,19 @@ def enrich_shortlist(store, report, now=None):
                        'availability': availability, 'projection': projection,
                        'context': context, '_score': score})
     usable.sort(key=lambda item: (-item['_score'], -int(item['projection'].get('n') or 0), item['leg']['player']))
-    selected, seen = [], set()
-    for item in usable:
-        player = canonical_player(item['leg']['player'])
-        if player in seen:
-            continue
-        seen.add(player)
-        selected.append({key: value for key, value in item.items() if key != '_score'})
-        if len(selected) == 3:
-            break
+    # Only a verified saved event establishes which two teams a single-game
+    # request must cover. Do not infer the opponent from player names or images.
+    event_teams = {}
+    for leg in original:
+        context, issue = _event(store, leg, now)
+        team = canonical_team(leg.get('team'))
+        opponent = canonical_team(context.get('opponent'))
+        event_id = context.get('game_id')
+        if not issue and event_id and team in TEAM_WORDS and opponent in TEAM_WORDS:
+            event_teams.setdefault(event_id, set()).update((team, opponent))
+    required_teams = next(iter(event_teams.values())) if len(event_teams) == 1 else ()
+    chosen, coverage = select_lineup(usable, count, required_teams=required_teams, constraints=constraints)
+    selected = [{key: value for key, value in item.items() if key != '_score'} for item in chosen]
     # Collapse repeated More/Less exclusions for the same missing sample or offer.
     unique_skipped = []
     seen_skips = set()
@@ -413,6 +421,7 @@ def enrich_shortlist(store, report, now=None):
     return {'board_id': report.get('board_id'), 'report_id': report.get('id'),
             'generated_at': now.isoformat(), 'source_report_generated_at': report.get('generated_at'),
             'research_only': True, 'shortlist': selected, 'skipped': unique_skipped,
+            **coverage,
             'watchlist': _watchlist(store, original, news, now),
             'has_adjusted_offers': adjusted_offers,
             'notes': ['Experimental comparisons, not validated win probabilities.',
@@ -424,7 +433,11 @@ def enrich_shortlist(store, report, now=None):
 def format_shortlist(data):
     """Keep the decision, its reason, and next request in one Telegram message."""
     picks = data.get('shortlist', [])
-    lines = ['My shortlist' if picks else 'No pick from these lines yet']
+    heading = ('Partial shortlist — lineup incomplete' if picks and data.get('lineup_complete') is False
+               else 'My shortlist' if picks else 'No pick from these lines yet')
+    lines = [heading]
+    if data.get('constraint_note'):
+        lines.append(_clean(data['constraint_note'], 280))
     for number, item in enumerate(picks, 1):
         leg = item['leg']
         block = (f"{number}. {_clean(leg['player'], 70)} — {leg['side'].title()} {float(leg['line']):g} "
@@ -465,5 +478,21 @@ def format_shortlist(data):
             if not candidates:
                 break
             lines.pop(candidates[-1])
+        if not any(line.startswith('• ') for line in lines):
+            lines = [line for line in lines if line not in {
+                'Beyond your screenshots — check these lines:',
+                'Send those actual offers before I choose More/Less for them.'}]
+        # A four/six-player request must not lose its last pick or the no-entry
+        # footer to a character slice. Shorten prose before dropping any fact.
+        for maximum in (180, 120, 80):
+            if len('\n\n'.join(lines)) <= 2400:
+                break
+            lines = ['\n'.join(('Why: ' + _clean(part[5:], maximum) if part.startswith('Why: ')
+                                 else 'Watch: ' + _clean(part[7:], max(80, maximum))
+                                 if part.startswith('Watch: ') else part)
+                                for part in line.split('\n')) for line in lines]
+        if len('\n\n'.join(lines)) > 2400:
+            lines = ['\n'.join(part for part in line.split('\n') if not part.startswith('Why: '))
+                     for line in lines]
         text = '\n\n'.join(lines)
-    return text[:2400]
+    return text

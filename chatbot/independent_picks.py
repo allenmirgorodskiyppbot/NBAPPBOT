@@ -16,6 +16,7 @@ from board_shortlist import MARKET_NAMES, player_availability
 from contextual_projection import projection_for_leg
 from feeds import canonical_player, canonical_team
 from news_digest import _aware, _clean
+from lineup_selection import select_lineup
 
 EASTERN = ZoneInfo('America/New_York')
 MARKETS = ('pts', 'reb', 'ast', 'pra', 'fga')
@@ -88,11 +89,17 @@ def _reason(projection):
     return text
 
 
-def build_independent_picks(store, date=None, count=4, team='NYK', now=None):
+def build_independent_picks(store, date=None, count=4, team='NYK', now=None, constraints=None):
     """Build a read-only conditional research draft without reading any board."""
     now = _now(now)
     if type(count) is not int or not 1 <= count <= 6:
         raise ValueError('Request between one and six distinct players.')
+    constraints = dict(constraints or {})
+    # A preference changes the ordering of independently qualified markets. It
+    # must not expand the supported market set or weaken the evidence gates.
+    preferred_stat = constraints.get('preferred_stat')
+    if preferred_stat not in MARKETS:
+        preferred_stat = None
     team = canonical_team(team)
     game, error = _select_game(store, date, team, now)
     result = {'mode': 'independent_projections', 'generated_at': now.isoformat(),
@@ -103,6 +110,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None):
               'limits': ['These are own projections and conditional target lines, not current PrizePicks offers.',
                          'Experimental scenarios; no calibrated win probabilities or combined entry odds.',
                          'Current availability, game time and offer terms require checking. No entry is recorded.']}
+    _, coverage = select_lineup([], count, constraints=constraints)
+    result.update(coverage)
+    if preferred_stat:
+        result['lineup_constraints']['preferred_stat'] = preferred_stat
     if error:
         return result
     teams = {game['home_team'], game['away_team']}
@@ -170,22 +181,21 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None):
                             'reason': _reason(projection), 'availability': availability,
                             'caution': availability.get('note'), '_rank': rank})
         if choices:
-            choices.sort(key=lambda value: (-value['_rank'], MARKETS.index(value['stat'])))
+            choices.sort(key=lambda value: (bool(preferred_stat and value['stat'] != preferred_stat),
+                                            -value['_rank'], MARKETS.index(value['stat'])))
             candidates.append(choices[0])
         else:
             result['held'].append({'player': player['player'], 'reason': next(iter(dict.fromkeys(reasons)), 'Insufficient data.')})
     candidates.sort(key=lambda value: (-value['_rank'], value['player']))
-    chosen = candidates[:count]
-    available_teams = {row['team'] for row in candidates}
-    if count >= 2 and len(available_teams) >= 2 and len({row['team'] for row in chosen}) < 2:
-        other = next(row for row in candidates if row['team'] != chosen[0]['team'])
-        chosen[-1] = other
+    chosen, coverage = select_lineup(candidates, count, required_teams=teams, constraints=constraints)
+    result.update(coverage)
+    if preferred_stat:
+        result['lineup_constraints']['preferred_stat'] = preferred_stat
     result['picks'] = [{k: v for k, v in row.items() if k != '_rank'} for row in chosen]
-    result['two_team_coverage'] = len({row['team'] for row in chosen}) >= 2
     result['note'] = (f"{len(chosen)} of {count} requested player projections are supported." if len(chosen) < count else
                       'Compare these independent targets with the actual offers before selecting sides.')
-    if count >= 2 and not result['two_team_coverage']:
-        result['note'] += ' Two-team coverage is unavailable; this is not a complete ordinary multi-team entry.'
+    if not result['lineup_complete']:
+        result['note'] += ' ' + result['constraint_note']
     result['source_data_through_date'] = min((row['projection']['last_date'] for row in chosen), default=None)
     result['revision'] = hashlib.sha256(json.dumps({'game': game, 'picks': result['picks'],
                                                   'held': result['held']}, sort_keys=True).encode()).hexdigest()
@@ -199,8 +209,11 @@ def format_independent_picks(report, compact=False):
         return 'Independent picks: ' + str(report.get('note') or 'No supported upcoming game is available.')
     tip = _aware(game.get('start_time'))
     label = tip.astimezone(EASTERN).strftime('%b %d, %-I:%M %p Eastern') if tip else str(game['date'])
-    lines = [f"My projections — {game['home_team']} vs {game['away_team']} · {label}",
+    heading = 'Partial research' if report.get('lineup_complete') is False else 'My projections'
+    lines = [f"{heading} — {game['home_team']} vs {game['away_team']} · {label}",
              'My target lines, not quoted PrizePicks offers.']
+    if report.get('lineup_complete') is False:
+        lines[1] += '\n' + _clean(report.get('constraint_note'), 240)
     for i, item in enumerate(report.get('picks', []), 1):
         value = item['projection']['reference_projection']
         targets = item['targets']

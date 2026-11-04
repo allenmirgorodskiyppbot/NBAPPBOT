@@ -66,7 +66,9 @@ def safe_ai_request_details(value):
         'phase': {'evidence_reply'},
         'status': {'running', 'repairing', 'needs_retrieval', 'completed', 'cancelled', 'failed'},
         'validation_reason': {'invalid_json', 'invalid_schema', 'invalid_evidence', 'analysis_too_long',
-                              'retrieval_with_analysis', 'empty_reply', 'numerical_prose', 'unsupported_assignment', 'unsupported_scope'},
+                              'retrieval_with_analysis', 'empty_reply', 'numerical_prose', 'unsupported_assignment',
+                              'unsupported_scope', 'unsupported_number', 'unsupported_metric',
+                              'unsupported_recommendation', 'unsupported_availability', 'unsupported_certainty'},
         'finish_reason': {'stop', 'length', 'load'},
         'failure_category': {'timeout', 'connection_error', 'model_error', 'invalid_model_response',
                              'empty_model_answer', 'output_limit', 'tool_limit', 'grounding_error', 'internal_error'},
@@ -171,7 +173,7 @@ def _normalize_pick_dates(argument, current):
     return _SHORT_PICK_DATE.sub(replace, argument)
 
 
-def parse_picks_request(text, now=None):
+def parse_picks_request(text, now=None, default_count=4):
     """Route explicit research requests; questions about old picks stay in chat.
 
     The routing only chooses a capability. All players, projections and targets
@@ -246,7 +248,9 @@ def parse_picks_request(text, now=None):
     numbers.extend(number_words[n] for n in re.findall(r'\b(?:two|three|four|five|six)\b', without_date))
     if len(set(numbers)) > 1 or numbers and not 2 <= numbers[0] <= 6:
         raise ValueError('Request between 2 and 6 distinct-player targets; fewer may be supported.')
-    count = numbers[0] if numbers else 4
+    count = numbers[0] if numbers else default_count
+    if type(count) is not int or not 2 <= count <= 6:
+        count = 4
     if command:
         remaining = re.sub(r'\b(?:\d{4}-\d{2}-\d{2}|\d+|two|three|four|five|six|today|tonight|tomorrow|next)\b', '', argument)
         if remaining.strip():
@@ -390,13 +394,30 @@ class TelegramBot:
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
         with self._db() as db:
             rows = db.execute('SELECT question,answer FROM telegram_conversation WHERE chat_id=? '
-                              'AND created_at>=? ORDER BY update_id DESC LIMIT 3', (chat_id, cutoff)).fetchall()
+                              'AND created_at>=? ORDER BY update_id DESC LIMIT 12', (chat_id, cutoff)).fetchall()
         history = []
         for row in reversed(rows):
             history.append({'role': 'user', 'content': row['question']})
             if row['answer']:
                 history.append({'role': 'assistant', 'content': row['answer']})
-        return history[-6:]
+        return history[-24:]
+
+    async def _handle_ordered_message(self, message, update_id):
+        """A quick correction waits for the preceding answer in the same chat.
+
+        Health/clear commands remain responsive. Album uploads have their own
+        collector and must not wait behind one another on this dialogue lock.
+        """
+        text = str(message.get('text') or '').strip()
+        command = text.split(maxsplit=1)[0].split('@', 1)[0].lower() if text else ''
+        conversational = bool(text and (not text.startswith('/') or command == '/picks'))
+        if not conversational or message.get('photo') or message.get('document'):
+            return await self._handle_message(message, update_id)
+        if not hasattr(self, '_conversation_locks'):
+            self._conversation_locks = {}
+        lock = self._conversation_locks.setdefault(message['chat']['id'], asyncio.Lock())
+        async with lock:
+            return await self._handle_message(message, update_id)
 
     def _remember(self, chat_id, update_id, question, answer=None):
         with self._db() as db:
@@ -410,7 +431,7 @@ class TelegramBot:
                            (answer[:4000], chat_id, update_id))
             db.execute('DELETE FROM telegram_conversation WHERE chat_id=? AND update_id NOT IN '
                        '(SELECT update_id FROM telegram_conversation WHERE chat_id=? '
-                       'ORDER BY update_id DESC LIMIT 3)', (chat_id, chat_id))
+                       'ORDER BY update_id DESC LIMIT 12)', (chat_id, chat_id))
 
     def _get_state(self, name, default=''):
         with self._db() as db:
@@ -583,14 +604,14 @@ class TelegramBot:
             raise RuntimeError('Telegram file download failed; please try the upload again.') from None
         return bytes(payload)
 
-    async def _board_saved_reply(self, board):
+    async def _board_saved_reply(self, board, chat_id=None):
         heading=f'PrizePicks board saved: {board["id"]}\n{len(board["legs"])} uploaded lines. No placed entry recorded.'
         if not callable(getattr(self.store,'connect',None)):
             return heading+'\n/analyze '+board['id']
         await self._refresh_board_news()
         import analysis_engine
         report=await asyncio.to_thread(analysis_engine.analyze_board,self.store,board['id'])
-        return heading+'\n\n'+await self._shortlist_reply(report)
+        return heading+'\n\n'+await self._shortlist_reply(report, chat_id)
 
     async def _refresh_board_news(self):
         if self.research_refresh_callback is not None:
@@ -611,21 +632,37 @@ class TelegramBot:
             except Exception:
                 log.warning('Tentative matchup recheck incomplete; original source dates retained.')
 
-    async def _shortlist_reply(self, report):
+    def _pick_constraints(self, chat_id):
+        if chat_id is None or not callable(getattr(self.store, 'connect', None)):
+            return {}
+        from conversation import resolve_conversation
+        turn = resolve_conversation(None, self.store, 'Use my lineup preferences.', self._conversation(chat_id))
+        constraints = dict(turn.get('constraints', {}))
+        count = turn.get('state', {}).get('slots', {}).get('pick_count')
+        if type(count) is int and 1 <= count <= 6:
+            constraints['pick_count'] = count
+        return constraints
+
+    async def _shortlist_reply(self, report, chat_id=None):
         if callable(getattr(self.store, 'connect', None)) and 'original_legs' in report:
             from board_shortlist import enrich_shortlist, format_shortlist
-            shortlist = await asyncio.to_thread(enrich_shortlist, self.store, report)
+            constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
+            shortlist = await asyncio.to_thread(enrich_shortlist, self.store, report,
+                count=constraints.get('pick_count', 3), constraints=constraints)
             return format_shortlist(shortlist)
         import analysis_engine
         formatter = getattr(analysis_engine, 'format_analysis', None)
         return formatter(report) if formatter else self._compact(report)
 
-    async def _independent_picks_reply(self, request, chat_id):
+    async def _independent_picks_reply(self, request, chat_id, original_text=None):
         from independent_picks import build_independent_picks, format_independent_picks
         typing = asyncio.create_task(self._typing(chat_id))
         try:
             await self._refresh_board_news()
-            report = await asyncio.to_thread(build_independent_picks, self.store, **request)
+            constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
+            if original_text is not None:
+                request = parse_picks_request(original_text, default_count=constraints.get('pick_count', 4)) or request
+            report = await asyncio.to_thread(build_independent_picks, self.store, **request, constraints=constraints)
             return format_independent_picks(report)
         finally:
             typing.cancel()
@@ -733,7 +770,7 @@ class TelegramBot:
                     report = await asyncio.to_thread(analysis_engine.analyze_board, self.store, board['id'])
                     header = f"Read {bundle['market_count']} distinct lines across {bundle['upload_count']} recent screenshot(s)."
                     header += ('\nAssumed game date: ' if bundle.get('date_assumed') else '\nGame date: ') + date + ' Eastern; matched saved schedule.'
-                    detail = await self._shortlist_reply(report)
+                    detail = await self._shortlist_reply(report, chat_id)
                     skipped = list(dict.fromkeys(bundle.get('unresolved', []) + problems))
                     if skipped:
                         detail += '\nUnread/unsupported cards kept out: ' + '; '.join(skipped[:2])[:270]
@@ -778,7 +815,7 @@ class TelegramBot:
                         + self._compact(report))
             legs = parse_board_document(filename, payload)
             board = self.store.create_board(legs, source=f'telegram:{update_id}:{filename[:100]}')
-            return await self._board_saved_reply(board)
+            return await self._board_saved_reply(board, message['chat']['id'])
         text = str(message.get('text', '')).strip()
         if not text:
             return 'Send a question, /help, or a PrizePicks board as text, CSV, JSON or a photo.'
@@ -789,7 +826,7 @@ class TelegramBot:
         if command in {'/start', '/help'}:
             return HELP
         if command == '/picks':
-            return await self._independent_picks_reply(parse_picks_request(text), message['chat']['id'])
+            return await self._independent_picks_reply(parse_picks_request(text), message['chat']['id'], text)
         if command == '/clear':
             with self._db() as db:
                 db.execute('DELETE FROM telegram_conversation WHERE chat_id=?', (message['chat']['id'],))
@@ -906,7 +943,7 @@ class TelegramBot:
                 return 'Paste available lines with their game date:\n' + BOARD_EXAMPLE
             legs = parse_board_text(argument)
             board = self.store.create_board(legs, source=f'telegram:{update_id}')
-            return await self._board_saved_reply(board)
+            return await self._board_saved_reply(board, message['chat']['id'])
         if command == '/track':
             parts = argument.split()
             if len(parts) not in {3, 4}:
@@ -947,12 +984,12 @@ class TelegramBot:
             await self._refresh_board_news()
             import analysis_engine
             report = await asyncio.to_thread(analysis_engine.analyze_board, self.store, argument)
-            return await self._shortlist_reply(report)
+            return await self._shortlist_reply(report, message['chat']['id'])
         if command.startswith('/'):
             return 'Unknown command. Use /help to see available commands.'
         independent_request = parse_picks_request(text)
         if independent_request is not None:
-            response = await self._independent_picks_reply(independent_request, message['chat']['id'])
+            response = await self._independent_picks_reply(independent_request, message['chat']['id'], text)
             self._remember(message['chat']['id'], update_id, text)
             self._remember(message['chat']['id'], update_id, text, response)
             return response
@@ -995,7 +1032,15 @@ class TelegramBot:
                     response = ('I’m finishing earlier requests. This request was not started and no records '
                                 'were changed. Try again shortly; /status, /ai_status and /help still work.')
                 else:
-                    response = await self._handle_message(message, update_id)
+                    text = str(message.get('text') or message.get('caption') or '').strip()
+                    context_command = text.split(maxsplit=1)[0].split('@',1)[0].lower() if text else ''
+                    remember_result = bool(message.get('photo') or message.get('document') or
+                                           context_command in {'/picks','/board','/analyze'})
+                    if remember_result:
+                        self._remember(chat_id, update_id, text or 'Analyze these uploaded player lines.')
+                    response = await self._handle_ordered_message(message, update_id)
+                    if remember_result and response:
+                        self._remember(chat_id, update_id, text, response)
             except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeError) as error:
                 # Validation errors contain user data or field names, not network credentials.
                 response = 'Could not save that input: ' + str(error)[:500] + '\nUse /help for the required format.'
