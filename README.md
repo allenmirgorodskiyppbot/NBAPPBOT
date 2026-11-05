@@ -8,6 +8,10 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 history and strategy upgrade
 
+Tested application `SOURCE_REF`: `f9243b6c946fac219a7a9944ad882ff58f34294c`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41983132608)
+passed. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+
 The current research benchmark is the **arithmetic mean of the latest 20 usable,
 completed regular-season games for the player's current team**, strictly before
 the game being assessed. Earlier seasons on that team can contribute; their dates
