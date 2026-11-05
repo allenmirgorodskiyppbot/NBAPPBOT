@@ -6,9 +6,24 @@ import tempfile
 import unittest
 
 from career_identity import resolve_career_identity, career_player_key, matchup_career_coverage
+from master import MasterStore
 
 
 class CareerIdentityTests(unittest.TestCase):
+    def test_status_keeps_coverage_summary_without_dumping_every_player(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = MasterStore(Path(folder) / 'master.sqlite')
+            saved = {'phase': 'updated', 'requested_players': 488, 'covered_players': 488,
+                     'missing_players': 0, 'source_data_through_date': '2026-11-04',
+                     'coverage': [{'player': f'Player {index}'} for index in range(488)]}
+            store.set_checkpoint('matchup_career_history_status', saved)
+            public = store.status()['matchup_career_history']
+            self.assertEqual(public['covered_players'], 488)
+            self.assertEqual(public['missing_players'], 0)
+            self.assertEqual(public['source_data_through_date'], '2026-11-04')
+            self.assertNotIn('coverage', public)
+            self.assertEqual(store.get_checkpoint('matchup_career_history_status'), saved)
+
     def lookup(self, rows, name, saved=None):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'targets.json'

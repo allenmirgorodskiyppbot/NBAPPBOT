@@ -363,7 +363,11 @@ class MasterStore:
                     'nightly_nba_refresh': self.get_checkpoint('nightly_nba_refresh', {}),
                     'tracking_refresh': self.get_checkpoint('tracking_refresh_status', {}),
                     'history_upgrade': self.get_checkpoint('history_upgrade_status', {}),
-                    'matchup_career_history': self.get_checkpoint('matchup_career_history_status', {}),
+                    'matchup_career_history': {key: value for key, value in
+                        (self.get_checkpoint('matchup_career_history_status', {}) or {}).items()
+                        if key in {'phase', 'last_checked_at', 'source', 'manifest_sha256',
+                                   'source_data_through_date', 'requested_players', 'covered_players',
+                                   'missing_players', 'missing_player_names', 'coverage_claim', 'note'}},
                     'assignment_refresh': self.get_checkpoint('assignment_refresh_status', {}),
                     'metric_refresh_coverage': self.get_checkpoint('metric_refresh_coverage', {}),
                     'season_calendar': self.get_checkpoint('season_calendar:' + current_season(dt.datetime.now(dt.timezone.utc)), {}),
