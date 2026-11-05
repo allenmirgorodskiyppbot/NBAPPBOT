@@ -344,7 +344,7 @@ def run_self_checks(live_master, data_dir, exporter=None, *, progress=None):
             'warnings': sum(item['status'] == 'WARN' for item in checks),
             'elapsed_seconds': round(time.monotonic()-started, 3),
             'scope': 'Sample data is confined to temporary databases. Live checks are read-only. '
-                     'AI generation and tomorrow\'s actual PrizePicks lines are separate tests.'}
+                     'AI generation and actual PrizePicks lines are separate tests.'}
 
 
 def format_self_check(report):

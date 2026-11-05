@@ -152,12 +152,29 @@ async def ai_status():
             'source_ref': os.getenv('SOURCE_REF', '')}
 
 
+async def self_test_status():
+    """In-memory check progress stays available without model or database work."""
+    from release_checks import check_progress_summary
+    state = app.state
+    progress = getattr(state, 'self_test_progress', {}) or {}
+    active = state.self_test_lock.locked()
+    stage, elapsed = check_progress_summary(state)
+    phase = progress.get('phase', 'idle')
+    if active and phase != 'running':
+        phase, stage, elapsed = 'queued', 'Waiting for the check worker', 0
+    elif not active and phase in {'completed', 'failed'}:
+        elapsed = progress.get('elapsed_seconds', elapsed)
+    return {'phase': phase, 'stage': stage, 'elapsed_seconds': elapsed,
+            'active': active, 'owner': progress.get('owner')}
+
+
 async def self_test():
     from self_check import run_self_checks, format_self_check, run_serialized_checks
     from release_checks import run_checks_with_progress, check_progress_summary
     state = app.state
     if state.self_test_lock.locked():
-        stage, elapsed = check_progress_summary(state)
+        status = await self_test_status()
+        stage, elapsed = status['stage'], status['elapsed_seconds']
         return f'A self-test is already running. Stage: {stage}; elapsed {elapsed:.0f}s. Please wait for its report.'
     try:
         report = await run_serialized_checks(state.self_test_lock, run_checks_with_progress,
@@ -618,7 +635,8 @@ async def lifespan(application):
             async with worker._cycle_lock:
                 await worker.collect_news_sources()
     state.telegram = TelegramBot(state.master, telegram_answer, model_status_callback=ai_status,
-                                self_test_callback=self_test, research_refresh_callback=refresh_board_news,
+                                self_test_callback=self_test, self_test_status_callback=self_test_status,
+                                research_refresh_callback=refresh_board_news,
                                 answer_preferences_callback=telegram_answer, manual_refresh_callback=telegram_refresh_dataset,
                                 manual_refresh_status_callback=telegram_refresh_status)
     state.temporary = tempfile.TemporaryDirectory(prefix='knicks-')

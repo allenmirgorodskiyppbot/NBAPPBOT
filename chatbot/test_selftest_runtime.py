@@ -39,7 +39,8 @@ class SelfTestRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     def bot(self, callback):
         return TelegramBot(self.master, AsyncMock(side_effect=AssertionError('No AI expected')),
-            token='123:TEST_TOKEN_ONLY', allowed_user_ids=[123], self_test_callback=callback)
+            token='123:TEST_TOKEN_ONLY', allowed_user_ids=[123], self_test_callback=callback,
+            self_test_status_callback=app.self_test_status)
 
     async def test_real_tiny_fixture_export_finishes_while_full_export_lock_is_held(self):
         gate = threading.Lock(); gate.acquire()
@@ -85,7 +86,7 @@ class SelfTestRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.gather(first, second)
         self.assertEqual((calls, maximum), (2, 1))
 
-    async def test_reply_timeout_keeps_manual_worker_busy_until_actual_completion(self):
+    async def test_background_manual_worker_keeps_singleflight_until_final_report(self):
         entered, release = threading.Event(), threading.Event()
         calls = []
 
@@ -96,31 +97,28 @@ class SelfTestRuntimeTests(unittest.IsolatedAsyncioTestCase):
             if not release.wait(3): raise RuntimeError('Fixture release timed out')
             return report()
 
-        original_wait_for = asyncio.wait_for
-        observed_limits = []
-
-        async def short_reply(awaitable, timeout):
-            observed_limits.append(timeout)
-            return await original_wait_for(awaitable, .04)
-
         bot = self.bot(app.self_test)
         message = {'text': '/selftest', 'chat': {'id': 123, 'type': 'private'}}
-        with patch('self_check.run_self_checks', checks), patch('telegram_bot.asyncio.wait_for', short_reply):
+        with patch('self_check.run_self_checks', checks):
             try:
                 answer = await bot._handle_message(message, 1)
-                self.assertTrue(entered.is_set())
-                self.assertIn('60-second reply limit', answer)
+                self.assertIsNone(answer)
+                await eventually(entered.is_set)
                 self.assertTrue(self.state.self_test_lock.locked())
                 busy = await bot._handle_message(message, 2)
                 self.assertIn('already running', busy)
-                self.assertIn('Controlled fixture check', busy)
-                self.assertIn('elapsed', busy)
+                status = await bot._handle_message({'text':'/selftest status','chat':{'id':123}}, 3)
+                self.assertIn('Controlled fixture check', status)
+                self.assertIn('Elapsed', status)
                 self.assertEqual(len(calls), 1)
             finally:
                 release.set()
+                await asyncio.gather(*list(bot._self_test_tasks))
                 await eventually(lambda: not self.state.self_test_lock.locked())
-        self.assertEqual(observed_limits, [60, 60])
         self.assertEqual(self.state.self_test_progress['phase'], 'completed')
+        with self.master.connect() as db:
+            self.assertEqual(db.execute('SELECT status FROM telegram_selftest_jobs').fetchone()[0],'completed')
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM telegram_outbox WHERE event_key LIKE 'selftest-result:%'").fetchone()[0],1)
 
     async def test_automatic_check_cancellation_preserves_worker_lock_and_blocks_manual_duplicate(self):
         entered, release = threading.Event(), threading.Event()
@@ -164,7 +162,9 @@ class SelfTestRuntimeTests(unittest.IsolatedAsyncioTestCase):
             raise OSError('PRIVATE_DATABASE_PATH PRIVATE_TOKEN')
         bot = self.bot(app.self_test)
         with patch('self_check.run_self_checks', checks), self.assertLogs('knicks', level='WARNING') as logs:
-            answer = await bot._handle_message({'text':'/selftest','chat':{'id':123}}, 3)
+            self.assertIsNone(await bot._handle_message({'text':'/selftest','chat':{'id':123}}, 3))
+            await asyncio.gather(*list(bot._self_test_tasks))
+            answer = await bot._self_test_status(123)
         self.assertIn('OSError', answer)
         self.assertNotIn('PRIVATE_', answer + repr(logs.output) + repr(self.state.self_test_progress))
         self.assertEqual(self.state.self_test_progress['stage'], 'Controlled integrity stage')

@@ -36,7 +36,7 @@ MAX_MASTER_UPLOAD = 20 * 1024 * 1024
 TYPING_INTERVAL_SECONDS = 4
 MAX_ACTIVE_COMMANDS = 10
 RESPONSIVE_COMMANDS = {'/start', '/help', '/status', '/ai_status', '/clear', '/newboard',
-                       '/reminder', '/usage', '/freshness', '/strategy', '/refresh', '/update'}
+                       '/reminder', '/usage', '/freshness', '/strategy', '/refresh', '/update', '/selftest'}
 
 
 TRANSPORT_BUSY_TIMEOUT_MS = 100
@@ -112,7 +112,8 @@ HELP = '''Knicks Research bot
 /refresh (or /update) — check for dataset updates now; results arrive when the check finishes
 /refresh status (or /update status) — current stage, elapsed time, and last result
 /ai_status — local AI readiness, busy state and last failure category
-/selftest — isolated data/backup tests and read-only live health checks
+/selftest — start background isolated data/backup tests; the report arrives when finished
+/selftest status — current check, elapsed time and last self-test report
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
 /picks [Nov 2|today|tomorrow] [2-6] — own projections; date/count optional
 /clear — clear this chat's conversation context and lineup preferences
@@ -439,7 +440,7 @@ class TelegramBot:
     def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None,
                  model_status_callback=None, self_test_callback=None, research_refresh_callback=None,
                  answer_preferences_callback=None, manual_refresh_callback=None,
-                 manual_refresh_status_callback=None):
+                 manual_refresh_status_callback=None, self_test_status_callback=None):
         self.store = store
         self.answer_callback = answer_callback
         self.answer_preferences_callback = answer_preferences_callback
@@ -450,8 +451,11 @@ class TelegramBot:
         self._shutting_down = False
         self._dataset_refresh_tasks = set()
         self._dataset_refresh_pending_results = {}
+        self._self_test_tasks = set()
+        self._self_test_pending_results = {}
         self.model_status_callback = model_status_callback
         self.self_test_callback = self_test_callback
+        self.self_test_status_callback = self_test_status_callback
         self.research_refresh_callback = research_refresh_callback
         self._photo_locks = {}
         self._photo_semaphore = asyncio.Semaphore(1)
@@ -566,6 +570,12 @@ class TelegramBot:
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS telegram_dataset_one_active
                     ON telegram_dataset_jobs((1)) WHERE status='running';
+                CREATE TABLE IF NOT EXISTS telegram_selftest_jobs (
+                    id TEXT PRIMARY KEY,update_id INTEGER UNIQUE NOT NULL,chat_id INTEGER NOT NULL,
+                    status TEXT NOT NULL,created_at TEXT NOT NULL,completed_at TEXT,result_text TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS telegram_selftest_one_active
+                    ON telegram_selftest_jobs((1)) WHERE status='running';
             ''')
             columns = {row['name'] for row in db.execute('PRAGMA table_info(telegram_outbox)')}
             if 'expires_at' not in columns:
@@ -821,13 +831,183 @@ class TelegramBot:
             lines.append(str(job['result_text'])[:1800])
         return '\n'.join(lines)
 
+    def _reserve_self_test(self, chat_id, update_id):
+        job_id = uuid.uuid4().hex
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                db.execute('BEGIN IMMEDIATE')
+                if db.execute('SELECT 1 FROM telegram_selftest_jobs WHERE update_id=?', (update_id,)).fetchone():
+                    return 'This self-test request was already received. Use /selftest status for its report.', None, None
+                active = db.execute("SELECT id,chat_id,update_id FROM telegram_selftest_jobs WHERE status='running'").fetchone()
+                if active:
+                    pending = self._self_test_pending_results.get(active['id'])
+                    if pending is None:
+                        return 'A self-test is already running. Use /selftest status for its stage and elapsed time.', None, None
+                    text, status = pending
+                    self._queue_in_db(db, active['chat_id'], text, 'selftest-result:' + active['id'])
+                    db.execute('UPDATE telegram_selftest_jobs SET status=?,completed_at=?,result_text=? WHERE id=?',
+                               (status, utcnow(), text, active['id']))
+                    db.execute("UPDATE telegram_updates SET status='done',completed_at=? WHERE update_id=? AND status='processing'",
+                               (utcnow(), active['update_id']))
+                    return 'The previous self-test report is queued. The checks were not repeated. Use /selftest status to read it.', None, active['id']
+                db.execute('INSERT INTO telegram_selftest_jobs VALUES (?,?,?,?,?,?,?)',
+                           (job_id, update_id, chat_id, 'running', utcnow(), None, None))
+                self._queue_in_db(db, chat_id, 'Self-test started in the background. Checks can take several minutes under load. '
+                    'I’ll send the report when they finish. Use /selftest status for progress.', 'selftest-start:' + job_id)
+        finally:
+            db.close()
+        return None, job_id, None
+
+    async def _start_self_test(self, chat_id, update_id):
+        if chat_id not in self.allowed_user_ids:
+            return 'Self-tests are available only in the configured private chat.'
+        if self._shutting_down:
+            return 'The bot is shutting down. Try /selftest after it restarts.'
+        if self.self_test_callback is None:
+            return 'Self-test is not configured for this deployment. Use /status and /ai_status.'
+        response, job_id, recovered = await self._retry_db(self._reserve_self_test, chat_id, update_id)
+        if recovered:
+            self._self_test_pending_results.pop(recovered, None)
+        if response is not None:
+            return response
+        task = asyncio.create_task(self._run_self_test(job_id), name='self-test:' + job_id)
+        self._self_test_tasks.add(task)
+        task.add_done_callback(self._self_test_finished)
+        return None
+
+    def _finish_self_test(self, job_id, text, status):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                db.execute('BEGIN IMMEDIATE')
+                row = db.execute("SELECT chat_id,update_id FROM telegram_selftest_jobs WHERE id=? AND status='running'", (job_id,)).fetchone()
+                if row is None:
+                    return
+                self._queue_in_db(db, row['chat_id'], text, 'selftest-result:' + job_id)
+                db.execute('UPDATE telegram_selftest_jobs SET status=?,completed_at=?,result_text=? WHERE id=?',
+                           (status, utcnow(), text, job_id))
+                db.execute("UPDATE telegram_updates SET status='done',completed_at=? WHERE update_id=? AND status='processing'",
+                           (utcnow(), row['update_id']))
+        finally:
+            db.close()
+
+    async def _run_self_test(self, job_id):
+        cancelled = False
+        try:
+            text = await self.self_test_callback()
+            if not isinstance(text, str) or not text.strip():
+                raise TypeError('Unusable self-test report')
+            text = text[:16000]
+            failed = re.match(r'^Self-test:\s*\d+ passed,\s*(\d+) failed\b', text)
+            status = ('busy' if text.startswith('A self-test is already running') else
+                      'failed' if failed and int(failed[1]) else 'completed')
+        except asyncio.CancelledError:
+            cancelled = True
+            status = 'interrupted'
+            text = 'The self-test was interrupted by application shutdown. No checks were replayed. Use /selftest after restart.'
+        except Exception as error:
+            from release_checks import safe_check_category
+            status = 'failed'
+            text = ('Self-test could not finish (' + safe_check_category(error) + '). '
+                    'Check chatbot logs for the stage. No sample entries were added to your master.')
+        self._self_test_pending_results[job_id] = (text, status)
+
+        async def persist():
+            for attempt in range(3):
+                try:
+                    await self._retry_db(self._finish_self_test, job_id, text, status)
+                    self._self_test_pending_results.pop(job_id, None)
+                    return
+                except sqlite3.Error:
+                    raise  # BUSY/LOCKED already retry; permanent storage faults remain visible.
+                except Exception:
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(.1 * (2 ** attempt))
+
+        # Once a report exists, shutdown must not replace it with interruption
+        # while its atomic outbox/status transaction is finishing.
+        from dataset_update import _complete_callback
+        await _complete_callback(persist)
+        if cancelled:
+            raise asyncio.CancelledError
+
+    def _self_test_finished(self, task):
+        self._self_test_tasks.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.warning('Self-test report is retained in memory but could not be saved; /selftest status can show it.')
+
+    def _read_self_test_status(self, chat_id):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            row = db.execute('SELECT * FROM telegram_selftest_jobs WHERE chat_id=? '
+                "ORDER BY (status='running') DESC,rowid DESC LIMIT 1", (chat_id,)).fetchone()
+            return dict(row) if row else None
+        finally:
+            db.close()
+
+    async def _self_test_status(self, chat_id):
+        job = await self._retry_db(self._read_self_test_status, chat_id)
+        progress = {}
+        if self.self_test_status_callback is not None:
+            try:
+                value = await asyncio.wait_for(self.self_test_status_callback(), timeout=3)
+                if isinstance(value, dict): progress = value
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.warning('Self-test progress callback unavailable; saved job status remains readable.')
+        if not job:
+            heading = 'Self-checks are running automatically.' if progress.get('active') else 'No manual self-test has run yet.'
+            lines = [heading]
+        else:
+            pending = self._self_test_pending_results.get(job['id'])
+            if pending:
+                return 'Self-test checks finished; saving the report is waiting for the database. Use /selftest to retry saving it.\n\n' + pending[0]
+            lines = ['Self-test is running in the background.' if job['status']=='running' else 'Last self-test: ' + job['status'] + '.']
+            if job['status'] != 'running' and job.get('result_text'):
+                return '\n'.join(lines) + '\n\n' + job['result_text']
+        if progress.get('stage'):
+            lines.append('Stage: ' + str(progress['stage']).replace('\n',' ')[:140] + '.')
+        seconds = None if job and job['status']=='running' else progress.get('elapsed_seconds')
+        if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
+            try:
+                seconds = (datetime.now(timezone.utc)-datetime.fromisoformat(job['created_at'].replace('Z','+00:00'))).total_seconds() if job else 0
+            except (ValueError, TypeError): seconds = 0
+        seconds = max(0, int(seconds))
+        lines.append(f'Elapsed: {seconds//60}m {seconds%60}s.')
+        return '\n'.join(lines)
+
+    def _recover_self_tests(self):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                db.execute('BEGIN IMMEDIATE')
+                owned = {task.get_name().split(':',1)[1] for task in list(self._self_test_tasks)
+                         if not task.done() and task.get_name().startswith('self-test:')}
+                owned.update(self._self_test_pending_results)
+                rows = db.execute("SELECT id,chat_id,update_id FROM telegram_selftest_jobs WHERE status='running'").fetchall()
+                for row in rows:
+                    if row['id'] in owned:
+                        continue
+                    text = 'A self-test was interrupted by an application restart. No checks were replayed. Use /selftest to run a new check.'
+                    self._queue_in_db(db, row['chat_id'], text, 'selftest-result:' + row['id'])
+                    db.execute("UPDATE telegram_selftest_jobs SET status='interrupted',completed_at=?,result_text=? WHERE id=?",
+                               (utcnow(), text, row['id']))
+                    db.execute("UPDATE telegram_updates SET status='interrupted',completed_at=? WHERE update_id=? AND status='processing'",
+                               (utcnow(), row['update_id']))
+        finally:
+            db.close()
+
     async def shutdown(self):
         """Only application shutdown owns cancellation of independent data jobs."""
         self._shutting_down = True
-        tasks = list(self._dataset_refresh_tasks)
+        tasks = [*self._dataset_refresh_tasks, *self._self_test_tasks]
         for task in tasks: task.cancel()
         if tasks: await asyncio.gather(*tasks, return_exceptions=True)
         self._dataset_refresh_tasks.clear()
+        self._self_test_tasks.clear()
 
     def _dataset_refresh_finished(self, task):
         self._dataset_refresh_tasks.discard(task)
@@ -1313,26 +1493,11 @@ class TelegramBot:
             from player_stats import player_log_command
             return await asyncio.to_thread(player_log_command, self.store, argument)
         if command == '/selftest':
+            if argument.casefold() == 'status':
+                return await self._self_test_status(message['chat']['id'])
             if argument:
-                return 'Use /selftest alone. Sample imports and entries stay in temporary test databases.'
-            if self.self_test_callback is None:
-                return 'Self-test is not configured for this deployment. Use /status and /ai_status.'
-            try:
-                report = await asyncio.wait_for(self.self_test_callback(), timeout=60)
-                return report if isinstance(report, str) else 'Self-test did not return a usable report.'
-            except asyncio.CancelledError:
-                raise
-            except TimeoutError:
-                log.warning('Self-test reached the 60-second reply limit; inspect application stage and elapsed-time logs.')
-                return ('The self-test reached the 60-second reply limit. A check may still be running; '
-                        '/selftest will report if it is busy. Check the chatbot logs for its stage and elapsed time. '
-                        'No sample entries were added to your master.')
-            except Exception as error:
-                from release_checks import safe_check_category
-                category = safe_check_category(error)
-                log.warning('Self-test could not finish (%s); inspect application stage logs.', category)
-                return ('Self-test could not finish (' + category + '). Check the chatbot logs for its stage; '
-                        'no sample entries were added to your master.')
+                return 'Use /selftest to start checks or /selftest status for progress and the last report.'
+            return await self._start_self_test(message['chat']['id'], update_id)
         if command == '/ai_status':
             if argument:
                 return 'Use /ai_status alone to check local model readiness without making an AI request.'
@@ -1594,6 +1759,7 @@ class TelegramBot:
 
     def _recover_interrupted(self):
         self._recover_dataset_refreshes()
+        self._recover_self_tests()
         with self._db() as db:
             rows = db.execute("SELECT update_id,chat_id FROM telegram_updates WHERE status='processing'").fetchall()
         owned = {task.get_name().split(':', 1)[1] for task in list(self._dataset_refresh_tasks)
@@ -1601,6 +1767,11 @@ class TelegramBot:
         with self._db() as db:
             owned_updates = {row['update_id'] for row in db.execute(
                 "SELECT id,update_id FROM telegram_dataset_jobs WHERE status='running'") if row['id'] in owned}
+            self_owned = {task.get_name().split(':',1)[1] for task in list(self._self_test_tasks)
+                          if not task.done() and task.get_name().startswith('self-test:')}
+            self_owned.update(self._self_test_pending_results)
+            owned_updates.update(row['update_id'] for row in db.execute(
+                "SELECT id,update_id FROM telegram_selftest_jobs WHERE status='running'") if row['id'] in self_owned)
         for row in rows:
             if row['update_id'] in owned_updates:
                 continue
