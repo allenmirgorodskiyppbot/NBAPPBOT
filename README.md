@@ -8,9 +8,10 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 data and reliability upgrade
 
-Tested application `SOURCE_REF`: `530e69c294b0adf3e0d47bf2690e699b3f34d72b`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42080813093)
-passed all **1,383 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `39c4cef17570e28c9c4dbe6a08811504e6fd2fbc`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42099681375)
+passed all **1,478 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 
 The current research benchmark is the **arithmetic mean of the latest 20 usable,
 completed regular-season games for the player's current team**, strictly before
@@ -60,9 +61,11 @@ reminders, exports, backups and grading remain available.
 
 ## Verified gap completion and reminder reliability
 
-The November 5 exported master has **171,889 player observations, 21,198 games and
-93 worksheets**. Its 153,677 saved final Played observations contain all 16 basic
-counting/minutes fields. This describes the saved population, not a proof of a
+The current November 5 master export has **171,889 player observations, 21,198 games
+and 96 worksheets**. The calendar update adds three worksheets to the previous
+93-sheet export without changing its saved player-observation count. Its 153,677
+saved final Played observations contain all 16 basic counting/minutes fields.
+This describes the saved population, not a proof of a
 complete career inventory. The upgrade adds 679 observations and completes 653
 plus/minus values, 2,954 historical starter flags and 7,338 game-score fields from
 verified public source evidence. Known non-null facts, entries, grading, chat and
@@ -96,6 +99,17 @@ publisher retracts complete coverage. Daily and current-event publishers use
 separate concurrency groups and disjoint file scopes, so timing checks cannot
 cancel a pending daily refresh. Git API publication preserves unrelated commits,
 checks for conflicting source changes and honors the same token/branch rules.
+This remains a daily refresh of available published NBA statistics across all
+30 teams. A game ending does not trigger an immediate completed-game import;
+the result must first be published and pass the independent coverage checks.
+
+The saved **2026–27 season calendar is currently Knicks-only**. It retains **80 published
+assigned games and two unassigned games toward an 82-game season**. Unknown Cup
+opponents and missing tipoff times remain unresolved. The three added Excel sheets
+are `Knicks_Season_Schedule`, `Schedule_Coverage` and `Schedule_TBD`: they show saved
+fixtures, actual coverage and unresolved slots. Calendar rows do not create player
+results or establish current game timing. NBA-wide game-stat collection continues
+independently of this narrower future-calendar scope.
 
 If direct historical inventory endpoints refuse requests, a completed nonempty
 regular-season date can be corroborated by an exact match across the published NBA
@@ -370,12 +384,14 @@ averages, player-versus-team samples, team production, team defense and tentativ
 assignments. Coverage dates, source publication dates and assignment dates remain
 separate. A newer season average never substitutes for an older measured matchup.
 
-The model receives scoped evidence and writes a short explanation first, followed
-by compact source citations. For a stated prop, the application calculates the
-observed distribution, mean, median, workload and source limits before the model
-explains a qualified More, Less or Pass assessment. Supported numbers can appear
-in the explanation; checks reject unsupported quantities, conflicting metrics,
-opponent-scope changes and invented availability or defender assignments. A team
+The model interprets the question and reads scoped evidence before writing a
+short explanation. For a stated prop, the application calculates the observed
+distribution, mean, median, workload and source limits. Routine prop and next-game
+answers display their exact decision, line, dates and numerical facts through
+application rendering; the model supplies a short interpretation of those facts.
+The model cannot change a calculated More, Less or Pass decision. Deeper generated
+numeric claims retain their source checks, which reject unsupported quantities,
+conflicting metrics, opponent-scope changes and invented availability or defender assignments. A team
 total does not establish an individual defender's ability. These checks are bounded,
 not a guarantee that every generated interpretation is correct. Deeper model-written
 query filters/calculations remain explicitly marked for review.
@@ -400,12 +416,20 @@ constraints and market preferences carry into subsequent Telegram research.
 Hypothetical `/picks` targets remain distinct from uploaded sportsbook lines.
 Conversational answers do not create entries or modify the financial ledger.
 
-Routine prop decisions, reasons, risk questions, definitions, preferences and
-acknowledgments use checked calculations and concise replies without waiting for
-inference. These replies also work while the model is starting or busy. Explicit
-requests for a deeper explanation still use the local model, with a 35-second
-discussion budget and a checked fallback. Questions needing additional
-data retain the retrieval tools and use the same final source contract. Invalid
+Ordinary conversation uses the local AI to interpret meaning and the relevant
+discussion, including unfamiliar phrasing and indirect follow-ups. Rephrased
+questions use the conversation's subject without requiring a special command.
+Factual basketball
+questions read scoped saved observations, schedule records or collected news
+before answering; a remembered model fact does not establish a current roster,
+injury, statistic or matchup. Prop reasoning, risks and game previews receive a
+short model-written explanation alongside the application-rendered facts.
+
+When the model is starting or busy, or its answer times out or fails validation,
+the bot returns a checked computed fallback or asks for an essential missing
+detail. This fallback also preserves unavailable legs and freshness holds.
+Questions needing additional data retain the retrieval tools and use the same
+final source contract. Invalid
 explanations get one bounded repair attempt, then return a concise computed
 assessment or labeled saved facts if still invalid. `/ai_status` retains the actual
 failure and timing information. Rejected replies are never reused from the cache.
@@ -418,12 +442,15 @@ completed context; health commands remain available while it works.
 Clearing chat history during a request cannot restore the deleted conversation
 when that request completes.
 
-Ask **“what’s up next?”**, **“who do we play?”**, or **“what should we expect?”**
-after a game preview. The bot looks up the next saved Knicks matchup, gives its
-Eastern date/time and dated recent scoring/results for both teams, and lists
-verified game-specific availability when present. This overrides an older prop
-discussion. Saved calendar timing and incomplete team schedules remain explicitly
-qualified; a quick preview does not certify live timing or authorize a pick.
+Ask about upcoming basketball in your own words, then continue discussing the
+game or a proposed player statistic. The AI uses the conversation to resolve the
+subject; it asks a short clarification when several picks or meanings remain
+possible. A next-game question reads the saved Knicks calendar and dated evidence,
+then gives the Eastern date/time, relevant team results and a short outlook.
+Explicit subject changes override an older prop discussion. Saved timing,
+incomplete calendars and unverified game-specific availability remain qualified;
+a preview does not certify live timing or authorize a pick.
+
 `/ai_status` includes active-job elapsed time and timings for the latest compact
 reply phase, including model loading, prompt evaluation and generation when
 provided. Those phase counters do not include earlier retrieval calls; `/usage`
@@ -431,6 +458,10 @@ counts model work across the paths. Deeper lookups use a small relevant catalog,
 the same model context, and at most two tool rounds inside a bounded deadline.
 Explicit row/cell requests read the source instead of guessing from season totals.
 Provider response time still needs a live Akash check.
+
+Five actual local component tests took **9.5–21.8 seconds**. Those measurements
+describe the tested local model and data setup, not a live Akash response-time
+guarantee or proof that every phrasing will be interpreted correctly.
 
 Ordinary questions can use player names, unique surnames, supported nicknames,
 team cities/names/codes and common name variations. Recent private conversation

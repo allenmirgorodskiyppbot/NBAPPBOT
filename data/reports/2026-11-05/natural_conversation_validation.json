@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "prepared_at": "2026-11-05T20:03:36.146089+00:00",
+  "tested_source_ref": "39c4cef17570e28c9c4dbe6a08811504e6fd2fbc",
+  "ci": {
+    "tests_passed": 1478,
+    "seconds": 145.951,
+    "run_id": 42099681375,
+    "job_id": 127498886898,
+    "conclusion": "success",
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42099681375"
+  },
+  "dialogue_validation": {
+    "method": "Actual local-model application flows over an isolated copy of public observations and the saved calendar. Component-specific runs: unchanged NBA paths and the separately updated completion-only workflow transport. This is not a single identical-commit five-case run.",
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "model_digest": "bea73b6912753ad23edfdc21d8a49ff9cc7abbabc4783c713ffc718ce0222574",
+    "runtime": "Ollama 0.40.13; four CPU threads; existing cached weights.",
+    "new_model_downloads": 0,
+    "paid_api_or_hardware_changes": false,
+    "cases": [
+      {
+        "case": "Unfamiliar next-game wording",
+        "generated_reply_delivered": true,
+        "elapsed_seconds": 16.643,
+        "source_read_before_reply": true,
+        "original_records_and_ledger_unchanged": true
+      },
+      {
+        "case": "Game-preview follow-up",
+        "generated_reply_delivered": true,
+        "elapsed_seconds": 14.785,
+        "source_read_before_reply": true,
+        "original_records_and_ledger_unchanged": true
+      },
+      {
+        "case": "Exact player-stat offer",
+        "generated_reply_delivered": true,
+        "elapsed_seconds": 15.735,
+        "source_read_before_reply": true,
+        "original_records_and_ledger_unchanged": true
+      },
+      {
+        "case": "Indirect reasoning follow-up",
+        "generated_reply_delivered": true,
+        "elapsed_seconds": 21.835,
+        "source_read_before_reply": true,
+        "original_records_and_ledger_unchanged": true
+      },
+      {
+        "case": "Refresh-workflow follow-up",
+        "generated_reply_delivered": true,
+        "elapsed_seconds": 9.532,
+        "source_read_before_reply": true,
+        "original_records_and_ledger_unchanged": true
+      }
+    ],
+    "successful_examples": 5,
+    "numeric_fact_rendering": "Application calculations render exact dates, thresholds and statistics. The local model supplies checked qualitative interpretation from those retrieved facts.",
+    "context_checks": [
+      "Selected Knicks matchup retained across follow-up.",
+      "Player, statistic, threshold and November 7 game date retained for prop discussion.",
+      "Unverified game-day coverage remained a Hold/Pass.",
+      "A software-workflow question did not become an NBA preview."
+    ],
+    "workflow_transport": {
+      "endpoint": "/api/generate",
+      "http_status": 200,
+      "validated_reply_delivered": true,
+      "literal_escaped_paragraph_breaks_visible": false
+    },
+    "latency_scope": "Warm local validation examples only; deployment latency and all natural-language phrasings are not guaranteed."
+  },
+  "master_export": {
+    "file_name": "NBA_Master.xlsx",
+    "bytes": 77759981,
+    "sha256": "af20497e3b0d1f5158ac5c74dc10089501921f3f9dcf16392dbad12acd79b447",
+    "worksheets": 96,
+    "player_observations_preserved": 171889,
+    "calendar_sheets": {
+      "Knicks_Season_Schedule": 80,
+      "Schedule_Coverage": 1,
+      "Schedule_TBD": 1
+    },
+    "outside_knicks_calendar_rows": 0,
+    "original_dataset_modified": false
+  },
+  "knicks_calendar": {
+    "season": "2026-27",
+    "covered_teams": [
+      "NYK"
+    ],
+    "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
+    "source_published_at": "2026-11-03T15:15:40+00:00",
+    "source_content_sha256": "5cd684d20ea833536b874ec519daa4a0bdc7a2b7b5eada73a59185d3bb3d663a",
+    "source_checked_at": "2026-11-05T18:47:28.384008+00:00",
+    "source_revision": "230acab5a27ad5cc33f5ef886ff484e1623d1f3a602b7800ba96d1e584c1b073",
+    "upstream_published_schedule_validated": true,
+    "published_assigned_games": 80,
+    "regular_season_target": 82,
+    "unassigned_regular_season_games": 2,
+    "complete_for_published_games": true,
+    "complete_82_game_schedule": false,
+    "tipoff_times_reported_by_this_source": 0,
+    "previously_saved_tipoffs_preserved": 75,
+    "unassigned_note": "Remaining Knicks regular-season games depend on NBA Cup scheduling; their exact dates, opponents and times remain unknown until assigned.",
+    "scope": "Published Knicks regular-season fixture inventory. Other clubs appear only as Knicks opponents; their independent future schedules are not certified here.",
+    "does_not_verify": [
+      "Current live timing",
+      "Final results or player participation",
+      "Current injuries, lineups or defender assignments"
+    ]
+  },
+  "live_validation": {
+    "authenticated_akash_tested": false,
+    "telegram_messages_sent": 0,
+    "deployment_activation_and_user_checks_pending": true
+  },
+  "limits": [
+    "These example checks do not establish universal conversational accuracy or betting performance.",
+    "A workbook export and published fixture list do not make all tracking fields current.",
+    "The two NBA Cup-dependent regular-season assignments remain unknown; dates, opponents and times were not invented."
+  ],
+  "public_data_readback": {
+    "source_ref": "39c4cef17570e28c9c4dbe6a08811504e6fd2fbc",
+    "calendar_rows": 80,
+    "all_calendar_rows_include_nyk": true,
+    "covered_teams": [
+      "NYK"
+    ],
+    "regular_season_target": 82,
+    "unassigned_games": 2,
+    "nba_scope_players": 490,
+    "nba_scope_teams": 30,
+    "published_stat_coverage": "2026-11-04"
+  },
+  "local_full_regression": {
+    "tests_passed": 1478,
+    "seconds": 215.193,
+    "conclusion": "success"
+  },
+  "refresh_scope": {
+    "season_schedule": "Knicks only",
+    "player_statistics": "All 30 NBA teams; current authorized population 490 identities",
+    "daily_time": "11:30",
+    "timezone": "America/New_York",
+    "hourly_source_retries": true,
+    "instant_after_final_game_update_promised": false
+  }
+}
