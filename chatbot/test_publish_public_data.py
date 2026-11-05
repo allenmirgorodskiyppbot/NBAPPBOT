@@ -16,7 +16,7 @@ import httpx
 from publish_public_data import (APIError, Change, PublicationError, Publisher,
     allowed_path, blob_sha, inspect_changes, main)
 
-PATH='data/live/schedule_today.json'
+PATH='data/live/existing_tracking.json'
 OLD=b'{"old":true}\n';NEW=b'{"new":true}\n'
 BASE=('100644','blob',blob_sha(OLD))
 TOKEN='unit-test-secret-never-log'
@@ -106,7 +106,7 @@ class PublicDataAPITests(unittest.TestCase):
     def test_same_file_remote_change_aborts_before_any_mutation(self):
         self.api.advance(same_file=True);head=self.api.head
         with self.assertRaisesRegex(PublicationError,'changed remotely'):
-            self.publisher.publish([Change('data/live/schedule_status.json',b'new',None),Change(PATH,NEW,BASE)])
+            self.publisher.publish([Change('data/live/existing_dataset_scope.json',b'new',None),Change(PATH,NEW,BASE)])
         self.assertEqual(self.api.head,head)
         self.assertFalse(any(r.method in {'POST','PATCH'} for r in self.api.calls))
 
@@ -177,12 +177,16 @@ class PublicDataCheckoutTests(unittest.TestCase):
 
     def test_scope_includes_tracked_untracked_deletion_but_excludes_cache_and_code(self):
         (self.root/PATH).unlink();(self.root/'data/live/2026-11-05.json').write_text('{}')
+        (self.root/'data/live/schedule_today.json').write_text('{"current":"fixture"}')
+        (self.root/'data/live/schedule_status.json').write_text('{"health":"fixture"}')
         (self.root/'data/live/.cache').mkdir();(self.root/'data/live/.cache/private.json').write_text('secret')
         (self.root/'data/live/private.json').write_text('secret');(self.root/'app.py').write_text('unrelated change')
         _,changes=inspect_changes(self.root,'daily')
         self.assertEqual({c.path for c in changes},{PATH,'data/live/2026-11-05.json'})
         self.assertIsNone(next(c.content for c in changes if c.path==PATH))
-        _,schedule=inspect_changes(self.root,'schedule');self.assertEqual([c.path for c in schedule],[PATH])
+        _,schedule=inspect_changes(self.root,'schedule')
+        self.assertEqual({c.path for c in schedule},{'data/live/schedule_today.json','data/live/schedule_status.json'})
+        self.assertFalse({c.path for c in changes}&{c.path for c in schedule})
 
     def test_selected_symlink_and_size_bound_rejected(self):
         (self.root/PATH).unlink();(self.root/PATH).symlink_to(self.root/'app.py')
@@ -203,6 +207,20 @@ class PublicDataCheckoutTests(unittest.TestCase):
         self.assertFalse(allowed_path('data/live//schedule_today.json','daily'))
         self.assertTrue(allowed_path('data/live/historical_matchups/tracking_pair_history_abcdef012345_001.jsonl.gz','daily'))
         self.assertFalse(allowed_path('data/live/career_history/career-001.jsonl.gz','schedule'))
+
+    def test_schedule_paths_are_exclusively_owned_and_workflows_run_independently(self):
+        for name in ['schedule_today.json','schedule_status.json']:
+            path='data/live/'+name
+            self.assertTrue(allowed_path(path,'schedule'))
+            self.assertFalse(allowed_path(path,'daily'))
+        source=Path(__file__).parent
+        daily=(source/'nba-daily-data.yml').read_text()
+        schedule=(source/'nba-schedule-data.yml').read_text()
+        self.assertIn('group: nba-public-data-daily',daily)
+        self.assertIn('group: nba-public-data-schedule',schedule)
+        self.assertNotIn('group: nba-public-data\n',daily+schedule)
+        self.assertIn('publish_public_data.py --mode daily',daily)
+        self.assertIn('publish_public_data.py --mode schedule',schedule)
 
 
 if __name__=='__main__':unittest.main()

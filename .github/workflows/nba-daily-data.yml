@@ -23,7 +23,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: nba-public-data
+  group: nba-public-data-daily
   cancel-in-progress: false
 jobs:
   refresh:
