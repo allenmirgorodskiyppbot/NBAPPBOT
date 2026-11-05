@@ -520,6 +520,9 @@ def build_export_tables(master, now=None):
     else:
         assignments=assignment_rows_for(master,fallback_rows=assignments,now=now)
     records=[json.loads(r['payload_json']) for r in raw['refreshed_tracking']]
+    from season_schedule_refresh import schedule_coverage_rows, unassigned_schedule_rows
+    season_rows = sorted((row for row in raw['season_schedule'] if 'NYK' in (row.get('home_team'),row.get('away_team'))), key=lambda row:(str(row.get('season') or ''),
+        str(row.get('date') or ''), str(row.get('home_team') or ''), str(row.get('away_team') or '')))
     tables={**raw, **audits,
             'Player_Metrics':player_metrics(players),
             'Calculated_Splits':calculated_splits(evidence_groups['splits'],players,rest),
@@ -530,6 +533,12 @@ def build_export_tables(master, now=None):
             'Tracking_Metrics':tracking_metrics(records),
             'Matchup_Assignments':assignments,
             'Team_Schedule':list(rest.values()),
+            'Knicks_Season_Schedule':[{**row, 'timing_scope':
+                'Saved start time; a separate current timing check is required.' if row.get('start_time')
+                else 'Publication supplies the game date only; tipoff time is unknown.'}
+                for row in season_rows],
+            'Schedule_Coverage':schedule_coverage_rows(master),
+            'Schedule_TBD':unassigned_schedule_rows(master),
             'Original_Evidence':[{**r,'status':'Original dated workbook snapshot; not relabeled as current'} for r in evidence],
             'Original_Missing_Data':[{**r,'export_status':'Original dated assessment; use Refresh_Coverage for current availability'}
                                      for r in evidence_groups['missing_data']],
@@ -584,6 +593,9 @@ def build_export_tables(master, now=None):
     for item in tracking_status.get('coverage',[]):
         coverage.append({'group':'Tracking: '+str(item.get('category')),**item,
                          'note':'Source publication time, covered-game date and export time are separate.'})
+    for item in tables['Schedule_Coverage']:
+        coverage.append({'group':'Season schedule: '+str(item.get('team')), **item,
+                         'note':'Published season fixtures do not verify live timing. Unassigned games and missing source tipoff times remain explicit.'})
     tables['Refresh_Coverage']=coverage
     tables['Export_ReadMe']=[{'topic':'Generated','value':stamp},
         {'topic':'Source policy','value':'Saved observations and original definitions only. Exporting performs no network request or statistical writes.'},
@@ -591,6 +603,8 @@ def build_export_tables(master, now=None):
         {'topic':'Missing values','value':'Missing or DNP observations are never substituted with zeros. Empty samples/rate denominators remain blank.'},
         {'topic':'Populations','value':'Historical seasons and phases stay separate except explicitly named Available career/Recent windows. Coappearance does not establish guarding.'},
         {'topic':'Freshness','value':'Export generation time is not data coverage. Read each source/last-game date and Refresh_Coverage.'}]
+    tables['Export_ReadMe'].append({'topic':'Knicks season schedule',
+        'value':'Knicks_Season_Schedule lists the saved Knicks season fixtures. Schedule_Coverage shows the published count and 82-game target; Schedule_TBD retains the Knicks’ unresolved Cup-dependent games. Date-only publications do not establish tipoff times. Player and team statistics still cover the authorized NBA-wide population.'})
     from master_upgrade import augment_export_tables
     tables = augment_export_tables(master, tables, now=now)
     from data_gaps import augment_gap_tables

@@ -31,16 +31,16 @@ def _direct_reply(answer, cards=(), *, sources=None):
                           if cards else 'Deterministic conversation; no current statistics asserted.')}
 
 
-def _bounded_request(request):
+def _bounded_request(request, *, compact=False):
     # Resolve slots from the full history first. The model only needs a small
     # presentation excerpt alongside the independently retrieved source cards.
     if not callable(getattr(request, 'model_copy', None)):
         return request
     history = []
-    for item in request.history[-4:]:
+    for item in request.history[-(2 if compact else 4):]:
         if not callable(getattr(item, 'model_copy', None)):
             return request
-        history.append(item.model_copy(update={'content': item.content[:300]}))
+        history.append(item.model_copy(update={'content': item.content[:180 if compact else 300]}))
     while sum(len(item.content) for item in history) > 900 and len(history) > 1:
         history.pop(0)
     return request.model_copy(update={'history': history})
@@ -82,18 +82,28 @@ def _conversational_fallback(turn, question):
     return 'I can help talk through a pick, compare the actual lines, or explain what could change the assessment.'
 
 
-async def _generate_reply(generate, request, progress, master, cards, *, dialogue, fallback):
+async def _generate_reply(generate, request, progress, master, cards, *, dialogue, fallback, compact=False, brief=None):
     """A failed explanation must still deliver the checked answer, never model prose."""
     try:
         async with asyncio.timeout(MODEL_DISCUSSION_SECONDS):
-            result = await generate(_bounded_request(request), progress, master, cards, natural=True,
-                                    dialogue=dialogue, fallback=fallback)
+            bounded = _bounded_request(request, compact=compact)
+            if compact and brief and callable(getattr(bounded, 'model_copy', None)):
+                # Reference resolution has already used the full dialogue.
+                # Give inference its resolved facts, not a second copy of old prose.
+                bounded = bounded.model_copy(update={'history':[]})
+            result = await generate(bounded, progress, master, cards, natural=True,
+                                    dialogue={**dialogue, **({'_compact':True} if compact else {}),
+                                              **({'_brief_evidence':brief} if brief is not None else {})}, fallback=fallback)
     except asyncio.CancelledError:
         raise
-    except Exception:
-        result = None
+    except Exception as error:
+        failure = _direct_reply(fallback, cards)
+        failure['ai_failure_category'] = 'timeout' if isinstance(error, TimeoutError) else 'grounding_error'
+        return failure
     if not isinstance(result, dict) or not str(result.get('answer') or '').strip():
         return _direct_reply(fallback, cards)
+    if result.get('ai_used') is not False:
+        result = {**result, 'ai_used':True, 'response_mode':'generated'}
     return result
 
 
@@ -115,6 +125,57 @@ def _unavailable_card(pick, reason, index):
                                 'text': text, 'values': []}]}
 
 
+def _brief_pick_facts(report):
+    """Render quantities directly; the model supplies the interpretation only."""
+    metric = MARKET_NAMES[report['stat']]
+    first = f"{report['player']} — {report['decision'].title()} {report['line']:g} {metric} ({report['date']}). {report['reason']}"
+    baseline = report.get('baseline') or {}
+    sample = report.get('sample') or {}
+    facts = []
+    if baseline.get('available'):
+        seasons = ', '.join(baseline.get('seasons') or [])
+        facts.append(f"Baseline: {baseline['n']} same-team games"+(' ('+seasons+')' if seasons else '')+
+                     f", average {baseline['reference_projection']:g}, "
+                     f"median {baseline['baseline_median']:g}, through {baseline['last_date']}.")
+    if sample.get('n'):
+        facts.append(f"Recent sample: above in {sample['more']}/{sample['n']}, median {sample['median']:g}, through {sample['last_date']}.")
+    return first + ('\n'+' '.join(facts) if facts else '')
+
+
+def _pick_interpretation(report):
+    """Short, application-derived relationships for the language model."""
+    baseline = report.get('baseline') or {}
+    parts = [report['reason'][:200]]
+    if baseline.get('available'):
+        relation = lambda value: 'above' if value > report['line'] else 'below' if value < report['line'] else 'equal to'
+        parts.append('The same-team historical mean is '+relation(baseline['reference_projection'])+
+                     ' the offered line; the historical median is '+relation(baseline['baseline_median'])+' it.')
+    sample = report.get('sample') or {}
+    if sample.get('more') and sample.get('less'):
+        parts.append('Recent stored outcomes occur on both sides of the line.')
+    return ' '.join(parts)
+
+
+def _pick_model_evidence(report):
+    baseline = report.get('baseline') or {}
+    sample = report.get('sample') or {}
+    relation = lambda value: 'above' if value > report['line'] else 'below' if value < report['line'] else 'equal to'
+    records = []
+    for card in report['evidence_cards']:
+        kind = card.get('kind')
+        if kind == 'prop_assessment':
+            text = report['reason'][:180]
+        elif kind == 'prop_baseline' and baseline.get('available'):
+            text = 'Historical mean is '+relation(baseline['reference_projection'])+' the offered line; median is '+relation(baseline['baseline_median'])+' it.'
+        elif kind == 'prop_sample':
+            text = ('Recent stored outcomes occur on both sides of the line.' if sample.get('more') and sample.get('less')
+                    else 'Recent outcomes describe the stored sample, not a future probability.')
+        else:
+            text = 'Reduced minutes or changed opportunities can affect this statistic; these are conditional risks.'
+        records.append({'id':card['id'],'kind':kind,'text':text})
+    return records
+
+
 def _changed_readiness(master, checks):
     """A model may take long enough for a tipoff or source status to change."""
     from pick_discussion import _now
@@ -132,7 +193,7 @@ def _changed_readiness(master, checks):
     return None
 
 
-async def _explain_picks(master, turn, request, progress, generate, discussion):
+async def _explain_picks(master, turn, request, progress, generate, discussion, *, natural_dialogue=False):
     """Recompute every selected leg, retaining unavailable and unpriced legs."""
     from research_discussion import build_research_discussion
     picks = turn['recent_picks']
@@ -140,11 +201,21 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
     targets = [p for p in picks if p.get('line_kind') == 'research_target']
     priced = [p for p in picks if p.get('line_kind') != 'research_target']
     cards, assessments, lines, sources, checks = [], [], [], [], []
+    fact_lines = []
+    brief = []
     if targets:
         research = await asyncio.to_thread(build_research_discussion, master, targets, slots)
         if not research.get('cards') and not priced:
             return {'answer':research['fallback_answer'], 'sources':research.get('sources', []), 'ai_used':False}
         cards.extend(research.get('cards', []))
+        if natural_dialogue:
+            fact_lines.append(research['fallback_answer'])
+            items = [*research.get('assessments', []), *research.get('held', [])]
+            for card in research.get('cards', []):
+                item = next((item for item in items if item.get('player') == card.get('entity')), {})
+                limit = (item.get('cautions') or [item.get('reason') or ''])[0]
+                brief.append({'id':card['id'],'kind':card.get('kind'),
+                              'text':'This is a historical research target, not a verified offered line. '+limit[:180]})
         checks.extend({key:item[key] for key in ('player','stat','team','date')}
                       for item in research.get('assessments', []) if item.get('data_readiness', {}).get('ready'))
         assessments.extend({key:item[key] for key in ('player','stat','status','reason','cautions',
@@ -157,6 +228,7 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
             for pick in targets:
                 reason = research['fallback_answer']
                 cards.append(_unavailable_card(pick, reason, len(cards) + 1))
+                brief.append({'id':cards[-1]['id'],'kind':'unavailable','text':reason[:180]})
             if not research.get('held'):
                 assessments.extend({'player':p['player'], 'status':'held', 'decision':'pass',
                                     'reason':research['fallback_answer']} for p in targets)
@@ -186,6 +258,7 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
         if not report.get('available'):
             reason = report['fallback_answer']
             cards.append(_unavailable_card(pick, reason, len(cards) + 1))
+            brief.append({'id':cards[-1]['id'],'kind':'unavailable','text':reason[:180]})
             assessments.append({'player':pick['player'], 'stat':pick.get('stat'),
                                 'decision':'pass', 'status':'held', 'reason':reason})
             lines.append(f"{pick['player']}: Hold. {reason}")
@@ -197,9 +270,13 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
             'text':report['reason'], 'entity':report['player'], 'fact_type':'assessment'}]
         card['text'] = ' '.join(f['text'] for f in card['approved_facts'])
         cards.append(card)
+        brief.append({'id':card['id'],'kind':'prop_interpretation','text':_pick_interpretation(report)})
         assessments.append({'player':report['player'], 'stat':report['stat'],
-                            'decision':report['decision'], 'reason':report['reason']})
+                            'decision':report['decision'], 'reason':report['reason'],
+                            'held_for_data':not report.get('data_readiness', {}).get('ready', True)})
         sample = report['sample']
+        if natural_dialogue:
+            fact_lines.append(_brief_pick_facts(report))
         metric = MARKET_NAMES[report['stat']]
         lines.append(f"{report['player']} — {report['decision'].title()} {report['line']:g} {metric}. "
                      f"Above in {sample['more']}/{sample['n']}, below in {sample['less']}/{sample['n']} "
@@ -216,15 +293,21 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
         'Do not omit a player because its evidence is unavailable.'))
     if discussion.get('selected_pick'):
         discussion['action'] += ' The user’s ordinal identifies the selected player in the lineup; explain why that player and market were selected.'
+    if natural_dialogue and len(assessments) == 1:
+        discussion['decision'] = assessments[0].get('decision')
     # The bounded model/validator supports four evidence cards. Larger lineups
     # still get every computed explanation instead of silently dropping legs.
-    if len(cards) > 4 or not _wants_model(request.message):
+    if natural_dialogue and len(assessments) == 1 and len(cards) > 4:
+        from grounded_reply import compact_natural_evidence
+        cards = compact_natural_evidence(cards, request.message)[:4]
+    if len(cards) > 4 or not (natural_dialogue or _wants_model(request.message)):
         changed = await asyncio.to_thread(_changed_readiness, master, checks)
         if changed:
             return changed
         return fallback_result
     result = await _generate_reply(generate, request, progress, master, cards,
-                                   dialogue=discussion, fallback=fallback)
+                                   dialogue=discussion, fallback=fallback, compact=natural_dialogue,
+                                   brief=brief if natural_dialogue and len(assessments)==len(brief) else None)
     changed = await asyncio.to_thread(_changed_readiness, master, checks)
     if changed:
         return changed
@@ -232,17 +315,98 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
         return fallback_result
     from grounded_reply import _entity_mentions
     entities = {p['player'] for p in picks}
-    mentioned = _entity_mentions(result.get('answer', ''), entities)
+    mentioned = _entity_mentions(result.get('answer', '') + ('\n'+'\n'.join(fact_lines) if natural_dialogue else ''), entities)
     if not entities <= mentioned:
         return fallback_result
     held = [item['player'] for item in assessments
             if item.get('status') == 'held' or item.get('decision') == 'pass']
+    data_holds = [f"Hold — {item['player']}: "+(item.get('cautions') or [item['reason']])[0] for item in assessments
+                  if item.get('held_for_data') or item.get('status') == 'held']
+    if natural_dialogue and data_holds:
+        result['answer'] = '\n'.join(data_holds)+'\n\n'+result['answer']
+    if natural_dialogue and fact_lines and result.get('ai_used') is not False:
+        result['answer'] = '\n\n'.join(fact_lines)+'\n\n'+result['answer']
     if held and not re.search(r'\b(?:pass|hold|held|skip)\b', result.get('answer', ''), re.I):
         result['answer'] = 'Hold for now: ' + ', '.join(dict.fromkeys(held)) + '.\n\n' + result['answer']
     return result
 
 
-async def answer_conversation(store, master, request, progress, generate, turn=None, *, fast_only=False):
+def semantic_focus(turn, history):
+    """Pass only validated conversational focus, never historical prose as fact."""
+    from upcoming_game import _history_team
+    team = _history_team(history)
+    if team:
+        return {'focus_kind':'game','pick_count':0,'team':team}
+    state = turn.get('state') or {}
+    picks = turn.get('recent_picks') or state.get('recent_picks') or []
+    slots = state.get('slots') or {}
+    count = min(8, len(picks)) or int(bool(slots.get('player') and slots.get('stat') and slots.get('line') is not None))
+    return {'focus_kind':'prop' if count else 'none','pick_count':count,'team':None}
+
+
+def apply_semantic_route(turn, route, question, *, focus=None):
+    """Language selects a read-only action; identities and offers stay verified inputs."""
+    if not route:
+        return turn
+    result = {**turn, 'state': dict(turn.get('state') or {})}
+    action = route['route']
+    from upcoming_game import _WORKFLOW
+    if (_WORKFLOW.search(question) and not re.search(r'\b(?:nba|basketball|games?|matchups?|opponent)\b', question, re.I)
+            and action in {'next_game','discuss_prop'}):
+        result.update(intent='chat', slots={}, recent_picks=[], complete_prop=False)
+        return result
+    # An indirect reaction stays attached to the active offer. A model's
+    # next-game guess cannot silently discard it without a new game subject.
+    if (action == 'next_game' and (focus or {}).get('focus_kind') == 'prop'
+            and re.search(r'\b(?:think(?:ing)?|reason(?:ing)?|why|explain|risk|downside|upside|logic|'
+                          r'confidence|sold|steep|that (?:pick|line|stat))\b', question, re.I)):
+        from upcoming_game import wants_next_game_request
+        if not wants_next_game_request(question):
+            action = 'discuss_prop'
+    if action == 'next_game':
+        # Do not reinterpret a current offered prop as a schedule question.
+        from upcoming_game import _PROP_BOUNDARY, _WORKFLOW
+        if _PROP_BOUNDARY.search(question):
+            return turn
+        if _WORKFLOW.search(question) and not re.search(r'\b(?:nba|basketball|games?|matchups?|opponent)\b', question, re.I):
+            # A language-model mistake must not turn a software next-step
+            # question into a fabricated change of basketball subject.
+            result.update(intent='chat', slots={}, recent_picks=[], complete_prop=False)
+            return result
+        result.update(intent='upcoming_game', clarification=None, slots={}, recent_picks=[],
+                      complete_prop=False, semantic_next_game=True)
+        explicit_teams = (turn.get('entities') or {}).get('teams') or []
+        remembered_team = ((focus or {}).get('team')
+                           if (focus or {}).get('focus_kind') == 'game' and not explicit_teams else None)
+        result['state']['upcoming_game_team'] = remembered_team or route.get('team') or result['state'].get('upcoming_game_team') or 'NYK'
+    elif action == 'discuss_prop' and not turn.get('clarification'):
+        state = result['state']
+        if state.get('ambiguous_players') and len(turn.get('recent_picks') or []) > 1:
+            result['clarification'] = 'Which pick do you mean? Give the player and statistic, or its list number.'
+            return result
+        if not turn.get('complete_prop') and not turn.get('recent_picks'):
+            # An unfamiliar explanation can refer to the last exact offer. A new
+            # player, market or numeric input must go through ordinary validation.
+            from conversation import _market
+            stat, market_error = _market(question)
+            entities = turn.get('entities') or {}
+            if (turn.get('intent') != 'chat' or entities.get('players') or entities.get('teams')
+                    or stat or market_error or re.search(r'\d', question) or turn.get('errors')):
+                return turn
+            slots = dict(state.get('slots') or {})
+            if slots.get('player') and slots.get('stat') and slots.get('line') is not None:
+                result.update(slots=slots, complete_prop=True)
+        if result.get('complete_prop') or result.get('recent_picks'):
+            result['intent'] = 'explanation'
+    elif action == 'research':
+        result['intent'] = 'research'
+    elif action == 'clarify':
+        result.update(clarification='Do you mean the next Knicks game, a particular pick, or a player statistic?')
+    return result
+
+
+async def answer_conversation(store, master, request, progress, generate, turn=None, *, fast_only=False,
+                              natural_dialogue=False):
     history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
     turn = turn or await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
         preferences=getattr(request, 'lineup_preferences', None))
@@ -252,8 +416,37 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
     if intent == 'upcoming_game':
         from upcoming_game import build_preview
         from pick_discussion import _now
-        return await asyncio.to_thread(build_preview, master, request.message, history, now=_now(None),
-                                       team=turn.get('state', {}).get('upcoming_game_team'))
+        preview = await asyncio.to_thread(build_preview, master, request.message, history, now=_now(None),
+            team=turn.get('state', {}).get('upcoming_game_team'),
+            resolved_intent=bool(turn.get('semantic_next_game')))
+        if not natural_dialogue or not preview or not preview.get('next_game_focus'):
+            return preview
+        from upcoming_game import preview_evidence, validate_preview_analysis
+        cards = preview_evidence(preview)
+        forms = preview.get('recent_form', [])
+        brief = []
+        if len(forms) == 2:
+            for item,other,card in zip(forms, reversed(forms), cards):
+                relation = lambda key: 'lower' if item[key] < other[key] else 'higher' if item[key] > other[key] else 'equal'
+                brief.append({'id':card['id'],'kind':'team_comparison','text':item['team']+
+                    ' has '+relation('points_for_average')+' stored scoring and '+relation('points_against_average')+
+                    ' stored points allowed than '+other['team']+'. The samples are small and against different opponents; no forecast is established.'})
+        result = await _generate_reply(generate, request, progress, master, cards,
+            dialogue={'intent':'upcoming_game','action':'Explain the upcoming matchup in the user’s own context. '
+                'Use the dated team samples as samples against different opponents; explain conditional implications. '
+                'Do not repeat tipoff, venue or availability: the application supplies these separately.'},
+            fallback=preview['answer'], compact=True, brief=brief or None)
+        if result.get('ai_used') is False:
+            return {**preview, 'ai_failure_category':result.get('ai_failure_category')}
+        if not validate_preview_analysis(result.get('answer', ''), preview):
+            return preview
+        facts = '\n'.join(f"{item['team']}: {item['points_for_average']:g} scored / {item['points_against_average']:g} allowed per game; "
+                          f"{item['games']} stored finals through {item['data_through_date']}."
+                          for item in preview.get('recent_form', []))
+        prefix = preview['answer_header'] + ('\n\n'+facts if facts else '')
+        return {**preview, **result, 'answer':prefix+'\n\n'+result['answer'],
+                'sources':preview.get('sources', [])+result.get('sources', []),
+                'ai_used':True, 'response_mode':'generated'}
     if intent == 'research':
         return None
     if fast_only and _wants_model(request.message) and intent != 'lineup_constraint':
@@ -293,9 +486,10 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
                    for word in ('blowout','minutes','payout','threes','attempts','motivation'))]
         discussion['relevant_risks'] = (focused or risks[-1:])[:2]
         progress['detail'] = 'Checking the line and its main risk'
-        if _wants_model(request.message):
+        if natural_dialogue or _wants_model(request.message):
             result = await _generate_reply(generate, request, progress, master, report['evidence_cards'],
-                                           dialogue=discussion, fallback=report['fallback_answer'])
+                dialogue=discussion, fallback=report['fallback_answer'], compact=natural_dialogue,
+                brief=_pick_model_evidence(report) if natural_dialogue else None)
         else:
             result = _direct_reply(report['fallback_answer'], report['evidence_cards'])
         if report.get('data_readiness', {}).get('ready'):
@@ -307,6 +501,16 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
                 return changed
         if result is None:
             result = {'answer':report['fallback_answer'], 'sources':report.get('sources',[]), 'ai_used':False}
+        if natural_dialogue and result.get('ai_used') is not False:
+            result['answer'] = _brief_pick_facts(report)+'\n\n'+result['answer']
+        elif (natural_dialogue and report['decision'] == 'pass'
+                and not report.get('data_readiness', {}).get('ready', True)):
+            # Current-data eligibility is an application fact, not optional
+            # model prose. Keep the actual hold reason even if it explains a
+            # historical sample well but forgets why this game is ineligible.
+            header = report['fallback_answer'].split('\n', 1)[0]
+            if not result['answer'].startswith(header):
+                result['answer'] = header+'\n\n'+result['answer']
         if (report['decision'] == 'pass' and
                 not re.search(r'\b(?:pass|hold|held|skip)\b', result.get('answer', ''), re.I)):
             result['answer'] = 'Pass for now.\n\n' + result['answer']
@@ -318,7 +522,8 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
     if intent == 'explanation' and turn.get('recent_picks'):
         # Explain the selected identities, recomputing every claim from data.
         # Prior model prose is not recycled as authoritative evidence.
-        return await _explain_picks(master, turn, request, progress, generate, discussion)
+        return await _explain_picks(master, turn, request, progress, generate, discussion,
+                                    natural_dialogue=natural_dialogue)
     if intent == 'preference':
         discussion['action'] = ('Acknowledge the preference and explain the relevant tradeoff. '
             'Do not reverse an assessment merely to agree, and do not ask for a new line unless '
@@ -326,7 +531,7 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
     elif intent == 'explanation':
         discussion['action'] = ('Explain the general mechanism using the conversation. If several '
             'picks could be meant, ask which one; do not choose an arbitrary player.')
-    if intent == 'preference' and not _wants_model(request.message):
+    if intent == 'preference' and not natural_dialogue and not _wants_model(request.message):
         result = _direct_reply(_conversational_fallback(turn, request.message))
         result['constraints'] = turn.get('constraints', {})
         return result
@@ -335,18 +540,33 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         return _direct_reply(_conversational_fallback(turn, request.message))
     cards = (await asyncio.to_thread(_preference_evidence, store, master, turn, history)
              if intent == 'preference' and turn.get('slots', {}).get('player') else [])
+    if natural_dialogue and intent == 'chat':
+        from upcoming_game import _WORKFLOW
+        if _WORKFLOW.search(request.message):
+            from telegram_bot import HELP
+            text = '\n'.join(line for line in HELP.splitlines()
+                             if line.startswith(('/freshness ', '/picks ', '/board ', '/analyze ')))[:900]
+            cards = [{'id':'B1','kind':'bot_help','entity':'bot','source':'Installed bot command help',
+                      'text':text,'approved_facts':[{'entity':'bot','fact_type':'context','text':text}]}]
     if fast_only:
         return None
     return await _generate_reply(generate, request, progress, master, cards, dialogue=discussion,
-                                fallback=_conversational_fallback(turn, request.message))
+                                fallback=_conversational_fallback(turn, request.message), compact=natural_dialogue)
 
 
-async def try_fast_answer(store, master, request, progress=None):
+async def try_fast_answer(store, master, request, progress=None, *, prefer_natural=False):
     """Return a checked routine answer before model readiness/queue guards.
 
     This path performs no inference or live schedule fetch. The saved freshness
     checks still decide whether a prop is eligible, so missing verification
     returns a Pass rather than an invented current recommendation.
     """
+    turn = None
+    if prefer_natural:
+        history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
+        turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
+                                       preferences=getattr(request, 'lineup_preferences', None))
+        if not turn.get('clarification') and turn['intent'] in {'prop','explanation','preference','upcoming_game'}:
+            return None
     return await answer_conversation(store, master, request, progress if progress is not None else {},
-                                     None, fast_only=True)
+                                     None, turn=turn, fast_only=True)

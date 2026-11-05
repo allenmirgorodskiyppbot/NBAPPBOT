@@ -144,7 +144,8 @@ def seed_calendar(store, path=SEED_PATH):
 
 def saved_schedule(store, now):
     season=current_season(now)
-    meta=store.get_checkpoint('season_calendar:'+season,{})
+    from season_schedule_refresh import team_calendar_metadata
+    meta=team_calendar_metadata(store, 'NYK', season=season)
     if not meta:
         return {}
     with store.connect() as db:
@@ -164,7 +165,8 @@ def calendar_context(store, date, team):
     if not target:
         return {}
     year=int(date[:4])-(int(date[5:7])<7)
-    meta=store.get_checkpoint(f'season_calendar:{year}-{str(year+1)[-2:]}',{})
+    from season_schedule_refresh import team_calendar_metadata
+    meta=team_calendar_metadata(store, team, season=f'{year}-{str(year+1)[-2:]}')
     rest_covered=(team in meta.get('covered_teams',[]) and meta.get('complete_for_published_games') is True
                   and not meta.get('unassigned_coverage_unknown')
                   and not (meta.get('unassigned_games',0) and not meta.get('unassigned_windows')))

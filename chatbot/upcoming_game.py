@@ -160,9 +160,9 @@ def _schedule(store, team, now):
         tip = _aware(row.get('start_time'))
         if tip and (tip.astimezone(EASTERN).date() != day or tip <= now):
             continue
-        # A same-day unknown time cannot establish that a game is still ahead.
-        if not tip and day <= now.astimezone(EASTERN).date():
-            continue
+        # A same-day unknown clock must not disappear in favor of a later
+        # game. Retain the candidate, explicitly without upcoming status.
+        row['_today_time_unknown'] = not tip and day == now.astimezone(EASTERN).date()
         row['_tipoff'] = tip
         eligible.append(row)
     return min(eligible, key=lambda row:(row['date'], row.get('start_time') or '99', row['id'])) if eligible else None
@@ -192,7 +192,8 @@ def _verified_timing(store, game, now):
 
 
 def _coverage(store, team, game, now):
-    metadata = _checkpoint(store,'season_calendar:'+current_season(now),{}) or {}
+    from season_schedule_refresh import team_calendar_metadata
+    metadata = team_calendar_metadata(store, team, season=current_season(now)) or {}
     covered = {canonical_team(value) for value in metadata.get('covered_teams',[])}
     if metadata.get('team'):
         covered.add(canonical_team(metadata['team']))
@@ -269,12 +270,20 @@ def _clock(stamp):
     return local.strftime('%I:%M %p').lstrip('0') + ' Eastern'
 
 
-def build_preview(store, text='', history=None, *, now=None, team=None):
-    """Return a computed preview, or None when the message is not a next-game request."""
+def build_preview(store, text='', history=None, *, now=None, team=None, resolved_intent=False):
+    """Compute a saved preview after either explicit or validated semantic routing.
+
+    ``resolved_intent`` belongs to the read-only semantic dispatcher. It bypasses
+    phrase recognition, never the prop, identity, date or coverage checks.
+    """
+    if type(resolved_intent) is not bool:
+        raise ValueError('Resolved preview intent must be a boolean.')
+    if resolved_intent and team is not None and canonical_team(team) not in TEAM_NAMES:
+        raise ValueError('Resolved preview team must be an NBA team.')
     text = _normalize(text)
     if _PROP_BOUNDARY.search(text):
         return None
-    if not wants_next_game_request(text,history) and not (team and _FOLLOWUP.search(text)
+    if not resolved_intent and not wants_next_game_request(text,history) and not (team and _FOLLOWUP.search(text)
             and not _WORKFLOW.search(text) and not _context_barrier(history)
             and not re.search(r'\b(?:pra|fga|tpa|3pm|3ptm|props?|line)\b', text, re.I)):
         return None
@@ -282,6 +291,13 @@ def build_preview(store, text='', history=None, *, now=None, team=None):
     if current.tzinfo is None:
         raise ValueError('Next-game previews require a timezone-aware clock.')
     selected, ambiguous = _team_choice(text,history,team)
+    mentioned = _teams(text)
+    if resolved_intent and team and len(mentioned) <= 1 and (
+            not mentioned or canonical_team(team) in mentioned or
+            re.search(r'\b(?:we|our|us)\b', text, re.I)):
+        # A semantic route may distinguish "our game against Cleveland" from
+        # "Cleveland's upcoming game". Multiple explicit subjects still clarify.
+        selected, ambiguous = canonical_team(team), []
     if ambiguous:
         return {'answer':'Which team’s next game do you mean: ' + ' or '.join(ambiguous) + '?',
                 'sources':[],'ai_used':False,'response_mode':'computed'}
@@ -302,7 +318,9 @@ def build_preview(store, text='', history=None, *, now=None, team=None):
     if game.get('_schedule_conflict') and not timing:
         matchup = selected + ' vs ' + opponent
         venue = 'venue needs confirmation'
-    title = 'Next game' if coverage['selected_team_coverage_established'] else 'Next saved matchup'
+    today_time_unknown = game.get('_today_time_unknown', False)
+    title = ('Next game' if coverage['selected_team_coverage_established'] and not today_time_unknown
+             else 'Next saved matchup')
     heading = f"{title} for {selected} ({TEAM_NAMES[selected][-1]}): {matchup} — {date_label}, {tip_label} ({venue})."
     if timing:
         qualification = f"Timing independently checked at {_clock(_aware(timing['checked_at']))}."
@@ -314,6 +332,9 @@ def build_preview(store, text='', history=None, *, now=None, team=None):
             qualification = 'Saved schedule sources disagree; the listed time and venue need a current check.'
     if not coverage['selected_team_coverage_established']:
         qualification += f" Full {selected} schedule coverage is not established; this may not be their next NBA game."
+    if today_time_unknown:
+        qualification += (" This is today's saved matchup, but its start time and current status are unverified. "
+                          "I can't tell whether it has started, so I cannot establish which game is next.")
     forms = [record for record in (_form(store,selected,current),_form(store,opponent,current)) if record]
     details = []
     if forms:
@@ -340,8 +361,95 @@ def build_preview(store, text='', history=None, *, now=None, team=None):
     sources.extend({'tool':'official_availability','source':row['source_url'],
                     'report_at':row['report_at'],'player':row['player']} for row in availability)
     focus = {key:game.get(key) for key in ('id','date','home_team','away_team','start_time','status')}
-    focus.update(team=selected,opponent=opponent,timing_verified=bool(timing))
-    return {**base,'answer':heading+' '+qualification+'\n\n'+'\n'.join(details),
+    focus.update(team=selected,opponent=opponent,timing_verified=bool(timing),
+                 upcoming_established=not today_time_unknown,today_time_unknown=bool(today_time_unknown))
+    header = heading+' '+qualification
+    availability_detail = next((line for line in details if line.startswith(
+        ('Saved official availability:', 'Game-specific availability'))), '')
+    return {**base,'answer':header+'\n\n'+'\n'.join(details),
+            'answer_header':header+('\n'+availability_detail if availability_detail else ''),
+            'answer_details':'\n'.join(line for line in details if line != availability_detail),
             'sources':sources,'next_game_focus':focus,'recent_form':forms,'availability':availability,
             'schedule_coverage':coverage,
             'grounding':'Saved schedule and dated observations; no current-game pick or injury inference.'}
+
+
+def preview_evidence(preview):
+    """Approved team-score facts for natural synthesis, not future game claims.
+
+    Schedule timing and official designations remain in ``answer_header``. They
+    are deliberately absent from this model evidence so synthesis cannot upgrade
+    a saved calendar or turn a limited report into a confirmed lineup.
+    """
+    if not isinstance(preview, dict) or not preview.get('next_game_focus'):
+        return []
+    cards = []
+    for row in preview.get('recent_form', [])[:2]:
+        entity = row['team']
+        scope = (f"Latest {row['games']} saved current-season final games through "
+                 f"{row['data_through_date']}, across different opponents; sample completeness is not established")
+        facts = [
+            {'entity':entity,'fact_type':'average','metric':'points','scope':scope,
+             'text':f"{entity} averaged {row['points_for_average']:g} points scored per game in this saved sample.",
+             'values':[row['points_for_average']]},
+            {'entity':entity,'fact_type':'average','metric':'points','scope':scope,
+             'text':f"{entity} allowed an average of {row['points_against_average']:g} points per game in this saved sample.",
+             'values':[row['points_against_average']]},
+            {'entity':entity,'fact_type':'counts','metric':'games','scope':scope,
+             'text':f"{entity}'s saved sample contains {row['games']} games: {row['wins']} wins and {row['losses']} losses.",
+             'values':[row['games'],row['wins'],row['losses']]},
+            {'entity':entity,'fact_type':'source_date','metric':'date','scope':scope,
+             'text':f"{entity}'s latest saved final in this sample is dated {row['data_through_date']}; complete source coverage is not established.",
+             'values':[]},
+        ]
+        cards.append({'id':f'G{len(cards)+1}','kind':'upcoming_team_form','entity':entity,
+            'source':next(iter(row.get('sources', [])), 'Saved validated final team scores'),
+            'source_urls':list(row.get('sources', [])),'data_through_date':row['data_through_date'],
+            'scope':scope,'text':' '.join(f['text'] for f in facts)+' '+scope+'.',
+            'approved_facts':facts})
+    limits = ('The saved samples involve different opponents. They do not establish pace, opponent-specific defense, '
+              'a future score, a winning probability, or a betting advantage.')
+    if preview['next_game_focus'].get('today_time_unknown'):
+        limits += (' The saved same-day matchup has no known start time or current status. It is not established '
+                   'to still be upcoming; a later calendar date cannot be labeled the next game until this is checked.')
+    cards.append({'id':'G3','kind':'upcoming_preview_limits','source':'Saved preview evidence limits',
+        'text':limits,'approved_facts':[{'fact_type':'context','values':[],'text':limits}]})
+    cards.append({'id':'G4','kind':'availability_coverage','source':'Saved preview evidence limits',
+        'text':'Team-score samples do not establish player health, starters, restrictions or individual defender assignments. The application supplies any saved official designations separately.',
+        'approved_facts':[{'fact_type':'context','values':[],
+            'text':'Team-score samples do not establish player health, starters, restrictions or individual defender assignments.'}]})
+    return cards
+
+
+def validate_preview_analysis(text, preview):
+    """Keep synthesis within team facts; application text owns time/availability.
+
+    Alias normalization is validation-only. Without it, "the Knicks" could
+    evade a numeric entity check whose evidence uses the code ``NYK``.
+    """
+    from grounded_reply import render_natural_reply, ReplyValidationError
+    if not isinstance(text, str) or not text.strip():
+        return False
+    body = text.split('\n\nSources:', 1)[0].strip()
+    if re.search(r'\b(?:tip[- ]?off|scheduled|venue|starts? at|confirmed|verified|official|Monday|Tuesday|Wednesday|'
+                 r'Thursday|Friday|Saturday|Sunday|tonight|tomorrow)\b', body, re.I):
+        return False
+    # Timing/availability are application-rendered, including uncertainty. The
+    # model may discuss conditional minutes, but cannot assert a roster update.
+    if re.search(r'\b(?:injur\w*|healthy|questionable|doubtful|ruled out|starting lineup|'
+                 r'confirmed starters|player availability|cleared to play)\b', body, re.I):
+        return False
+    aliases = sorted(((alias,code) for code,names in TEAM_NAMES.items()
+                      for alias in (code,*names)), key=lambda item:len(item[0]), reverse=True)
+    normalized = body
+    for alias,code in aliases:
+        normalized = re.sub(r'(?<!\w)'+re.escape(alias)+r'(?!\w)',code,normalized,flags=re.I)
+    cards = preview_evidence(preview)
+    if not cards:
+        return False
+    try:
+        render_natural_reply({'evidence_ids':[card['id'] for card in cards],
+                              'reply':normalized,'needs_more_data':False},cards)
+    except (ReplyValidationError, ValueError, TypeError, KeyError):
+        return False
+    return True

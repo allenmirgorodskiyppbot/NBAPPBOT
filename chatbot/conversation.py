@@ -132,7 +132,7 @@ def _date(text, now):
             except ValueError:
                 return None, 'invalid_date', spans
     month_names = '|'.join(sorted(_MONTHS, key=len, reverse=True))
-    for match in re.finditer(r'\b(' + month_names + r')\.?\s+(\d{1,2})(?:st|nd|rd|th)?'
+    for match in re.finditer(r'\b(' + month_names + r')\.?\s*(\d{1,2})(?:st|nd|rd|th)?'
                              r'(?:,?\s+(20\d{2}))?\b|(?<![\d/])(\d{1,2})/(\d{1,2})'
                              r'(?:/(20\d{2}))?(?![\d/])', text, re.I):
         spans.append(match.span())
@@ -174,8 +174,8 @@ def _market(text):
             # More-specific three-point attempts take precedence over threes.
             return stat, None
     components = []
-    for stat, pattern in [('pts', r'\b(?:points?|pts|ppg)\b'), ('reb', r'\b(?:rebounds?|rebs?|rpg)\b'),
-                           ('ast', r'\b(?:assists?|asts?|apg)\b'), ('stl', r'\b(?:steals?|stl)\b'),
+    for stat, pattern in [('pts', r'\b(?:points?|pts|ppg)\b'), ('reb', r'(?<!/)\b(?:rebounds?|rebs?|rpg|boards)\b'),
+                           ('ast', r'\b(?:assists?|asts?|apg|dimes)\b'), ('stl', r'\b(?:steals?|stl)\b'),
                            ('blk', r'\b(?:blocks?|blk)\b'), ('tov', r'\b(?:turnovers?|tov|to)\b'),
                            ('minutes', r'\bminutes\b')]:
         # "to" is ordinary prose, not a market without explicit typography.

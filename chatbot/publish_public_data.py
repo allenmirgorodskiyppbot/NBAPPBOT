@@ -27,7 +27,7 @@ MAX_FILE_BYTES = 32_000_000
 MAX_TOTAL_BYTES = 128_000_000
 MAX_API_BYTES = 16_000_000
 SHA = re.compile(r'[0-9a-f]{40}')
-FIXED = {'existing_dataset_scope.json',
+FIXED = {'existing_dataset_scope.json', 'season_schedule.json',
          'existing_tracking.json','structured_availability.json.gz',
          'official_injury_pdf_status.json','availability_collection_status.json',
          'career_history_status.json'}

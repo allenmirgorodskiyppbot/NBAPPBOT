@@ -129,3 +129,69 @@ async def efficient_chat(client, payload, store=None, url=None, diagnostics=None
         while len(_CACHE)>MAX_CACHE_ITEMS:
             _CACHE.popitem(last=False)
     return body
+
+
+def _completion_payload(payload):
+    """Quote the existing no-tools dialogue without changing its model contract."""
+    allowed={'model','messages','format','options','think','stream','keep_alive','_transport'}
+    if not isinstance(payload,dict) or set(payload)-allowed:
+        raise ValueError('Completion transport accepts only a bounded no-tools chat payload.')
+    if payload.get('stream',False) is not False:
+        raise ValueError('Completion transport requires stream=False.')
+    if payload.get('_transport','generate') != 'generate':
+        raise ValueError('Invalid completion transport marker.')
+    messages=payload.get('messages')
+    if not isinstance(messages,list) or not messages:
+        raise ValueError('Completion transport requires a system-led dialogue.')
+    for index,message in enumerate(messages):
+        if (not isinstance(message,dict) or set(message)-{'role','content'}
+                or message.get('role') not in ({'system'} if index==0 else {'user','assistant'})
+                or not isinstance(message.get('content'),str)):
+            raise ValueError('Completion dialogue cannot contain tools, images or extra system instructions.')
+    request={key:payload[key] for key in ('model','format','options','think','keep_alive') if key in payload}
+    request.update(system=messages[0]['content'],
+        prompt=json.dumps({'quoted_conversation':messages[1:]},ensure_ascii=False,separators=(',',':')),
+        raw=False,stream=False)
+    return request
+
+
+class _CompletionResponse:
+    def __init__(self,response):self.response=response
+
+    def raise_for_status(self):return self.response.raise_for_status()
+
+    def json(self):
+        body=self.response.json()
+        if not isinstance(body,dict):
+            return body
+        if body.get('tool_calls') or (isinstance(body.get('message'),dict) and body['message'].get('tool_calls')):
+            raise ValueError('Completion transport cannot return tool calls.')
+        content=body.get('response','')
+        if not isinstance(content,str):
+            raise ValueError('Completion response must contain text.')
+        result={key:value for key,value in body.items() if key not in {'response','context','message'}}
+        result['message']={'role':'assistant','content':content}
+        return result
+
+
+class _CompletionClient:
+    def __init__(self,client):self.client=client
+
+    async def post(self,endpoint,*,json):
+        if not endpoint.endswith('/api/chat'):
+            raise ValueError('Unexpected completion adapter endpoint.')
+        response=await self.client.post(endpoint[:-len('/api/chat')]+'/api/generate',
+                                       json=_completion_payload(json))
+        return _CompletionResponse(response)
+
+
+async def efficient_generate(client,payload,store=None,url=None,diagnostics=None,validator=None):
+    """No-tools completion with the same validation, counters and bounded cache.
+
+    The internal marker distinguishes native chat and completion cache entries;
+    it is never sent to the model. Keep this marker when caching a repaired
+    original request with ``cache_validated_response``.
+    """
+    _completion_payload(payload)  # Reject unsupported requests before any cache or HTTP work.
+    tagged={**payload,'_transport':'generate'}
+    return await efficient_chat(_CompletionClient(client),tagged,store,url,diagnostics,validator)

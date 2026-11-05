@@ -1001,13 +1001,93 @@ def _retired_line_correction_span(clause, facts, question):
     return correction.span('old')
 
 
+def _natural_quantity_clauses(text, entities):
+    """Separate explicitly attributed measurements, never pool their values.
+
+    A comma/as clause can compare offense with defense. A watch/consider
+    introduction can also name the defense before a different team's measured
+    offense. Only detach those clauses when each measurement names its subject.
+    """
+    aliases = set()
+    for entity in entities:
+        aliases.add(entity)
+        if len(entity.split()) > 1:
+            aliases.add(entity.split()[-1])
+    if not aliases:
+        return re.split(r'(?<=[.!?;])\s+|\b(?:whereas|while|and|but)\b', text)
+    names = '(?:'+'|'.join(re.escape(alias) for alias in sorted(aliases,key=len,reverse=True))+')'
+    measured = re.compile(r'(?<!\w)'+names+r'(?!\w)(?:[’\x27]s)?\s+'
+        r'(?:(?:has|have|had|a|an|the|high|low|recent|saved|stored)\s+){0,4}'
+        r'(?:scor(?:ed|es|ing)|averag\w*|allow(?:ed|s)?|conced\w*|median|recorded|made)\b', re.I)
+    result = []
+    for original in re.split(r'(?<=[.!?;])\s+|\b(?:whereas|while|and|but)\b', text):
+        pending = [original]
+        while pending:
+            clause = pending.pop(0)
+            boundary = None
+            for match in re.finditer(r',\s*(?:(?:as|because)\s+)?',clause,re.I):
+                left,right = clause[:match.start()],clause[match.end():]
+                if (_numbers(left) and measured.search(left) and measured.match(right.strip())
+                        and _numbers(right)):
+                    boundary = match
+                    break
+            if boundary:
+                pending[:0] = [clause[:boundary.start()],clause[boundary.end():]]
+                continue
+            subjects = list(measured.finditer(clause))
+            if len(_entity_mentions(clause,entities)) > 1 and subjects:
+                subject = subjects[-1]
+                prefix = clause[:subject.start()]
+                if (not _numbers(prefix) and re.search(r'\b(?:watch|watching|consider|monitor|compare|look at)\b',prefix,re.I)
+                        and _numbers(clause[subject.end():])):
+                    result.extend([prefix,clause[subject.start():]])
+                    continue
+            result.append(clause)
+    return result
+
+
+def _threshold_game_label_supported(text, match, value, facts):
+    """"Below-25.5 games" labels outcomes relative to a line, not a game count."""
+    label = re.search(r'\b(above|below|over|under)-$',text[:match.start()],re.I)
+    if not label or not re.match(r'\s+(?:(?:stored|observed)\s+)?games?\b',text[match.end():],re.I):
+        return False
+    direction = 'less' if label[1].casefold() in {'below','under'} else 'more'
+    for line in facts:
+        if line.get('fact_type') != 'line' or value not in _numbers(line.get('text','')):
+            continue
+        for sample in facts:
+            if (sample.get('fact_type') not in {'sample','sample_counts'}
+                    or any(sample.get(key)!=line.get(key) for key in ('entity','metric','scope'))
+                    or value not in _numbers(sample.get('text',''))):
+                continue
+            if any(side==direction and count>0 for side,count,_ in _sample_direction_claims(sample.get('text',''))):
+                return True
+    return False
+
+
+def _typed_fact_numbers(fact, claim_type, pattern):
+    """Keep a compound baseline's average separate from its median and count."""
+    text = _number_text(fact.get('text',''))
+    if claim_type not in {'average','median'} or not (re.search(r'\bmedian\b',text,re.I)
+            and re.search(r'\b(?:averag\w*|mean)\b',text,re.I)):
+        return _numbers(text)
+    result = set()
+    for term in re.finditer(pattern,text,re.I):
+        remaining = text[term.end():]
+        next_type = re.search(r'\b(?:median|averag\w*|mean)\b',remaining,re.I)
+        after = _NUMBER.search(remaining[:min(24,next_type.start() if next_type else 24)])
+        if after:
+            result.add(float(after.group()))
+    return result
+
+
 def _validate_natural_numbers(text, selected, all_cards, question=''):
     if _unsupported_sample_equality(text,selected):
         raise ReplyValidationError('unsupported_metric')
     facts = [fact for card in selected for fact in _card_facts(card)]
     entities = _entities(all_cards)
     active_entities = set()
-    for clause in re.split(r'(?<=[.!?;])\s+|\b(?:whereas|while|and|but)\b', text):
+    for clause in _natural_quantity_clauses(text, entities):
         mentioned = _entity_mentions(clause, entities)
         if mentioned:
             active_entities = mentioned
@@ -1020,7 +1100,7 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
                 bool(re.search(r'\b(?:allowed|allows?|conced\w*|opponent FG|defended)\b', fact.get('text',''), re.I)) == defensive_claim
                 or (defensive_claim and fact.get('opponent'))]
         # Broad season averages cannot be relabeled as opponent-specific results.
-        historical = re.search(r'\b(?:averag\w*|scor(?:ed|ing)|recorded|had|made|shot|grabbed|collected)\b', clause, re.I)
+        historical = re.search(r'\b(?:averag\w*|scor(?:ed|ing)|allow(?:ed|s)?|conced\w*|defended|recorded|had|made|shot|grabbed|collected)\b', clause, re.I)
         if historical:
             for opponent_claim in re.finditer(r'\b(?:against|versus|vs\.?|facing)\s+([A-Za-z][A-Za-z -]{1,60})', clause, re.I):
                 target = opponent_claim.group(1)
@@ -1071,7 +1151,9 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
             if value not in allowed:
                 raise ReplyValidationError('unsupported_number')
             unit = _UNIT_AFTER.match(normalized[match.end():])
-            if unit and not any(_quantity_supported(value, _metric_for_unit(unit.group(1)), f) for f in candidates):
+            threshold_label = bool(unit and _metric_for_unit(unit.group(1))=='games'
+                                   and _threshold_game_label_supported(normalized,match,value,candidates))
+            if unit and not threshold_label and not any(_quantity_supported(value, _metric_for_unit(unit.group(1)), f) for f in candidates):
                 raise ReplyValidationError('unsupported_metric')
         for claim in _sample_direction_claims(clause):
             if not any(any(claim[:2]==other[:2] and (claim[2] is None or claim[2]==other[2])
@@ -1084,6 +1166,10 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
             if not re.search(pattern, clause, re.I) or not _numbers(clause):
                 continue
             typed = [f for f in candidates if f.get('fact_type') == claim_type or re.search(pattern, f.get('text', ''), re.I)]
+            if re.search(r'\bbaseline\b',clause,re.I):
+                typed = [fact for fact in typed if re.search(r'\bbaseline\b',fact.get('text',''),re.I)]
+            elif re.search(r'\b(?:sample|recent)\b',clause,re.I):
+                typed = [fact for fact in typed if not re.search(r'\bbaseline\b',fact.get('text',''),re.I)]
             for term in re.finditer(pattern, normalized, re.I):
                 if re.search(r'\b(?:no|not|without|unsupported|unavailable|unknown)\b',normalized[:term.start()],re.I):
                     continue
@@ -1095,7 +1181,11 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
                 comparison = (re.search(r'\b(above|below|over|under|exceed\w*|less than|more than|equal to)\b',
                                         normalized[term.end():term.end()+after.start()],re.I) if after else None)
                 if comparison:
-                    centers = [float(f['values'][0]) for f in typed if f.get('values') and _finite(f['values'][0])]
+                    centers = (list(set().union(*(_typed_fact_numbers(f,claim_type,pattern) for f in typed)))
+                               if claim_type in {'average','median'} and typed else
+                               [float(f['values'][0]) for f in typed if f.get('values') and _finite(f['values'][0])])
+                    if not centers:
+                        raise ReplyValidationError('unsupported_metric')
                     if centers:
                         operator = comparison.group().casefold()
                         supported = (any(n<claimed for n in centers) if operator in {'below','under','less than'} else
@@ -1103,7 +1193,7 @@ def _validate_natural_numbers(text, selected, all_cards, question=''):
                         if not supported:
                             raise ReplyValidationError('unsupported_metric')
                     continue
-                if claimed is not None and not any(claimed in _numbers(f.get('text','')) for f in typed):
+                if claimed is not None and not any(claimed in _typed_fact_numbers(f,claim_type,pattern) for f in typed):
                     raise ReplyValidationError('unsupported_metric')
 
 

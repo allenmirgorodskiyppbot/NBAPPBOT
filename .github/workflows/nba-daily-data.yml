@@ -9,6 +9,7 @@ on:
       - 'chatbot/mirror_sources.py'
       - 'chatbot/published_game_inventory.py'
       - 'chatbot/dataset_refresh.py'
+      - 'chatbot/season_schedule_refresh.py'
       - 'chatbot/advanced_refresh.py'
       - 'chatbot/tracking_publications.py'
       - 'chatbot/historical_matchup_refresh.py'

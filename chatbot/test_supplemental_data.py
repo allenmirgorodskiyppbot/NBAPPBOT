@@ -64,6 +64,8 @@ class SupplementalTests(unittest.TestCase):
             source_url='https://ak-static.cms.nba.com/referee/injury/Injury-Report_2026-11-05_12_45PM.pdf',
             report_at='2026-11-05T12:45:00-05:00', text_sha256='b'*64, now=NOW), now=NOW)
         self.routes[sd.AVAILABILITY_URL] = gzip.compress(json.dumps(self.availability).encode())
+        from test_season_schedule_refresh import fixture_document
+        self.routes[sd.SEASON_SCHEDULE_URL] = json.dumps(fixture_document(now=NOW)).encode()
         self.measured_patch = patch.object(sd, 'refresh_measured_history',
             functools.partial(mh.refresh_measured_history, scope=SCOPE, pair_scope=PAIRS))
         self.measured_patch.start(); self.addCleanup(self.measured_patch.stop)
@@ -157,9 +159,40 @@ class SupplementalTests(unittest.TestCase):
             result = self.refresh(client, NOW + dt.timedelta(hours=1))
         self.assertFalse(result['changed'])
         self.assertEqual(self.requests[count:], [sd.REPAIR_BASE + sd.SUPPLEMENTAL_MANIFEST,
-            sd.MEASURED_BASE + sd.MEASURED_MANIFEST, sd.AVAILABILITY_URL])
+            sd.MEASURED_BASE + sd.MEASURED_MANIFEST, sd.AVAILABILITY_URL, sd.SEASON_SCHEDULE_URL])
         self.assertEqual(result['availability']['source_generated_at'], self.availability['generated_at'])
         self.assertEqual(result['availability']['phase'], 'unchanged')
+
+    def test_older_three_component_checkpoint_imports_new_calendar_before_hourly_timer(self):
+        old = {'phase':'updated','last_attempt':NOW.isoformat(),
+               'repairs':{'phase':'updated'},'measured_history':{'phase':'updated'},
+               'availability':{'phase':'updated'}}
+        self.store.set_checkpoint(sd.CHECKPOINT,old)
+        with self.client() as client:
+            result = self.refresh(client,NOW+dt.timedelta(minutes=1))
+            self.assertFalse(result.get('throttled',False))
+            self.assertEqual(result['season_schedule']['assigned_games'],80)
+            self.assertIn(sd.SEASON_SCHEDULE_URL,self.requests)
+            with self.store.connect() as db:
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM season_schedule').fetchone()[0],80)
+            count = len(self.requests)
+            repeated = self.refresh(client,NOW+dt.timedelta(minutes=2))
+        self.assertTrue(repeated['throttled']); self.assertFalse(repeated['changed'])
+        self.assertEqual(len(self.requests),count)
+
+    def test_new_calendar_failure_on_rollout_still_obeys_subsequent_hourly_cooldown(self):
+        self.store.set_checkpoint(sd.CHECKPOINT,{'phase':'updated','last_attempt':NOW.isoformat(),
+            'repairs':{'phase':'updated'},'measured_history':{'phase':'updated'},
+            'availability':{'phase':'updated'}})
+        self.routes[sd.SEASON_SCHEDULE_URL] = httpx.Response(503)
+        with self.client() as client:
+            result = self.refresh(client,NOW+dt.timedelta(minutes=1))
+            self.assertEqual(result['season_schedule']['phase'],'unavailable')
+            self.assertEqual(result['season_schedule']['http_status'],503)
+            self.assertIn('season_schedule',self.store.get_checkpoint(sd.CHECKPOINT))
+            count = len(self.requests)
+            repeated = self.refresh(client,NOW+dt.timedelta(minutes=2))
+        self.assertTrue(repeated['throttled']); self.assertEqual(len(self.requests),count)
 
     def test_explicit_force_rechecks_sources_within_hour_without_redownloading_or_reimporting(self):
         protected = self.protected()
@@ -172,7 +205,7 @@ class SupplementalTests(unittest.TestCase):
         self.assertTrue(result['repairs']['history_import']['already_imported'])
         self.assertEqual(result['repairs']['stat_completion']['fields_completed'],0)
         self.assertEqual(self.requests[count:],[sd.REPAIR_BASE+sd.SUPPLEMENTAL_MANIFEST,
-            sd.MEASURED_BASE+sd.MEASURED_MANIFEST,sd.AVAILABILITY_URL])
+            sd.MEASURED_BASE+sd.MEASURED_MANIFEST,sd.AVAILABILITY_URL,sd.SEASON_SCHEDULE_URL])
         self.assertEqual(protected,self.protected())
 
     def test_force_preserves_source_failure_and_saved_evidence_instead_of_claiming_refresh(self):

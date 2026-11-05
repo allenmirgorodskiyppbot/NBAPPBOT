@@ -229,8 +229,16 @@ class GamedayDigest:
         saved = saved_schedule(self.store, current)
         metadata = saved.get('metadata', {})
         checked = _aware(metadata.get('source_checked_at'))
+        kind = metadata.get('source_kind')
+        if kind == 'published_league_calendar':
+            from season_schedule_refresh import ROOT, TAG
+            expected = ROOT + TAG + '/nba_schedule_' + str(int(current_season(current)[:4])+1) + '.parquet'
+            if (metadata.get('upstream_published_schedule_validated') is not True
+                    or metadata.get('source') != expected
+                    or not re.fullmatch('[0-9a-f]{64}', str(metadata.get('source_content_sha256', '')))):
+                return {}
         if (not saved or metadata.get('season') != current_season(current)
-                or metadata.get('source_kind') not in {'saved_publication', 'live_schedule'}
+                or kind not in {'saved_publication', 'live_schedule', 'published_league_calendar'}
                 or 'NYK' not in metadata.get('covered_teams', [])
                 or not re.fullmatch('[0-9a-f]{64}', str(metadata.get('revision', '')))
                 or not checked or checked > current):

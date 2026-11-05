@@ -336,6 +336,15 @@ async def main_async(args):
         from mirror_sources import PublishedNBAData
         mirror=PublishedNBAData(client,collector.now)
         mirror.configure_scope(output)
+        from season_schedule_refresh import collect_season_schedule
+        try:
+            season_report = await collect_season_schedule(mirror, output, now=collector.now)
+        except Exception as error:
+            # Source collection is atomic. A refusal or invalid calendar leaves
+            # the last successful publication available with its original clock.
+            season_report = {'phase':'unavailable','error_type':type(error).__name__,
+                             'previous_publication_retained':True}
+        print('Knicks season calendar:', json.dumps(season_report, sort_keys=True), flush=True)
         for offset in range(args.days-1,-1,-1):
             day=(today-dt.timedelta(days=offset)).isoformat()
             path=output/(day+'.json')

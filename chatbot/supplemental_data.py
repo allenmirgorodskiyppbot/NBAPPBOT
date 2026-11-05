@@ -32,6 +32,8 @@ HISTORY_MANIFEST = 'history_manifest.json'
 STARTER_ROSTER = 'historical_starter_flags_dated.jsonl.gz'
 SCORE_CROSSWALK = 'game_scores_provider_crosswalk.jsonl.gz'
 AVAILABILITY_URL = BASE + '/live/structured_availability.json.gz'
+SEASON_SCHEDULE_URL = BASE + '/live/season_schedule.json'
+MAX_SEASON_SCHEDULE_BYTES = 2_000_000
 CHECKPOINT = 'supplemental_data_status'
 POLL_SECONDS = 3600
 MAX_METADATA_BYTES = 64_000
@@ -330,6 +332,20 @@ def _availability(store, root, client, previous, now):
                     source_generated_at=document.get('generated_at')), result['records_added'] > 0
 
 
+def _season_schedule(store, root, client, previous, now):
+    """Retrieve the published Knicks season calendar without verifying live timing."""
+    from season_schedule_refresh import import_published_schedule
+    path = root / 'season_schedule.json'
+    _stream(client, SEASON_SCHEDULE_URL, path, maximum=MAX_SEASON_SCHEDULE_BYTES)
+    blob = path.read_bytes()
+    document = json.loads(blob)
+    # Revalidate and reconcile even identical relay bytes, so a missing local
+    # calendar row is restored rather than hidden by a prior hash checkpoint.
+    result = import_published_schedule(store, document, now=now)
+    return _success(previous, now, **result, relay_source=SEASON_SCHEDULE_URL,
+                    content_sha256=hashlib.sha256(blob).hexdigest()), bool(result['changed'])
+
+
 def _prune(root, kept=2):
     # Delete only this worker's old cache directories; never touch user history.
     for name in ('repairs', 'measured'):
@@ -356,7 +372,12 @@ def _refresh(store, data_dir, client, now, *, force=False):
         attempted = dt.datetime.fromisoformat(old.get('last_attempt', ''))
     except (TypeError, ValueError):
         attempted = None
-    if not force and attempted and attempted.tzinfo and 0 <= (now - attempted).total_seconds() < POLL_SECONDS:
+    # An older release recorded only three source components. Try the newly
+    # added calendar once during rollout instead of waiting for its old timer.
+    # A saved failure still counts as an attempt and keeps the hourly cooldown.
+    calendar_attempted = 'season_schedule' in old
+    if (not force and calendar_attempted and attempted and attempted.tzinfo
+            and 0 <= (now - attempted).total_seconds() < POLL_SECONDS):
         return {**old, 'changed': False, 'throttled': True}
     if not _LOCK.acquire(blocking=False):
         return {'phase': 'busy', 'changed': False, 'retry_seconds': POLL_SECONDS}
@@ -367,10 +388,10 @@ def _refresh(store, data_dir, client, now, *, force=False):
         result = {'phase': 'checking', 'last_attempt': now.isoformat(),
                   'next_check_at': (now + dt.timedelta(seconds=POLL_SECONDS)).isoformat(),
                   'retry_seconds': POLL_SECONDS, 'changed': False,
-                  'note': 'Historical and availability source clocks are retained; current game readiness is checked independently.'}
+                  'note': 'Historical, availability and season-calendar source clocks are retained; current game readiness is checked independently.'}
         store.set_checkpoint(CHECKPOINT, {**old, **result})
         for key, action in [('repairs', _repairs), ('measured_history', _measured),
-                            ('availability', _availability)]:
+                            ('availability', _availability), ('season_schedule', _season_schedule)]:
             previous = old.get(key, {})
             try:
                 result[key], changed = action(store, root, client, previous, now)
@@ -378,7 +399,7 @@ def _refresh(store, data_dir, client, now, *, force=False):
             except Exception as error:
                 result[key] = _failure(previous, error, now)
             store.set_checkpoint(CHECKPOINT, {**old, **result})
-        phases = [result[key]['phase'] for key in ('repairs', 'measured_history', 'availability')]
+        phases = [result[key]['phase'] for key in ('repairs', 'measured_history', 'availability', 'season_schedule')]
         result['phase'] = ('unavailable' if all(p == 'unavailable' for p in phases) else
                            'partial' if any(p in {'unavailable', 'partial'} for p in phases) else 'updated')
         if result['phase'] == 'updated':

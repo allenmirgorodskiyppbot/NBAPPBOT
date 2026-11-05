@@ -109,7 +109,8 @@ def data_fingerprint(store):
             keys=[row[1] for row in sorted(columns,key=lambda row:row[5]) if row[5]]
             # Known tables have primary keys. The fallback also keeps a future
             # keyless table deterministic without collecting its rows in Python.
-            fields=[row[1] for row in columns if row[1] not in VOLATILE]
+            fields=[row[1] for row in columns if row[1] not in VOLATILE
+                    and not (table=='season_schedule' and row[1]=='source_asof')]
             order=keys or fields
             quote=lambda field:'"'+field.replace('"','""')+'"'
             query='SELECT '+','.join(map(quote,fields))+' FROM '+table
@@ -124,6 +125,12 @@ def data_fingerprint(store):
                 digest.update(encoded.encode());digest.update(b'\n')
         scope=store.get_checkpoint('dataset_refresh_scope',{}) or {}
         digest.update(json.dumps(_semantic(scope),sort_keys=True,separators=(',',':'),default=str).encode())
+        # Coverage and unassigned Cup/TBD slots can change without an assigned
+        # fixture changing. Include those facts so their Excel views rebuild.
+        calendar=dict(store.get_checkpoint('season_schedule_refresh',{}) or {})
+        for key in ('phase','changed','revision','preserved_tipoffs','retained_extra_saved_rows'):
+            calendar.pop(key,None)
+        digest.update(json.dumps(_semantic(calendar),sort_keys=True,separators=(',',':'),default=str).encode())
     return digest.hexdigest()
 
 
