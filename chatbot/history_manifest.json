@@ -1,0 +1,4449 @@
+{
+  "schema_version": 1,
+  "format": "nba-history-jsonl-gzip-v1",
+  "created_at": "2026-11-05T03:43:28.861138+00:00",
+  "source_data_through_date": "2026-11-02",
+  "players": [
+    {
+      "aliases": [
+        "Aaron Gordon"
+      ],
+      "espn_player_id": "3064290",
+      "nba_player_id": "203932",
+      "player": "Aaron Gordon",
+      "player_id": "name:aarongordon"
+    },
+    {
+      "aliases": [
+        "Aaron Nesmith"
+      ],
+      "espn_player_id": "4396909",
+      "nba_player_id": "1630174",
+      "player": "Aaron Nesmith",
+      "player_id": "name:aaronnesmith"
+    },
+    {
+      "aliases": [
+        "Aaron Wiggins"
+      ],
+      "espn_player_id": "4397183",
+      "nba_player_id": "1630598",
+      "player": "Aaron Wiggins",
+      "player_id": "name:aaronwiggins"
+    },
+    {
+      "aliases": [
+        "Ace Bailey"
+      ],
+      "espn_player_id": "4873138",
+      "nba_player_id": "1642846",
+      "player": "Ace Bailey",
+      "player_id": "name:acebailey"
+    },
+    {
+      "aliases": [
+        "Adam Flagler"
+      ],
+      "espn_player_id": "4397654",
+      "player": "Adam Flagler",
+      "player_id": "name:adamflagler"
+    },
+    {
+      "aliases": [
+        "Aday Mara"
+      ],
+      "espn_player_id": "5174983",
+      "player": "Aday Mara",
+      "player_id": "name:adaymara"
+    },
+    {
+      "aliases": [
+        "Adem Bona"
+      ],
+      "espn_player_id": "5105637",
+      "nba_player_id": "1641737",
+      "player": "Adem Bona",
+      "player_id": "name:adembona"
+    },
+    {
+      "aliases": [
+        "Ajay Mitchell"
+      ],
+      "espn_player_id": "4900671",
+      "nba_player_id": "1642349",
+      "player": "Ajay Mitchell",
+      "player_id": "name:ajaymitchell"
+    },
+    {
+      "aliases": [
+        "AJ Dybantsa"
+      ],
+      "espn_player_id": "5142718",
+      "player": "AJ Dybantsa",
+      "player_id": "name:ajdybantsa"
+    },
+    {
+      "aliases": [
+        "AJ Green"
+      ],
+      "espn_player_id": "4397475",
+      "nba_player_id": "1631260",
+      "player": "AJ Green",
+      "player_id": "name:ajgreen"
+    },
+    {
+      "aliases": [
+        "AJ Johnson"
+      ],
+      "espn_player_id": "5170947",
+      "player": "AJ Johnson",
+      "player_id": "name:ajjohnson"
+    },
+    {
+      "aliases": [
+        "AK Okereke"
+      ],
+      "espn_player_id": "5114350",
+      "player": "AK Okereke",
+      "player_id": "name:akokereke"
+    },
+    {
+      "aliases": [
+        "Alex Caruso"
+      ],
+      "espn_player_id": "2991350",
+      "nba_player_id": "1627936",
+      "player": "Alex Caruso",
+      "player_id": "name:alexcaruso"
+    },
+    {
+      "aliases": [
+        "Alex Karaban"
+      ],
+      "espn_player_id": "4917149",
+      "player": "Alex Karaban",
+      "player_id": "name:alexkaraban"
+    },
+    {
+      "aliases": [
+        "Alex Morales"
+      ],
+      "espn_player_id": "4593034",
+      "player": "Alex Morales",
+      "player_id": "name:alexmorales"
+    },
+    {
+      "aliases": [
+        "Alex Sarr"
+      ],
+      "espn_player_id": "5160992",
+      "nba_player_id": "1642259",
+      "player": "Alex Sarr",
+      "player_id": "name:alexsarr"
+    },
+    {
+      "aliases": [
+        "Al Horford"
+      ],
+      "espn_player_id": "3213",
+      "nba_player_id": "201143",
+      "player": "Al Horford",
+      "player_id": "name:alhorford"
+    },
+    {
+      "aliases": [
+        "Alijah Martin"
+      ],
+      "espn_player_id": "4702656",
+      "player": "Alijah Martin",
+      "player_id": "name:alijahmartin"
+    },
+    {
+      "aliases": [
+        "Allen Graves"
+      ],
+      "espn_player_id": "5149115",
+      "player": "Allen Graves",
+      "player_id": "name:allengraves"
+    },
+    {
+      "aliases": [
+        "Alperen Sengun"
+      ],
+      "espn_player_id": "4871144",
+      "nba_player_id": "1630578",
+      "player": "Alperen Sengun",
+      "player_id": "name:alperensengun"
+    },
+    {
+      "aliases": [
+        "Alpha Diallo"
+      ],
+      "espn_player_id": "4065813",
+      "player": "Alpha Diallo",
+      "player_id": "name:alphadiallo"
+    },
+    {
+      "aliases": [
+        "Amari Williams"
+      ],
+      "espn_player_id": "4702745",
+      "player": "Amari Williams",
+      "player_id": "name:amariwilliams"
+    },
+    {
+      "aliases": [
+        "Amen Thompson"
+      ],
+      "espn_player_id": "4684740",
+      "nba_player_id": "1641708",
+      "player": "Amen Thompson",
+      "player_id": "name:amenthompson"
+    },
+    {
+      "aliases": [
+        "Andre Drummond"
+      ],
+      "espn_player_id": "6585",
+      "nba_player_id": "203083",
+      "player": "Andre Drummond",
+      "player_id": "name:andredrummond"
+    },
+    {
+      "aliases": [
+        "Andrew Nembhard"
+      ],
+      "espn_player_id": "4395712",
+      "nba_player_id": "1629614",
+      "player": "Andrew Nembhard",
+      "player_id": "name:andrewnembhard"
+    },
+    {
+      "aliases": [
+        "Andrew Wiggins"
+      ],
+      "espn_player_id": "3059319",
+      "nba_player_id": "203952",
+      "player": "Andrew Wiggins",
+      "player_id": "name:andrewwiggins"
+    },
+    {
+      "aliases": [
+        "Anfernee Simons"
+      ],
+      "espn_player_id": "4351851",
+      "nba_player_id": "1629014",
+      "player": "Anfernee Simons",
+      "player_id": "name:anferneesimons"
+    },
+    {
+      "aliases": [
+        "Anthony Black"
+      ],
+      "espn_player_id": "4712849",
+      "nba_player_id": "1641710",
+      "player": "Anthony Black",
+      "player_id": "name:anthonyblack"
+    },
+    {
+      "aliases": [
+        "Anthony Davis"
+      ],
+      "espn_player_id": "6583",
+      "nba_player_id": "203076",
+      "player": "Anthony Davis",
+      "player_id": "name:anthonydavis"
+    },
+    {
+      "aliases": [
+        "Anthony Edwards"
+      ],
+      "espn_player_id": "4594268",
+      "nba_player_id": "1630162",
+      "player": "Anthony Edwards",
+      "player_id": "name:anthonyedwards"
+    },
+    {
+      "aliases": [
+        "Anthony Gill"
+      ],
+      "espn_player_id": "2581184",
+      "player": "Anthony Gill",
+      "player_id": "name:anthonygill"
+    },
+    {
+      "aliases": [
+        "Arthur Kaluma"
+      ],
+      "espn_player_id": "4433599",
+      "player": "Arthur Kaluma",
+      "player_id": "name:arthurkaluma"
+    },
+    {
+      "aliases": [
+        "Asa Newell"
+      ],
+      "espn_player_id": "4873201",
+      "player": "Asa Newell",
+      "player_id": "name:asanewell"
+    },
+    {
+      "aliases": [
+        "Ausar Thompson"
+      ],
+      "espn_player_id": "4684742",
+      "nba_player_id": "1641709",
+      "player": "Ausar Thompson",
+      "player_id": "name:ausarthompson"
+    },
+    {
+      "aliases": [
+        "Austin Reaves"
+      ],
+      "espn_player_id": "4066457",
+      "nba_player_id": "1630559",
+      "player": "Austin Reaves",
+      "player_id": "name:austinreaves"
+    },
+    {
+      "aliases": [
+        "Ayo Dosunmu"
+      ],
+      "espn_player_id": "4397002",
+      "nba_player_id": "1630245",
+      "player": "Ayo Dosunmu",
+      "player_id": "name:ayodosunmu"
+    },
+    {
+      "aliases": [
+        "Baba Miller"
+      ],
+      "espn_player_id": "5075626",
+      "player": "Baba Miller",
+      "player_id": "name:babamiller"
+    },
+    {
+      "aliases": [
+        "Bam Adebayo"
+      ],
+      "espn_player_id": "4066261",
+      "nba_player_id": "1628389",
+      "player": "Bam Adebayo",
+      "player_id": "name:bamadebayo"
+    },
+    {
+      "aliases": [
+        "Baylor Scheierman"
+      ],
+      "espn_player_id": "4593841",
+      "player": "Baylor Scheierman",
+      "player_id": "name:baylorscheierman"
+    },
+    {
+      "aliases": [
+        "Bennedict Mathurin"
+      ],
+      "espn_player_id": "4683634",
+      "nba_player_id": "1631097",
+      "player": "Bennedict Mathurin",
+      "player_id": "name:bennedictmathurin"
+    },
+    {
+      "aliases": [
+        "Bennett Stirtz"
+      ],
+      "espn_player_id": "5241364",
+      "player": "Bennett Stirtz",
+      "player_id": "name:bennettstirtz"
+    },
+    {
+      "aliases": [
+        "Ben Saraf"
+      ],
+      "espn_player_id": "5242502",
+      "player": "Ben Saraf",
+      "player_id": "name:bensaraf"
+    },
+    {
+      "aliases": [
+        "Ben Sheppard"
+      ],
+      "espn_player_id": "4433076",
+      "nba_player_id": "1641767",
+      "player": "Ben Sheppard",
+      "player_id": "name:bensheppard"
+    },
+    {
+      "aliases": [
+        "Bilal Coulibaly"
+      ],
+      "espn_player_id": "5104155",
+      "nba_player_id": "1641731",
+      "player": "Bilal Coulibaly",
+      "player_id": "name:bilalcoulibaly"
+    },
+    {
+      "aliases": [
+        "Blake Hinson"
+      ],
+      "espn_player_id": "4396963",
+      "player": "Blake Hinson",
+      "player_id": "name:blakehinson"
+    },
+    {
+      "aliases": [
+        "Blake Wesley"
+      ],
+      "espn_player_id": "4683935",
+      "player": "Blake Wesley",
+      "player_id": "name:blakewesley"
+    },
+    {
+      "aliases": [
+        "Bobby Portis"
+      ],
+      "espn_player_id": "3064482",
+      "player": "Bobby Portis",
+      "player_id": "name:bobbyportis"
+    },
+    {
+      "aliases": [
+        "Bogdan Bogdanovic"
+      ],
+      "espn_player_id": "3037789",
+      "player": "Bogdan Bogdanovic",
+      "player_id": "name:bogdanbogdanovic"
+    },
+    {
+      "aliases": [
+        "Bogoljub Markovic"
+      ],
+      "espn_player_id": "5214989",
+      "player": "Bogoljub Markovic",
+      "player_id": "name:bogoljubmarkovic"
+    },
+    {
+      "aliases": [
+        "Bones Hyland"
+      ],
+      "espn_player_id": "4592492",
+      "player": "Bones Hyland",
+      "player_id": "name:boneshyland"
+    },
+    {
+      "aliases": [
+        "Braden Smith"
+      ],
+      "espn_player_id": "5105854",
+      "player": "Braden Smith",
+      "player_id": "name:bradensmith"
+    },
+    {
+      "aliases": [
+        "Branden Carlson"
+      ],
+      "espn_player_id": "4592435",
+      "player": "Branden Carlson",
+      "player_id": "name:brandencarlson"
+    },
+    {
+      "aliases": [
+        "Brandin Podziemski"
+      ],
+      "espn_player_id": "4709138",
+      "nba_player_id": "1641764",
+      "player": "Brandin Podziemski",
+      "player_id": "name:brandinpodziemski"
+    },
+    {
+      "aliases": [
+        "Brandon Miller"
+      ],
+      "espn_player_id": "4433287",
+      "nba_player_id": "1641706",
+      "player": "Brandon Miller",
+      "player_id": "name:brandonmiller"
+    },
+    {
+      "aliases": [
+        "Brandon Williams"
+      ],
+      "espn_player_id": "4397040",
+      "player": "Brandon Williams",
+      "player_id": "name:brandonwilliams"
+    },
+    {
+      "aliases": [
+        "Brayden Burries"
+      ],
+      "espn_player_id": "5082206",
+      "player": "Brayden Burries",
+      "player_id": "name:braydenburries"
+    },
+    {
+      "aliases": [
+        "Brice Sensabaugh"
+      ],
+      "espn_player_id": "5105839",
+      "player": "Brice Sensabaugh",
+      "player_id": "name:bricesensabaugh"
+    },
+    {
+      "aliases": [
+        "Bronny James"
+      ],
+      "espn_player_id": "4683774",
+      "player": "Bronny James",
+      "player_id": "name:bronnyjames"
+    },
+    {
+      "aliases": [
+        "Brook Lopez"
+      ],
+      "espn_player_id": "3448",
+      "nba_player_id": "201572",
+      "player": "Brook Lopez",
+      "player_id": "name:brooklopez"
+    },
+    {
+      "aliases": [
+        "Brooks Barnhizer"
+      ],
+      "espn_player_id": "4684208",
+      "player": "Brooks Barnhizer",
+      "player_id": "name:brooksbarnhizer"
+    },
+    {
+      "aliases": [
+        "Bruce Thornton"
+      ],
+      "espn_player_id": "5105837",
+      "player": "Bruce Thornton",
+      "player_id": "name:brucethornton"
+    },
+    {
+      "aliases": [
+        "Bryce Hopkins"
+      ],
+      "espn_player_id": "4565698",
+      "player": "Bryce Hopkins",
+      "player_id": "name:brycehopkins"
+    },
+    {
+      "aliases": [
+        "Bryce McGowens"
+      ],
+      "espn_player_id": "4576086",
+      "player": "Bryce McGowens",
+      "player_id": "name:brycemcgowens"
+    },
+    {
+      "aliases": [
+        "Bub Carrington"
+      ],
+      "espn_player_id": "4845374",
+      "nba_player_id": "1642267",
+      "player": "Bub Carrington",
+      "player_id": "name:bubcarrington"
+    },
+    {
+      "aliases": [
+        "Buddy Hield"
+      ],
+      "espn_player_id": "2990984",
+      "nba_player_id": "1627741",
+      "player": "Buddy Hield",
+      "player_id": "name:buddyhield"
+    },
+    {
+      "aliases": [
+        "Cade Cunningham"
+      ],
+      "espn_player_id": "4432166",
+      "nba_player_id": "1630595",
+      "player": "Cade Cunningham",
+      "player_id": "name:cadecunningham"
+    },
+    {
+      "aliases": [
+        "Caleb Love"
+      ],
+      "espn_player_id": "4433144",
+      "player": "Caleb Love",
+      "player_id": "name:caleblove"
+    },
+    {
+      "aliases": [
+        "Caleb Martin"
+      ],
+      "espn_player_id": "3138160",
+      "nba_player_id": "1628997",
+      "player": "Caleb Martin",
+      "player_id": "name:calebmartin"
+    },
+    {
+      "aliases": [
+        "Caleb Wilson"
+      ],
+      "espn_player_id": "5095151",
+      "player": "Caleb Wilson",
+      "player_id": "name:calebwilson"
+    },
+    {
+      "aliases": [
+        "Cam Christie"
+      ],
+      "espn_player_id": "4845363",
+      "player": "Cam Christie",
+      "player_id": "name:camchristie"
+    },
+    {
+      "aliases": [
+        "Cameron Boozer"
+      ],
+      "espn_player_id": "5041935",
+      "player": "Cameron Boozer",
+      "player_id": "name:cameronboozer"
+    },
+    {
+      "aliases": [
+        "Cameron Carr"
+      ],
+      "espn_player_id": "5113969",
+      "player": "Cameron Carr",
+      "player_id": "name:cameroncarr"
+    },
+    {
+      "aliases": [
+        "Cameron Johnson"
+      ],
+      "espn_player_id": "3138196",
+      "nba_player_id": "1629661",
+      "player": "Cameron Johnson",
+      "player_id": "name:cameronjohnson"
+    },
+    {
+      "aliases": [
+        "Cam Spencer"
+      ],
+      "espn_player_id": "4433083",
+      "nba_player_id": "1642285",
+      "player": "Cam Spencer",
+      "player_id": "name:camspencer"
+    },
+    {
+      "aliases": [
+        "Cam Whitmore"
+      ],
+      "espn_player_id": "5105592",
+      "player": "Cam Whitmore",
+      "player_id": "name:camwhitmore"
+    },
+    {
+      "aliases": [
+        "Caris LeVert"
+      ],
+      "espn_player_id": "2991043",
+      "nba_player_id": "1627747",
+      "player": "Caris LeVert",
+      "player_id": "name:carislevert"
+    },
+    {
+      "aliases": [
+        "Carson Cooper"
+      ],
+      "espn_player_id": "5105817",
+      "player": "Carson Cooper",
+      "player_id": "name:carsoncooper"
+    },
+    {
+      "aliases": [
+        "Carter Bryant"
+      ],
+      "espn_player_id": "5061568",
+      "player": "Carter Bryant",
+      "player_id": "name:carterbryant"
+    },
+    {
+      "aliases": [
+        "Cason Wallace"
+      ],
+      "espn_player_id": "4683692",
+      "nba_player_id": "1641717",
+      "player": "Cason Wallace",
+      "player_id": "name:casonwallace"
+    },
+    {
+      "aliases": [
+        "Cedric Coward"
+      ],
+      "espn_player_id": "4903027",
+      "nba_player_id": "1642907",
+      "player": "Cedric Coward",
+      "player_id": "name:cedriccoward"
+    },
+    {
+      "aliases": [
+        "Chaney Johnson"
+      ],
+      "espn_player_id": "5174655",
+      "player": "Chaney Johnson",
+      "player_id": "name:chaneyjohnson"
+    },
+    {
+      "aliases": [
+        "Charles Bassey"
+      ],
+      "espn_player_id": "4397886",
+      "player": "Charles Bassey",
+      "player_id": "name:charlesbassey"
+    },
+    {
+      "aliases": [
+        "Chaz Lanier"
+      ],
+      "espn_player_id": "4700852",
+      "player": "Chaz Lanier",
+      "player_id": "name:chazlanier"
+    },
+    {
+      "aliases": [
+        "Chet Holmgren"
+      ],
+      "espn_player_id": "4433255",
+      "nba_player_id": "1631096",
+      "player": "Chet Holmgren",
+      "player_id": "name:chetholmgren"
+    },
+    {
+      "aliases": [
+        "Chris Cenac Jr."
+      ],
+      "espn_player_id": "5142621",
+      "player": "Chris Cenac Jr.",
+      "player_id": "name:chriscenacjr"
+    },
+    {
+      "aliases": [
+        "Chris Manon"
+      ],
+      "espn_player_id": "4702972",
+      "player": "Chris Manon",
+      "player_id": "name:chrismanon"
+    },
+    {
+      "aliases": [
+        "Christian Anderson"
+      ],
+      "espn_player_id": "5060701",
+      "player": "Christian Anderson",
+      "player_id": "name:christiananderson"
+    },
+    {
+      "aliases": [
+        "Christian Braun"
+      ],
+      "espn_player_id": "4431767",
+      "nba_player_id": "1631128",
+      "player": "Christian Braun",
+      "player_id": "name:christianbraun"
+    },
+    {
+      "aliases": [
+        "Chris Youngblood"
+      ],
+      "espn_player_id": "4706557",
+      "player": "Chris Youngblood",
+      "player_id": "name:chrisyoungblood"
+    },
+    {
+      "aliases": [
+        "CJ Huntley"
+      ],
+      "espn_player_id": "4702602",
+      "player": "CJ Huntley",
+      "player_id": "name:cjhuntley"
+    },
+    {
+      "aliases": [
+        "CJ McCollum"
+      ],
+      "espn_player_id": "2490149",
+      "nba_player_id": "203468",
+      "player": "CJ McCollum",
+      "player_id": "name:cjmccollum"
+    },
+    {
+      "aliases": [
+        "Clint Capela"
+      ],
+      "espn_player_id": "3102529",
+      "player": "Clint Capela",
+      "player_id": "name:clintcapela"
+    },
+    {
+      "aliases": [
+        "Coby White"
+      ],
+      "espn_player_id": "4395651",
+      "nba_player_id": "1629632",
+      "player": "Coby White",
+      "player_id": "name:cobywhite"
+    },
+    {
+      "aliases": [
+        "Cody Williams"
+      ],
+      "espn_player_id": "4895758",
+      "player": "Cody Williams",
+      "player_id": "name:codywilliams"
+    },
+    {
+      "aliases": [
+        "Colin Castleton"
+      ],
+      "espn_player_id": "4397204",
+      "player": "Colin Castleton",
+      "player_id": "name:colincastleton"
+    },
+    {
+      "aliases": [
+        "Collin Gillespie"
+      ],
+      "espn_player_id": "4278585",
+      "nba_player_id": "1631221",
+      "player": "Collin Gillespie",
+      "player_id": "name:collingillespie"
+    },
+    {
+      "aliases": [
+        "Collin Murray-Boyles"
+      ],
+      "espn_player_id": "5093267",
+      "player": "Collin Murray-Boyles",
+      "player_id": "name:collinmurrayboyles"
+    },
+    {
+      "aliases": [
+        "Collin Sexton"
+      ],
+      "espn_player_id": "4277811",
+      "nba_player_id": "1629012",
+      "player": "Collin Sexton",
+      "player_id": "name:collinsexton"
+    },
+    {
+      "aliases": [
+        "Cooper Flagg"
+      ],
+      "espn_player_id": "5041939",
+      "nba_player_id": "1642843",
+      "player": "Cooper Flagg",
+      "player_id": "name:cooperflagg"
+    },
+    {
+      "aliases": [
+        "Corey Kispert"
+      ],
+      "espn_player_id": "4280151",
+      "player": "Corey Kispert",
+      "player_id": "name:coreykispert"
+    },
+    {
+      "aliases": [
+        "Craig Porter Jr."
+      ],
+      "espn_player_id": "4701233",
+      "player": "Craig Porter Jr.",
+      "player_id": "name:craigporterjr"
+    },
+    {
+      "aliases": [
+        "Daeqwon Plowden"
+      ],
+      "espn_player_id": "4279318",
+      "player": "Daeqwon Plowden",
+      "player_id": "name:daeqwonplowden"
+    },
+    {
+      "aliases": [
+        "Dailyn Swain"
+      ],
+      "espn_player_id": "4848625",
+      "player": "Dailyn Swain",
+      "player_id": "name:dailynswain"
+    },
+    {
+      "aliases": [
+        "Dalton Knecht"
+      ],
+      "espn_player_id": "4897943",
+      "player": "Dalton Knecht",
+      "player_id": "name:daltonknecht"
+    },
+    {
+      "aliases": [
+        "Damian Lillard"
+      ],
+      "espn_player_id": "6606",
+      "player": "Damian Lillard",
+      "player_id": "name:damianlillard"
+    },
+    {
+      "aliases": [
+        "Daniel Gafford"
+      ],
+      "espn_player_id": "4278049",
+      "nba_player_id": "1629655",
+      "player": "Daniel Gafford",
+      "player_id": "name:danielgafford"
+    },
+    {
+      "aliases": [
+        "Daniss Jenkins"
+      ],
+      "espn_player_id": "5107199",
+      "nba_player_id": "1642450",
+      "player": "Daniss Jenkins",
+      "player_id": "name:danissjenkins"
+    },
+    {
+      "aliases": [
+        "Danny Wolf"
+      ],
+      "espn_player_id": "5107173",
+      "player": "Danny Wolf",
+      "player_id": "name:dannywolf"
+    },
+    {
+      "aliases": [
+        "Darius Acuff Jr."
+      ],
+      "espn_player_id": "5142620",
+      "player": "Darius Acuff Jr.",
+      "player_id": "name:dariusacuffjr"
+    },
+    {
+      "aliases": [
+        "Darius Garland"
+      ],
+      "espn_player_id": "4396907",
+      "nba_player_id": "1629636",
+      "player": "Darius Garland",
+      "player_id": "name:dariusgarland"
+    },
+    {
+      "aliases": [
+        "DaRon Holmes II"
+      ],
+      "espn_player_id": "4433607",
+      "player": "DaRon Holmes II",
+      "player_id": "name:daronholmesii"
+    },
+    {
+      "aliases": [
+        "Darryn Peterson"
+      ],
+      "espn_player_id": "5041955",
+      "player": "Darryn Peterson",
+      "player_id": "name:darrynpeterson"
+    },
+    {
+      "aliases": [
+        "David Jones Garcia"
+      ],
+      "espn_player_id": "4713010",
+      "player": "David Jones Garcia",
+      "player_id": "name:davidjonesgarcia"
+    },
+    {
+      "aliases": [
+        "Davion Mitchell"
+      ],
+      "espn_player_id": "4278053",
+      "nba_player_id": "1630558",
+      "player": "Davion Mitchell",
+      "player_id": "name:davionmitchell"
+    },
+    {
+      "aliases": [
+        "Day'Ron Sharpe"
+      ],
+      "espn_player_id": "4432194",
+      "nba_player_id": "1630549",
+      "player": "Day'Ron Sharpe",
+      "player_id": "name:dayronsharpe"
+    },
+    {
+      "aliases": [
+        "De'Aaron Fox"
+      ],
+      "espn_player_id": "4066259",
+      "nba_player_id": "1628368",
+      "player": "De'Aaron Fox",
+      "player_id": "name:deaaronfox"
+    },
+    {
+      "aliases": [
+        "Deandre Ayton"
+      ],
+      "espn_player_id": "4278129",
+      "nba_player_id": "1629028",
+      "player": "Deandre Ayton",
+      "player_id": "name:deandreayton"
+    },
+    {
+      "aliases": [
+        "De'Andre Hunter"
+      ],
+      "espn_player_id": "4065732",
+      "nba_player_id": "1629631",
+      "player": "De'Andre Hunter",
+      "player_id": "name:deandrehunter"
+    },
+    {
+      "aliases": [
+        "DeAndre Jordan"
+      ],
+      "espn_player_id": "3442",
+      "player": "DeAndre Jordan",
+      "player_id": "name:deandrejordan"
+    },
+    {
+      "aliases": [
+        "De'Anthony Melton"
+      ],
+      "espn_player_id": "4066436",
+      "nba_player_id": "1629001",
+      "player": "De'Anthony Melton",
+      "player_id": "name:deanthonymelton"
+    },
+    {
+      "aliases": [
+        "Dean Wade"
+      ],
+      "espn_player_id": "3912848",
+      "player": "Dean Wade",
+      "player_id": "name:deanwade"
+    },
+    {
+      "aliases": [
+        "Dejounte Murray"
+      ],
+      "espn_player_id": "3907497",
+      "nba_player_id": "1627749",
+      "player": "Dejounte Murray",
+      "player_id": "name:dejountemurray"
+    },
+    {
+      "aliases": [
+        "DeMar DeRozan"
+      ],
+      "espn_player_id": "3978",
+      "nba_player_id": "201942",
+      "player": "DeMar DeRozan",
+      "player_id": "name:demarderozan"
+    },
+    {
+      "aliases": [
+        "Deni Avdija"
+      ],
+      "espn_player_id": "4683021",
+      "nba_player_id": "1630166",
+      "player": "Deni Avdija",
+      "player_id": "name:deniavdija"
+    },
+    {
+      "aliases": [
+        "Dennis Schroder",
+        "Dennis Schr\u00f6der"
+      ],
+      "espn_player_id": "3032979",
+      "nba_player_id": "203471",
+      "player": "Dennis Schr\u00f6der",
+      "player_id": "name:dennisschroder"
+    },
+    {
+      "aliases": [
+        "Derik Queen"
+      ],
+      "espn_player_id": "4869780",
+      "nba_player_id": "1642852",
+      "player": "Derik Queen",
+      "player_id": "name:derikqueen"
+    },
+    {
+      "aliases": [
+        "Derrick Jones Jr."
+      ],
+      "espn_player_id": "3936099",
+      "nba_player_id": "1627884",
+      "player": "Derrick Jones Jr.",
+      "player_id": "name:derrickjonesjr"
+    },
+    {
+      "aliases": [
+        "Derrick White"
+      ],
+      "espn_player_id": "3078576",
+      "nba_player_id": "1628401",
+      "player": "Derrick White",
+      "player_id": "name:derrickwhite"
+    },
+    {
+      "aliases": [
+        "Desmond Bane"
+      ],
+      "espn_player_id": "4066320",
+      "nba_player_id": "1630217",
+      "player": "Desmond Bane",
+      "player_id": "name:desmondbane"
+    },
+    {
+      "aliases": [
+        "Devin Booker"
+      ],
+      "espn_player_id": "3136193",
+      "nba_player_id": "1626164",
+      "player": "Devin Booker",
+      "player_id": "name:devinbooker"
+    },
+    {
+      "aliases": [
+        "Devin Vassell"
+      ],
+      "espn_player_id": "4395630",
+      "nba_player_id": "1630170",
+      "player": "Devin Vassell",
+      "player_id": "name:devinvassell"
+    },
+    {
+      "aliases": [
+        "Dillon Brooks"
+      ],
+      "espn_player_id": "3155526",
+      "nba_player_id": "1628415",
+      "player": "Dillon Brooks",
+      "player_id": "name:dillonbrooks"
+    },
+    {
+      "aliases": [
+        "Dillon Mitchell"
+      ],
+      "espn_player_id": "5106283",
+      "player": "Dillon Mitchell",
+      "player_id": "name:dillonmitchell"
+    },
+    {
+      "aliases": [
+        "Domantas Sabonis"
+      ],
+      "espn_player_id": "3155942",
+      "nba_player_id": "1627734",
+      "player": "Domantas Sabonis",
+      "player_id": "name:domantassabonis"
+    },
+    {
+      "aliases": [
+        "Donovan Clingan"
+      ],
+      "espn_player_id": "5105565",
+      "nba_player_id": "1642270",
+      "player": "Donovan Clingan",
+      "player_id": "name:donovanclingan"
+    },
+    {
+      "aliases": [
+        "Donovan Mitchell"
+      ],
+      "espn_player_id": "3908809",
+      "nba_player_id": "1628378",
+      "player": "Donovan Mitchell",
+      "player_id": "name:donovanmitchell"
+    },
+    {
+      "aliases": [
+        "Dorian Finney-Smith"
+      ],
+      "espn_player_id": "2578185",
+      "nba_player_id": "1627827",
+      "player": "Dorian Finney-Smith",
+      "player_id": "name:dorianfinneysmith"
+    },
+    {
+      "aliases": [
+        "Drake Powell"
+      ],
+      "espn_player_id": "5037873",
+      "player": "Drake Powell",
+      "player_id": "name:drakepowell"
+    },
+    {
+      "aliases": [
+        "Draymond Green"
+      ],
+      "espn_player_id": "6589",
+      "nba_player_id": "203110",
+      "player": "Draymond Green",
+      "player_id": "name:draymondgreen"
+    },
+    {
+      "aliases": [
+        "Dru Smith"
+      ],
+      "espn_player_id": "4066993",
+      "nba_player_id": "1630696",
+      "player": "Dru Smith",
+      "player_id": "name:drusmith"
+    },
+    {
+      "aliases": [
+        "Duncan Robinson"
+      ],
+      "espn_player_id": "3157465",
+      "nba_player_id": "1629130",
+      "player": "Duncan Robinson",
+      "player_id": "name:duncanrobinson"
+    },
+    {
+      "aliases": [
+        "Duop Reath"
+      ],
+      "espn_player_id": "4066268",
+      "player": "Duop Reath",
+      "player_id": "name:duopreath"
+    },
+    {
+      "aliases": [
+        "Dylan Harper"
+      ],
+      "espn_player_id": "5037871",
+      "nba_player_id": "1642844",
+      "player": "Dylan Harper",
+      "player_id": "name:dylanharper"
+    },
+    {
+      "aliases": [
+        "Dyson Daniels"
+      ],
+      "espn_player_id": "4869342",
+      "nba_player_id": "1630700",
+      "player": "Dyson Daniels",
+      "player_id": "name:dysondaniels"
+    },
+    {
+      "aliases": [
+        "Ebuka Okorie"
+      ],
+      "espn_player_id": "5258459",
+      "player": "Ebuka Okorie",
+      "player_id": "name:ebukaokorie"
+    },
+    {
+      "aliases": [
+        "Egor Demin",
+        "Egor D\u00ebmin"
+      ],
+      "espn_player_id": "5175643",
+      "nba_player_id": "1642856",
+      "player": "Egor D\u00ebmin",
+      "player_id": "name:egordemin"
+    },
+    {
+      "aliases": [
+        "Elijah Harkless"
+      ],
+      "espn_player_id": "4397449",
+      "player": "Elijah Harkless",
+      "player_id": "name:elijahharkless"
+    },
+    {
+      "aliases": [
+        "Emanuel Sharp"
+      ],
+      "espn_player_id": "5106058",
+      "player": "Emanuel Sharp",
+      "player_id": "name:emanuelsharp"
+    },
+    {
+      "aliases": [
+        "Ernest Udeh Jr."
+      ],
+      "espn_player_id": "5106261",
+      "player": "Ernest Udeh Jr.",
+      "player_id": "name:ernestudehjr"
+    },
+    {
+      "aliases": [
+        "Evan Mobley"
+      ],
+      "espn_player_id": "4432158",
+      "nba_player_id": "1630596",
+      "player": "Evan Mobley",
+      "player_id": "name:evanmobley"
+    },
+    {
+      "aliases": [
+        "Felix Okpara"
+      ],
+      "espn_player_id": "5105841",
+      "player": "Felix Okpara",
+      "player_id": "name:felixokpara"
+    },
+    {
+      "aliases": [
+        "Franz Wagner"
+      ],
+      "espn_player_id": "4566434",
+      "nba_player_id": "1630532",
+      "player": "Franz Wagner",
+      "player_id": "name:franzwagner"
+    },
+    {
+      "aliases": [
+        "Fred VanVleet"
+      ],
+      "espn_player_id": "2991230",
+      "nba_player_id": "1627832",
+      "player": "Fred VanVleet",
+      "player_id": "name:fredvanvleet"
+    },
+    {
+      "aliases": [
+        "Gary Payton II"
+      ],
+      "espn_player_id": "3134903",
+      "nba_player_id": "1627780",
+      "player": "Gary Payton II",
+      "player_id": "name:garypaytonii"
+    },
+    {
+      "aliases": [
+        "Gary Trent Jr."
+      ],
+      "espn_player_id": "4277843",
+      "nba_player_id": "1629018",
+      "player": "Gary Trent Jr.",
+      "player_id": "name:garytrentjr"
+    },
+    {
+      "aliases": [
+        "Georges Niang"
+      ],
+      "espn_player_id": "2990969",
+      "player": "Georges Niang",
+      "player_id": "name:georgesniang"
+    },
+    {
+      "aliases": [
+        "GG Jackson"
+      ],
+      "espn_player_id": "5105550",
+      "nba_player_id": "1641713",
+      "player": "GG Jackson",
+      "player_id": "name:ggjackson"
+    },
+    {
+      "aliases": [
+        "Giannis Antetokounmpo"
+      ],
+      "espn_player_id": "3032977",
+      "nba_player_id": "203507",
+      "player": "Giannis Antetokounmpo",
+      "player_id": "name:giannisantetokounmpo"
+    },
+    {
+      "aliases": [
+        "Goga Bitadze"
+      ],
+      "espn_player_id": "4348700",
+      "nba_player_id": "1629048",
+      "player": "Goga Bitadze",
+      "player_id": "name:gogabitadze"
+    },
+    {
+      "aliases": [
+        "Gradey Dick"
+      ],
+      "espn_player_id": "5106258",
+      "player": "Gradey Dick",
+      "player_id": "name:gradeydick"
+    },
+    {
+      "aliases": [
+        "Graham Ike"
+      ],
+      "espn_player_id": "4703396",
+      "player": "Graham Ike",
+      "player_id": "name:grahamike"
+    },
+    {
+      "aliases": [
+        "Grayson Allen"
+      ],
+      "espn_player_id": "3135045",
+      "nba_player_id": "1628960",
+      "player": "Grayson Allen",
+      "player_id": "name:graysonallen"
+    },
+    {
+      "aliases": [
+        "Gui Santos"
+      ],
+      "espn_player_id": "4997536",
+      "player": "Gui Santos",
+      "player_id": "name:guisantos"
+    },
+    {
+      "aliases": [
+        "Hannes Steinbach"
+      ],
+      "espn_player_id": "5281370",
+      "player": "Hannes Steinbach",
+      "player_id": "name:hannessteinbach"
+    },
+    {
+      "aliases": [
+        "Harrison Barnes"
+      ],
+      "espn_player_id": "6578",
+      "nba_player_id": "203084",
+      "player": "Harrison Barnes",
+      "player_id": "name:harrisonbarnes"
+    },
+    {
+      "aliases": [
+        "Harrison Ingram"
+      ],
+      "espn_player_id": "4433618",
+      "player": "Harrison Ingram",
+      "player_id": "name:harrisoningram"
+    },
+    {
+      "aliases": [
+        "Herbert Jones"
+      ],
+      "espn_player_id": "4277813",
+      "nba_player_id": "1630529",
+      "player": "Herbert Jones",
+      "player_id": "name:herbertjones"
+    },
+    {
+      "aliases": [
+        "Hugo Gonzalez"
+      ],
+      "espn_player_id": "5175647",
+      "player": "Hugo Gonzalez",
+      "player_id": "name:hugogonzalez"
+    },
+    {
+      "aliases": [
+        "Immanuel Quickley"
+      ],
+      "espn_player_id": "4395724",
+      "nba_player_id": "1630193",
+      "player": "Immanuel Quickley",
+      "player_id": "name:immanuelquickley"
+    },
+    {
+      "aliases": [
+        "Isaac Jones"
+      ],
+      "espn_player_id": "5107818",
+      "player": "Isaac Jones",
+      "player_id": "name:isaacjones"
+    },
+    {
+      "aliases": [
+        "Isaac Okoro"
+      ],
+      "espn_player_id": "4432822",
+      "nba_player_id": "1630171",
+      "player": "Isaac Okoro",
+      "player_id": "name:isaacokoro"
+    },
+    {
+      "aliases": [
+        "Isaiah Collier"
+      ],
+      "espn_player_id": "4683766",
+      "nba_player_id": "1642268",
+      "player": "Isaiah Collier",
+      "player_id": "name:isaiahcollier"
+    },
+    {
+      "aliases": [
+        "Isaiah Crawford"
+      ],
+      "espn_player_id": "4592857",
+      "player": "Isaiah Crawford",
+      "player_id": "name:isaiahcrawford"
+    },
+    {
+      "aliases": [
+        "Isaiah Evans"
+      ],
+      "espn_player_id": "5061585",
+      "player": "Isaiah Evans",
+      "player_id": "name:isaiahevans"
+    },
+    {
+      "aliases": [
+        "Isaiah Hartenstein"
+      ],
+      "espn_player_id": "4222252",
+      "nba_player_id": "1628392",
+      "player": "Isaiah Hartenstein",
+      "player_id": "name:isaiahhartenstein"
+    },
+    {
+      "aliases": [
+        "Isaiah Jackson"
+      ],
+      "espn_player_id": "4432170",
+      "nba_player_id": "1630543",
+      "player": "Isaiah Jackson",
+      "player_id": "name:isaiahjackson"
+    },
+    {
+      "aliases": [
+        "Isaiah Joe"
+      ],
+      "espn_player_id": "4395702",
+      "nba_player_id": "1630198",
+      "player": "Isaiah Joe",
+      "player_id": "name:isaiahjoe"
+    },
+    {
+      "aliases": [
+        "Isaiah Stewart"
+      ],
+      "espn_player_id": "4432810",
+      "nba_player_id": "1630191",
+      "player": "Isaiah Stewart",
+      "player_id": "name:isaiahstewart"
+    },
+    {
+      "aliases": [
+        "Ivica Zubac"
+      ],
+      "espn_player_id": "4017837",
+      "nba_player_id": "1627826",
+      "player": "Ivica Zubac",
+      "player_id": "name:ivicazubac"
+    },
+    {
+      "aliases": [
+        "Jabari Smith Jr."
+      ],
+      "espn_player_id": "4432639",
+      "nba_player_id": "1631095",
+      "player": "Jabari Smith Jr.",
+      "player_id": "name:jabarismithjr"
+    },
+    {
+      "aliases": [
+        "Jabari Walker"
+      ],
+      "espn_player_id": "4432446",
+      "player": "Jabari Walker",
+      "player_id": "name:jabariwalker"
+    },
+    {
+      "aliases": [
+        "Jaden Akins"
+      ],
+      "espn_player_id": "4683730",
+      "player": "Jaden Akins",
+      "player_id": "name:jadenakins"
+    },
+    {
+      "aliases": [
+        "Jaden Bradley"
+      ],
+      "espn_player_id": "4432737",
+      "player": "Jaden Bradley",
+      "player_id": "name:jadenbradley"
+    },
+    {
+      "aliases": [
+        "Jaden Hardy"
+      ],
+      "espn_player_id": "4868423",
+      "player": "Jaden Hardy",
+      "player_id": "name:jadenhardy"
+    },
+    {
+      "aliases": [
+        "Jaden McDaniels"
+      ],
+      "espn_player_id": "4431671",
+      "nba_player_id": "1630183",
+      "player": "Jaden McDaniels",
+      "player_id": "name:jadenmcdaniels"
+    },
+    {
+      "aliases": [
+        "Jae'Sean Tate"
+      ],
+      "espn_player_id": "3136777",
+      "player": "Jae'Sean Tate",
+      "player_id": "name:jaeseantate"
+    },
+    {
+      "aliases": [
+        "Jahmai Mashack"
+      ],
+      "espn_player_id": "4683934",
+      "player": "Jahmai Mashack",
+      "player_id": "name:jahmaimashack"
+    },
+    {
+      "aliases": [
+        "Jaime Jaquez Jr."
+      ],
+      "espn_player_id": "4432848",
+      "nba_player_id": "1631170",
+      "player": "Jaime Jaquez Jr.",
+      "player_id": "name:jaimejaquezjr"
+    },
+    {
+      "aliases": [
+        "Jake LaRavia"
+      ],
+      "espn_player_id": "4592691",
+      "nba_player_id": "1631222",
+      "player": "Jake LaRavia",
+      "player_id": "name:jakelaravia"
+    },
+    {
+      "aliases": [
+        "Ja'Kobe Walter"
+      ],
+      "espn_player_id": "4684272",
+      "nba_player_id": "1642266",
+      "player": "Ja'Kobe Walter",
+      "player_id": "name:jakobewalter"
+    },
+    {
+      "aliases": [
+        "Ja'Kobi Gillespie"
+      ],
+      "espn_player_id": "5107968",
+      "player": "Ja'Kobi Gillespie",
+      "player_id": "name:jakobigillespie"
+    },
+    {
+      "aliases": [
+        "Jakob Poeltl"
+      ],
+      "espn_player_id": "3134908",
+      "nba_player_id": "1627751",
+      "player": "Jakob Poeltl",
+      "player_id": "name:jakobpoeltl"
+    },
+    {
+      "aliases": [
+        "Jalen Brunson"
+      ],
+      "espn_player_id": "3934672",
+      "nba_player_id": "1628973",
+      "player": "Jalen Brunson",
+      "player_id": "name:jalenbrunson"
+    },
+    {
+      "aliases": [
+        "Jalen Duren"
+      ],
+      "espn_player_id": "4433621",
+      "nba_player_id": "1631105",
+      "player": "Jalen Duren",
+      "player_id": "name:jalenduren"
+    },
+    {
+      "aliases": [
+        "Jalen Green"
+      ],
+      "espn_player_id": "4437244",
+      "nba_player_id": "1630224",
+      "player": "Jalen Green",
+      "player_id": "name:jalengreen"
+    },
+    {
+      "aliases": [
+        "Jalen Johnson"
+      ],
+      "espn_player_id": "4701230",
+      "nba_player_id": "1630552",
+      "player": "Jalen Johnson",
+      "player_id": "name:jalenjohnson"
+    },
+    {
+      "aliases": [
+        "Jalen Pickett"
+      ],
+      "espn_player_id": "4398390",
+      "player": "Jalen Pickett",
+      "player_id": "name:jalenpickett"
+    },
+    {
+      "aliases": [
+        "Jalen Slawson"
+      ],
+      "espn_player_id": "4398207",
+      "player": "Jalen Slawson",
+      "player_id": "name:jalenslawson"
+    },
+    {
+      "aliases": [
+        "Jalen Smith"
+      ],
+      "espn_player_id": "4397189",
+      "nba_player_id": "1630188",
+      "player": "Jalen Smith",
+      "player_id": "name:jalensmith"
+    },
+    {
+      "aliases": [
+        "Jalen Suggs"
+      ],
+      "espn_player_id": "4432165",
+      "nba_player_id": "1630591",
+      "player": "Jalen Suggs",
+      "player_id": "name:jalensuggs"
+    },
+    {
+      "aliases": [
+        "Jalen Williams"
+      ],
+      "espn_player_id": "4593803",
+      "nba_player_id": "1631114",
+      "player": "Jalen Williams",
+      "player_id": "name:jalenwilliams"
+    },
+    {
+      "aliases": [
+        "Jamal Cain"
+      ],
+      "espn_player_id": "4278572",
+      "player": "Jamal Cain",
+      "player_id": "name:jamalcain"
+    },
+    {
+      "aliases": [
+        "Jamal Murray"
+      ],
+      "espn_player_id": "3936299",
+      "nba_player_id": "1627750",
+      "player": "Jamal Murray",
+      "player_id": "name:jamalmurray"
+    },
+    {
+      "aliases": [
+        "Jamal Shead"
+      ],
+      "espn_player_id": "4432241",
+      "nba_player_id": "1642347",
+      "player": "Jamal Shead",
+      "player_id": "name:jamalshead"
+    },
+    {
+      "aliases": [
+        "Jamaree Bouyea"
+      ],
+      "espn_player_id": "4280245",
+      "player": "Jamaree Bouyea",
+      "player_id": "name:jamareebouyea"
+    },
+    {
+      "aliases": [
+        "James Harden"
+      ],
+      "espn_player_id": "3992",
+      "nba_player_id": "201935",
+      "player": "James Harden",
+      "player_id": "name:jamesharden"
+    },
+    {
+      "aliases": [
+        "James Wiseman"
+      ],
+      "espn_player_id": "4432808",
+      "player": "James Wiseman",
+      "player_id": "name:jameswiseman"
+    },
+    {
+      "aliases": [
+        "Jamison Battle"
+      ],
+      "espn_player_id": "4431893",
+      "player": "Jamison Battle",
+      "player_id": "name:jamisonbattle"
+    },
+    {
+      "aliases": [
+        "Ja Morant"
+      ],
+      "espn_player_id": "4279888",
+      "nba_player_id": "1629630",
+      "player": "Ja Morant",
+      "player_id": "name:jamorant"
+    },
+    {
+      "aliases": [
+        "Jarace Walker"
+      ],
+      "espn_player_id": "5106060",
+      "nba_player_id": "1641716",
+      "player": "Jarace Walker",
+      "player_id": "name:jaracewalker"
+    },
+    {
+      "aliases": [
+        "Jared McCain"
+      ],
+      "espn_player_id": "4683778",
+      "nba_player_id": "1642272",
+      "player": "Jared McCain",
+      "player_id": "name:jaredmccain"
+    },
+    {
+      "aliases": [
+        "Jaren Jackson Jr."
+      ],
+      "espn_player_id": "4277961",
+      "nba_player_id": "1628991",
+      "player": "Jaren Jackson Jr.",
+      "player_id": "name:jarenjacksonjr"
+    },
+    {
+      "aliases": [
+        "Jarred Vanderbilt"
+      ],
+      "espn_player_id": "4278077",
+      "nba_player_id": "1629020",
+      "player": "Jarred Vanderbilt",
+      "player_id": "name:jarredvanderbilt"
+    },
+    {
+      "aliases": [
+        "Jarrett Allen"
+      ],
+      "espn_player_id": "4066328",
+      "nba_player_id": "1628386",
+      "player": "Jarrett Allen",
+      "player_id": "name:jarrettallen"
+    },
+    {
+      "aliases": [
+        "Jase Richardson"
+      ],
+      "espn_player_id": "5239561",
+      "nba_player_id": "1642859",
+      "player": "Jase Richardson",
+      "player_id": "name:jaserichardson"
+    },
+    {
+      "aliases": [
+        "Javon Small"
+      ],
+      "espn_player_id": "4781746",
+      "player": "Javon Small",
+      "player_id": "name:javonsmall"
+    },
+    {
+      "aliases": [
+        "Javonte Green"
+      ],
+      "espn_player_id": "2596112",
+      "player": "Javonte Green",
+      "player_id": "name:javontegreen"
+    },
+    {
+      "aliases": [
+        "Jaxson Hayes"
+      ],
+      "espn_player_id": "4397077",
+      "player": "Jaxson Hayes",
+      "player_id": "name:jaxsonhayes"
+    },
+    {
+      "aliases": [
+        "Jay Huff"
+      ],
+      "espn_player_id": "4065731",
+      "nba_player_id": "1630643",
+      "player": "Jay Huff",
+      "player_id": "name:jayhuff"
+    },
+    {
+      "aliases": [
+        "Jaylen Brown"
+      ],
+      "espn_player_id": "3917376",
+      "nba_player_id": "1627759",
+      "player": "Jaylen Brown",
+      "player_id": "name:jaylenbrown"
+    },
+    {
+      "aliases": [
+        "Jaylen Clark"
+      ],
+      "espn_player_id": "4432247",
+      "player": "Jaylen Clark",
+      "player_id": "name:jaylenclark"
+    },
+    {
+      "aliases": [
+        "Jaylen Wells"
+      ],
+      "espn_player_id": "5112087",
+      "nba_player_id": "1642377",
+      "player": "Jaylen Wells",
+      "player_id": "name:jaylenwells"
+    },
+    {
+      "aliases": [
+        "Jaylin Sellers"
+      ],
+      "espn_player_id": "4898010",
+      "player": "Jaylin Sellers",
+      "player_id": "name:jaylinsellers"
+    },
+    {
+      "aliases": [
+        "Jaylin Williams"
+      ],
+      "espn_player_id": "4432823",
+      "nba_player_id": "1631119",
+      "player": "Jaylin Williams",
+      "player_id": "name:jaylinwilliams"
+    },
+    {
+      "aliases": [
+        "Jaylon Tyson"
+      ],
+      "espn_player_id": "4683747",
+      "nba_player_id": "1642281",
+      "player": "Jaylon Tyson",
+      "player_id": "name:jaylontyson"
+    },
+    {
+      "aliases": [
+        "Jayson Kent"
+      ],
+      "espn_player_id": "4703889",
+      "player": "Jayson Kent",
+      "player_id": "name:jaysonkent"
+    },
+    {
+      "aliases": [
+        "Jayson Tatum"
+      ],
+      "espn_player_id": "4065648",
+      "nba_player_id": "1628369",
+      "player": "Jayson Tatum",
+      "player_id": "name:jaysontatum"
+    },
+    {
+      "aliases": [
+        "Jerami Grant"
+      ],
+      "espn_player_id": "2991070",
+      "nba_player_id": "203924",
+      "player": "Jerami Grant",
+      "player_id": "name:jeramigrant"
+    },
+    {
+      "aliases": [
+        "Jeremiah Fears"
+      ],
+      "espn_player_id": "5144091",
+      "nba_player_id": "1642847",
+      "player": "Jeremiah Fears",
+      "player_id": "name:jeremiahfears"
+    },
+    {
+      "aliases": [
+        "Jericho Sims"
+      ],
+      "espn_player_id": "4277922",
+      "player": "Jericho Sims",
+      "player_id": "name:jerichosims"
+    },
+    {
+      "aliases": [
+        "Jett Howard"
+      ],
+      "espn_player_id": "5105806",
+      "player": "Jett Howard",
+      "player_id": "name:jetthoward"
+    },
+    {
+      "aliases": [
+        "Jevon Carter"
+      ],
+      "espn_player_id": "3133635",
+      "player": "Jevon Carter",
+      "player_id": "name:jevoncarter"
+    },
+    {
+      "aliases": [
+        "Joan Beringer"
+      ],
+      "espn_player_id": "5279133",
+      "nba_player_id": "1642866",
+      "player": "Joan Beringer",
+      "player_id": "name:joanberinger"
+    },
+    {
+      "aliases": [
+        "Jock Landale"
+      ],
+      "espn_player_id": "3146557",
+      "nba_player_id": "1629111",
+      "player": "Jock Landale",
+      "player_id": "name:jocklandale"
+    },
+    {
+      "aliases": [
+        "Joel Embiid"
+      ],
+      "espn_player_id": "3059318",
+      "nba_player_id": "203954",
+      "player": "Joel Embiid",
+      "player_id": "name:joelembiid"
+    },
+    {
+      "aliases": [
+        "John Collins"
+      ],
+      "espn_player_id": "3908845",
+      "nba_player_id": "1628381",
+      "player": "John Collins",
+      "player_id": "name:johncollins"
+    },
+    {
+      "aliases": [
+        "John Tonje"
+      ],
+      "espn_player_id": "4593043",
+      "player": "John Tonje",
+      "player_id": "name:johntonje"
+    },
+    {
+      "aliases": [
+        "Jonathan Kuminga"
+      ],
+      "espn_player_id": "4433247",
+      "nba_player_id": "1630228",
+      "player": "Jonathan Kuminga",
+      "player_id": "name:jonathankuminga"
+    },
+    {
+      "aliases": [
+        "Jonathan Mogbo"
+      ],
+      "espn_player_id": "5107897",
+      "player": "Jonathan Mogbo",
+      "player_id": "name:jonathanmogbo"
+    },
+    {
+      "aliases": [
+        "Jordan Clarkson"
+      ],
+      "espn_player_id": "2528426",
+      "player": "Jordan Clarkson",
+      "player_id": "name:jordanclarkson"
+    },
+    {
+      "aliases": [
+        "Jordan Goodwin"
+      ],
+      "espn_player_id": "4278402",
+      "nba_player_id": "1630692",
+      "player": "Jordan Goodwin",
+      "player_id": "name:jordangoodwin"
+    },
+    {
+      "aliases": [
+        "Jordan Hawkins"
+      ],
+      "espn_player_id": "4683750",
+      "player": "Jordan Hawkins",
+      "player_id": "name:jordanhawkins"
+    },
+    {
+      "aliases": [
+        "Jordan McLaughlin"
+      ],
+      "espn_player_id": "3134916",
+      "player": "Jordan McLaughlin",
+      "player_id": "name:jordanmclaughlin"
+    },
+    {
+      "aliases": [
+        "Jordan Poole"
+      ],
+      "espn_player_id": "4277956",
+      "nba_player_id": "1629673",
+      "player": "Jordan Poole",
+      "player_id": "name:jordanpoole"
+    },
+    {
+      "aliases": [
+        "Jordan Walsh"
+      ],
+      "espn_player_id": "4683689",
+      "player": "Jordan Walsh",
+      "player_id": "name:jordanwalsh"
+    },
+    {
+      "aliases": [
+        "Jose Alvarado"
+      ],
+      "espn_player_id": "4277869",
+      "nba_player_id": "1630631",
+      "player": "Jose Alvarado",
+      "player_id": "name:josealvarado"
+    },
+    {
+      "aliases": [
+        "Josh Dix"
+      ],
+      "espn_player_id": "5105800",
+      "player": "Josh Dix",
+      "player_id": "name:joshdix"
+    },
+    {
+      "aliases": [
+        "Josh Giddey"
+      ],
+      "espn_player_id": "4871145",
+      "nba_player_id": "1630581",
+      "player": "Josh Giddey",
+      "player_id": "name:joshgiddey"
+    },
+    {
+      "aliases": [
+        "Josh Green"
+      ],
+      "espn_player_id": "4432811",
+      "nba_player_id": "1630182",
+      "player": "Josh Green",
+      "player_id": "name:joshgreen"
+    },
+    {
+      "aliases": [
+        "Josh Hart"
+      ],
+      "espn_player_id": "3062679",
+      "nba_player_id": "1628404",
+      "player": "Josh Hart",
+      "player_id": "name:joshhart"
+    },
+    {
+      "aliases": [
+        "Josh Minott"
+      ],
+      "espn_player_id": "4687718",
+      "nba_player_id": "1631169",
+      "player": "Josh Minott",
+      "player_id": "name:joshminott"
+    },
+    {
+      "aliases": [
+        "Josh Okogie"
+      ],
+      "espn_player_id": "4065663",
+      "nba_player_id": "1629006",
+      "player": "Josh Okogie",
+      "player_id": "name:joshokogie"
+    },
+    {
+      "aliases": [
+        "Joshua Jefferson"
+      ],
+      "espn_player_id": "4870564",
+      "player": "Joshua Jefferson",
+      "player_id": "name:joshuajefferson"
+    },
+    {
+      "aliases": [
+        "Jrue Holiday"
+      ],
+      "espn_player_id": "3995",
+      "nba_player_id": "201950",
+      "player": "Jrue Holiday",
+      "player_id": "name:jrueholiday"
+    },
+    {
+      "aliases": [
+        "Julian Champagnie"
+      ],
+      "espn_player_id": "4592479",
+      "nba_player_id": "1630577",
+      "player": "Julian Champagnie",
+      "player_id": "name:julianchampagnie"
+    },
+    {
+      "aliases": [
+        "Julian Reese"
+      ],
+      "espn_player_id": "4683742",
+      "player": "Julian Reese",
+      "player_id": "name:julianreese"
+    },
+    {
+      "aliases": [
+        "Julius Randle"
+      ],
+      "espn_player_id": "3064514",
+      "nba_player_id": "203944",
+      "player": "Julius Randle",
+      "player_id": "name:juliusrandle"
+    },
+    {
+      "aliases": [
+        "Justin Champagnie"
+      ],
+      "espn_player_id": "4432907",
+      "player": "Justin Champagnie",
+      "player_id": "name:justinchampagnie"
+    },
+    {
+      "aliases": [
+        "Justin Edwards"
+      ],
+      "espn_player_id": "4711297",
+      "player": "Justin Edwards",
+      "player_id": "name:justinedwards"
+    },
+    {
+      "aliases": [
+        "Karim Lopez"
+      ],
+      "espn_player_id": "5231919",
+      "player": "Karim Lopez",
+      "player_id": "name:karimlopez"
+    },
+    {
+      "aliases": [
+        "Karl-Anthony Towns"
+      ],
+      "espn_player_id": "3136195",
+      "nba_player_id": "1626157",
+      "player": "Karl-Anthony Towns",
+      "player_id": "name:karlanthonytowns"
+    },
+    {
+      "aliases": [
+        "Karlo Matkovic"
+      ],
+      "espn_player_id": "4997538",
+      "player": "Karlo Matkovic",
+      "player_id": "name:karlomatkovic"
+    },
+    {
+      "aliases": [
+        "Kasparas Jakucionis",
+        "Kasparas Jaku\u010dionis"
+      ],
+      "espn_player_id": "5214640",
+      "nba_player_id": "1642857",
+      "player": "Kasparas Jaku\u010dionis",
+      "player_id": "name:kasparasjakucionis"
+    },
+    {
+      "aliases": [
+        "Kawhi Leonard"
+      ],
+      "espn_player_id": "6450",
+      "nba_player_id": "202695",
+      "player": "Kawhi Leonard",
+      "player_id": "name:kawhileonard"
+    },
+    {
+      "aliases": [
+        "Keaton Wagler"
+      ],
+      "espn_player_id": "5254165",
+      "player": "Keaton Wagler",
+      "player_id": "name:keatonwagler"
+    },
+    {
+      "aliases": [
+        "Keegan Murray"
+      ],
+      "espn_player_id": "4594327",
+      "nba_player_id": "1631099",
+      "player": "Keegan Murray",
+      "player_id": "name:keeganmurray"
+    },
+    {
+      "aliases": [
+        "Keldon Johnson"
+      ],
+      "espn_player_id": "4395723",
+      "player": "Keldon Johnson",
+      "player_id": "name:keldonjohnson"
+    },
+    {
+      "aliases": [
+        "Kel'el Ware"
+      ],
+      "espn_player_id": "5105623",
+      "nba_player_id": "1642276",
+      "player": "Kel'el Ware",
+      "player_id": "name:kelelware"
+    },
+    {
+      "aliases": [
+        "Kelly Oubre Jr."
+      ],
+      "espn_player_id": "3133603",
+      "nba_player_id": "1626162",
+      "player": "Kelly Oubre Jr.",
+      "player_id": "name:kellyoubrejr"
+    },
+    {
+      "aliases": [
+        "Kenrich Williams"
+      ],
+      "espn_player_id": "3133626",
+      "player": "Kenrich Williams",
+      "player_id": "name:kenrichwilliams"
+    },
+    {
+      "aliases": [
+        "Kentavious Caldwell-Pope"
+      ],
+      "espn_player_id": "2581018",
+      "nba_player_id": "203484",
+      "player": "Kentavious Caldwell-Pope",
+      "player_id": "name:kentaviouscaldwellpope"
+    },
+    {
+      "aliases": [
+        "Keon Ellis"
+      ],
+      "espn_player_id": "4702177",
+      "nba_player_id": "1631165",
+      "player": "Keon Ellis",
+      "player_id": "name:keonellis"
+    },
+    {
+      "aliases": [
+        "Kevin Durant"
+      ],
+      "espn_player_id": "3202",
+      "nba_player_id": "201142",
+      "player": "Kevin Durant",
+      "player_id": "name:kevindurant"
+    },
+    {
+      "aliases": [
+        "Kevin Huerter"
+      ],
+      "espn_player_id": "4066372",
+      "nba_player_id": "1628989",
+      "player": "Kevin Huerter",
+      "player_id": "name:kevinhuerter"
+    },
+    {
+      "aliases": [
+        "Kevin McCullar Jr."
+      ],
+      "espn_player_id": "4411057",
+      "player": "Kevin McCullar Jr.",
+      "player_id": "name:kevinmccullarjr"
+    },
+    {
+      "aliases": [
+        "Kevin Porter Jr."
+      ],
+      "espn_player_id": "4397140",
+      "player": "Kevin Porter Jr.",
+      "player_id": "name:kevinporterjr"
+    },
+    {
+      "aliases": [
+        "Kevon Looney"
+      ],
+      "espn_player_id": "3155535",
+      "nba_player_id": "1626172",
+      "player": "Kevon Looney",
+      "player_id": "name:kevonlooney"
+    },
+    {
+      "aliases": [
+        "Keyonte George"
+      ],
+      "espn_player_id": "4433627",
+      "nba_player_id": "1641718",
+      "player": "Keyonte George",
+      "player_id": "name:keyontegeorge"
+    },
+    {
+      "aliases": [
+        "Khaman Maluach"
+      ],
+      "espn_player_id": "5203685",
+      "nba_player_id": "1642863",
+      "player": "Khaman Maluach",
+      "player_id": "name:khamanmaluach"
+    },
+    {
+      "aliases": [
+        "Khris Middleton"
+      ],
+      "espn_player_id": "6609",
+      "player": "Khris Middleton",
+      "player_id": "name:khrismiddleton"
+    },
+    {
+      "aliases": [
+        "Kingston Flemings"
+      ],
+      "espn_player_id": "5149077",
+      "player": "Kingston Flemings",
+      "player_id": "name:kingstonflemings"
+    },
+    {
+      "aliases": [
+        "Klay Thompson"
+      ],
+      "espn_player_id": "6475",
+      "nba_player_id": "202691",
+      "player": "Klay Thompson",
+      "player_id": "name:klaythompson"
+    },
+    {
+      "aliases": [
+        "Koa Peat"
+      ],
+      "espn_player_id": "5041953",
+      "player": "Koa Peat",
+      "player_id": "name:koapeat"
+    },
+    {
+      "aliases": [
+        "Kobe Brown"
+      ],
+      "espn_player_id": "4431752",
+      "player": "Kobe Brown",
+      "player_id": "name:kobebrown"
+    },
+    {
+      "aliases": [
+        "Kobe Bufkin"
+      ],
+      "espn_player_id": "4683736",
+      "player": "Kobe Bufkin",
+      "player_id": "name:kobebufkin"
+    },
+    {
+      "aliases": [
+        "Kobe Sanders"
+      ],
+      "espn_player_id": "4702352",
+      "player": "Kobe Sanders",
+      "player_id": "name:kobesanders"
+    },
+    {
+      "aliases": [
+        "Koby Brea"
+      ],
+      "espn_player_id": "4591259",
+      "player": "Koby Brea",
+      "player_id": "name:kobybrea"
+    },
+    {
+      "aliases": [
+        "Kris Dunn"
+      ],
+      "espn_player_id": "2991139",
+      "nba_player_id": "1627739",
+      "player": "Kris Dunn",
+      "player_id": "name:krisdunn"
+    },
+    {
+      "aliases": [
+        "Kris Murray"
+      ],
+      "espn_player_id": "4594326",
+      "player": "Kris Murray",
+      "player_id": "name:krismurray"
+    },
+    {
+      "aliases": [
+        "Kyle Anderson"
+      ],
+      "espn_player_id": "2993874",
+      "player": "Kyle Anderson",
+      "player_id": "name:kyleanderson"
+    },
+    {
+      "aliases": [
+        "Kyle Filipowski"
+      ],
+      "espn_player_id": "4684793",
+      "player": "Kyle Filipowski",
+      "player_id": "name:kylefilipowski"
+    },
+    {
+      "aliases": [
+        "Kyle Kuzma"
+      ],
+      "espn_player_id": "3134907",
+      "nba_player_id": "1628398",
+      "player": "Kyle Kuzma",
+      "player_id": "name:kylekuzma"
+    },
+    {
+      "aliases": [
+        "Kyrie Irving"
+      ],
+      "espn_player_id": "6442",
+      "nba_player_id": "202681",
+      "player": "Kyrie Irving",
+      "player_id": "name:kyrieirving"
+    },
+    {
+      "aliases": [
+        "Kyshawn George"
+      ],
+      "espn_player_id": "5174563",
+      "nba_player_id": "1642273",
+      "player": "Kyshawn George",
+      "player_id": "name:kyshawngeorge"
+    },
+    {
+      "aliases": [
+        "Labaron Philon Jr."
+      ],
+      "espn_player_id": "4873090",
+      "player": "Labaron Philon Jr.",
+      "player_id": "name:labaronphilonjr"
+    },
+    {
+      "aliases": [
+        "LaMelo Ball"
+      ],
+      "espn_player_id": "4432816",
+      "nba_player_id": "1630163",
+      "player": "LaMelo Ball",
+      "player_id": "name:lameloball"
+    },
+    {
+      "aliases": [
+        "Landry Shamet"
+      ],
+      "espn_player_id": "3914044",
+      "player": "Landry Shamet",
+      "player_id": "name:landryshamet"
+    },
+    {
+      "aliases": [
+        "Larry Nance Jr."
+      ],
+      "espn_player_id": "2580365",
+      "player": "Larry Nance Jr.",
+      "player_id": "name:larrynancejr"
+    },
+    {
+      "aliases": [
+        "Lauri Markkanen"
+      ],
+      "espn_player_id": "4066336",
+      "nba_player_id": "1628374",
+      "player": "Lauri Markkanen",
+      "player_id": "name:laurimarkkanen"
+    },
+    {
+      "aliases": [
+        "Lawson Lovering"
+      ],
+      "espn_player_id": "4596528",
+      "player": "Lawson Lovering",
+      "player_id": "name:lawsonlovering"
+    },
+    {
+      "aliases": [
+        "Leaky Black"
+      ],
+      "espn_player_id": "4395650",
+      "player": "Leaky Black",
+      "player_id": "name:leakyblack"
+    },
+    {
+      "aliases": [
+        "LeBron James"
+      ],
+      "espn_player_id": "1966",
+      "nba_player_id": "2544",
+      "player": "LeBron James",
+      "player_id": "name:lebronjames"
+    },
+    {
+      "aliases": [
+        "Leonard Miller"
+      ],
+      "espn_player_id": "5044385",
+      "player": "Leonard Miller",
+      "player_id": "name:leonardmiller"
+    },
+    {
+      "aliases": [
+        "Liam McNeeley"
+      ],
+      "espn_player_id": "5239590",
+      "player": "Liam McNeeley",
+      "player_id": "name:liammcneeley"
+    },
+    {
+      "aliases": [
+        "LJ Cryer"
+      ],
+      "espn_player_id": "4433149",
+      "player": "LJ Cryer",
+      "player_id": "name:ljcryer"
+    },
+    {
+      "aliases": [
+        "Luguentz Dort"
+      ],
+      "espn_player_id": "4397020",
+      "nba_player_id": "1629652",
+      "player": "Luguentz Dort",
+      "player_id": "name:luguentzdort"
+    },
+    {
+      "aliases": [
+        "Luka Doncic",
+        "Luka Don\u010di\u0107"
+      ],
+      "espn_player_id": "3945274",
+      "nba_player_id": "1629029",
+      "player": "Luka Don\u010di\u0107",
+      "player_id": "name:lukadoncic"
+    },
+    {
+      "aliases": [
+        "Luka Garza"
+      ],
+      "espn_player_id": "4277951",
+      "player": "Luka Garza",
+      "player_id": "name:lukagarza"
+    },
+    {
+      "aliases": [
+        "Luke Kennard"
+      ],
+      "espn_player_id": "3913174",
+      "player": "Luke Kennard",
+      "player_id": "name:lukekennard"
+    },
+    {
+      "aliases": [
+        "Luke Kornet"
+      ],
+      "espn_player_id": "3064560",
+      "nba_player_id": "1628436",
+      "player": "Luke Kornet",
+      "player_id": "name:lukekornet"
+    },
+    {
+      "aliases": [
+        "Malevy Leons"
+      ],
+      "espn_player_id": "4897449",
+      "player": "Malevy Leons",
+      "player_id": "name:malevyleons"
+    },
+    {
+      "aliases": [
+        "Malik Monk"
+      ],
+      "espn_player_id": "4066262",
+      "nba_player_id": "1628370",
+      "player": "Malik Monk",
+      "player_id": "name:malikmonk"
+    },
+    {
+      "aliases": [
+        "Maliq Brown"
+      ],
+      "espn_player_id": "5105337",
+      "player": "Maliq Brown",
+      "player_id": "name:maliqbrown"
+    },
+    {
+      "aliases": [
+        "Marcus Sasser"
+      ],
+      "espn_player_id": "4432107",
+      "player": "Marcus Sasser",
+      "player_id": "name:marcussasser"
+    },
+    {
+      "aliases": [
+        "Marcus Smart"
+      ],
+      "espn_player_id": "2990992",
+      "nba_player_id": "203935",
+      "player": "Marcus Smart",
+      "player_id": "name:marcussmart"
+    },
+    {
+      "aliases": [
+        "Mario Hezonja"
+      ],
+      "espn_player_id": "2995706",
+      "player": "Mario Hezonja",
+      "player_id": "name:mariohezonja"
+    },
+    {
+      "aliases": [
+        "Marvin Bagley III"
+      ],
+      "espn_player_id": "4277848",
+      "player": "Marvin Bagley III",
+      "player_id": "name:marvinbagleyiii"
+    },
+    {
+      "aliases": [
+        "Matas Buzelis"
+      ],
+      "espn_player_id": "4711294",
+      "nba_player_id": "1641824",
+      "player": "Matas Buzelis",
+      "player_id": "name:matasbuzelis"
+    },
+    {
+      "aliases": [
+        "Matisse Thybulle"
+      ],
+      "espn_player_id": "3907498",
+      "nba_player_id": "1629680",
+      "player": "Matisse Thybulle",
+      "player_id": "name:matissethybulle"
+    },
+    {
+      "aliases": [
+        "Max Christie"
+      ],
+      "espn_player_id": "4432582",
+      "nba_player_id": "1631108",
+      "player": "Max Christie",
+      "player_id": "name:maxchristie"
+    },
+    {
+      "aliases": [
+        "Max Strus"
+      ],
+      "espn_player_id": "4065778",
+      "nba_player_id": "1629622",
+      "player": "Max Strus",
+      "player_id": "name:maxstrus"
+    },
+    {
+      "aliases": [
+        "Meleek Thomas"
+      ],
+      "espn_player_id": "5041951",
+      "player": "Meleek Thomas",
+      "player_id": "name:meleekthomas"
+    },
+    {
+      "aliases": [
+        "Micah Peavy"
+      ],
+      "espn_player_id": "4432185",
+      "player": "Micah Peavy",
+      "player_id": "name:micahpeavy"
+    },
+    {
+      "aliases": [
+        "Micah Potter"
+      ],
+      "espn_player_id": "4066399",
+      "player": "Micah Potter",
+      "player_id": "name:micahpotter"
+    },
+    {
+      "aliases": [
+        "Michael Ajayi"
+      ],
+      "espn_player_id": "5176517",
+      "player": "Michael Ajayi",
+      "player_id": "name:michaelajayi"
+    },
+    {
+      "aliases": [
+        "Michael Porter Jr."
+      ],
+      "espn_player_id": "4278104",
+      "nba_player_id": "1629008",
+      "player": "Michael Porter Jr.",
+      "player_id": "name:michaelporterjr"
+    },
+    {
+      "aliases": [
+        "Mikal Bridges"
+      ],
+      "espn_player_id": "3147657",
+      "nba_player_id": "1628969",
+      "player": "Mikal Bridges",
+      "player_id": "name:mikalbridges"
+    },
+    {
+      "aliases": [
+        "Mike Conley"
+      ],
+      "espn_player_id": "3195",
+      "player": "Mike Conley",
+      "player_id": "name:mikeconley"
+    },
+    {
+      "aliases": [
+        "Mikel Brown Jr."
+      ],
+      "espn_player_id": "5101761",
+      "player": "Mikel Brown Jr.",
+      "player_id": "name:mikelbrownjr"
+    },
+    {
+      "aliases": [
+        "Miles Bridges"
+      ],
+      "espn_player_id": "4066383",
+      "nba_player_id": "1628970",
+      "player": "Miles Bridges",
+      "player_id": "name:milesbridges"
+    },
+    {
+      "aliases": [
+        "Miles McBride"
+      ],
+      "espn_player_id": "4431823",
+      "nba_player_id": "1630540",
+      "player": "Miles McBride",
+      "player_id": "name:milesmcbride"
+    },
+    {
+      "aliases": [
+        "Mitchell Robinson"
+      ],
+      "espn_player_id": "4351852",
+      "nba_player_id": "1629011",
+      "player": "Mitchell Robinson",
+      "player_id": "name:mitchellrobinson"
+    },
+    {
+      "aliases": [
+        "Mo Bamba"
+      ],
+      "espn_player_id": "4277919",
+      "player": "Mo Bamba",
+      "player_id": "name:mobamba"
+    },
+    {
+      "aliases": [
+        "Mohamed Diawara"
+      ],
+      "espn_player_id": "5289900",
+      "player": "Mohamed Diawara",
+      "player_id": "name:mohameddiawara"
+    },
+    {
+      "aliases": [
+        "Morez Johnson Jr."
+      ],
+      "espn_player_id": "4873153",
+      "player": "Morez Johnson Jr.",
+      "player_id": "name:morezjohnsonjr"
+    },
+    {
+      "aliases": [
+        "Moritz Wagner"
+      ],
+      "espn_player_id": "3150844",
+      "nba_player_id": "1629021",
+      "player": "Moritz Wagner",
+      "player_id": "name:moritzwagner"
+    },
+    {
+      "aliases": [
+        "Moussa Cisse"
+      ],
+      "espn_player_id": "4701208",
+      "player": "Moussa Cisse",
+      "player_id": "name:moussacisse"
+    },
+    {
+      "aliases": [
+        "Moussa Diabate"
+      ],
+      "espn_player_id": "4433249",
+      "player": "Moussa Diabate",
+      "player_id": "name:moussadiabate"
+    },
+    {
+      "aliases": [
+        "Myles Turner"
+      ],
+      "espn_player_id": "3133628",
+      "nba_player_id": "1626167",
+      "player": "Myles Turner",
+      "player_id": "name:mylesturner"
+    },
+    {
+      "aliases": [
+        "Myron Gardner"
+      ],
+      "espn_player_id": "4431772",
+      "player": "Myron Gardner",
+      "player_id": "name:myrongardner"
+    },
+    {
+      "aliases": [
+        "Naji Marshall"
+      ],
+      "espn_player_id": "4278594",
+      "nba_player_id": "1630230",
+      "player": "Naji Marshall",
+      "player_id": "name:najimarshall"
+    },
+    {
+      "aliases": [
+        "Nate Ament"
+      ],
+      "espn_player_id": "5164559",
+      "player": "Nate Ament",
+      "player_id": "name:nateament"
+    },
+    {
+      "aliases": [
+        "Naz Reid"
+      ],
+      "espn_player_id": "4396971",
+      "nba_player_id": "1629675",
+      "player": "Naz Reid",
+      "player_id": "name:nazreid"
+    },
+    {
+      "aliases": [
+        "Neemias Queta"
+      ],
+      "espn_player_id": "4397424",
+      "nba_player_id": "1629674",
+      "player": "Neemias Queta",
+      "player_id": "name:neemiasqueta"
+    },
+    {
+      "aliases": [
+        "Nickeil Alexander-Walker"
+      ],
+      "espn_player_id": "4278039",
+      "nba_player_id": "1629638",
+      "player": "Nickeil Alexander-Walker",
+      "player_id": "name:nickeilalexanderwalker"
+    },
+    {
+      "aliases": [
+        "Nick Martinelli"
+      ],
+      "espn_player_id": "5105832",
+      "player": "Nick Martinelli",
+      "player_id": "name:nickmartinelli"
+    },
+    {
+      "aliases": [
+        "Nick Richards"
+      ],
+      "espn_player_id": "4278076",
+      "player": "Nick Richards",
+      "player_id": "name:nickrichards"
+    },
+    {
+      "aliases": [
+        "Nikola Jokic",
+        "Nikola Joki\u0107"
+      ],
+      "espn_player_id": "3112335",
+      "nba_player_id": "203999",
+      "player": "Nikola Joki\u0107",
+      "player_id": "name:nikolajokic"
+    },
+    {
+      "aliases": [
+        "Nikola Jovic"
+      ],
+      "espn_player_id": "4997528",
+      "player": "Nikola Jovic",
+      "player_id": "name:nikolajovic"
+    },
+    {
+      "aliases": [
+        "Nikola Vucevic",
+        "Nikola Vu\u010devi\u0107"
+      ],
+      "espn_player_id": "6478",
+      "nba_player_id": "202696",
+      "player": "Nikola Vu\u010devi\u0107",
+      "player_id": "name:nikolavucevic"
+    },
+    {
+      "aliases": [
+        "Nique Clifford"
+      ],
+      "espn_player_id": "4702384",
+      "nba_player_id": "1642363",
+      "player": "Nique Clifford",
+      "player_id": "name:niqueclifford"
+    },
+    {
+      "aliases": [
+        "Noa Essengue"
+      ],
+      "espn_player_id": "5242496",
+      "player": "Noa Essengue",
+      "player_id": "name:noaessengue"
+    },
+    {
+      "aliases": [
+        "Noah Clowney"
+      ],
+      "espn_player_id": "4712896",
+      "nba_player_id": "1641730",
+      "player": "Noah Clowney",
+      "player_id": "name:noahclowney"
+    },
+    {
+      "aliases": [
+        "Nolan Traore"
+      ],
+      "espn_player_id": "5279130",
+      "player": "Nolan Traore",
+      "player_id": "name:nolantraore"
+    },
+    {
+      "aliases": [
+        "Norman Powell"
+      ],
+      "espn_player_id": "2595516",
+      "nba_player_id": "1626181",
+      "player": "Norman Powell",
+      "player_id": "name:normanpowell"
+    },
+    {
+      "aliases": [
+        "Obi Toppin"
+      ],
+      "espn_player_id": "4278355",
+      "player": "Obi Toppin",
+      "player_id": "name:obitoppin"
+    },
+    {
+      "aliases": [
+        "O.G. Anunoby",
+        "OG Anunoby"
+      ],
+      "espn_player_id": "3934719",
+      "nba_player_id": "1628384",
+      "player": "OG Anunoby",
+      "player_id": "name:oganunoby"
+    },
+    {
+      "aliases": [
+        "Olivier-Maxence Prosper"
+      ],
+      "espn_player_id": "4595400",
+      "player": "Olivier-Maxence Prosper",
+      "player_id": "name:oliviermaxenceprosper"
+    },
+    {
+      "aliases": [
+        "Onyeka Okongwu"
+      ],
+      "espn_player_id": "4431680",
+      "nba_player_id": "1630168",
+      "player": "Onyeka Okongwu",
+      "player_id": "name:onyekaokongwu"
+    },
+    {
+      "aliases": [
+        "Oscar Tshiebwe"
+      ],
+      "espn_player_id": "4432827",
+      "player": "Oscar Tshiebwe",
+      "player_id": "name:oscartshiebwe"
+    },
+    {
+      "aliases": [
+        "Oso Ighodaro"
+      ],
+      "espn_player_id": "4601023",
+      "nba_player_id": "1642345",
+      "player": "Oso Ighodaro",
+      "player_id": "name:osoighodaro"
+    },
+    {
+      "aliases": [
+        "Otega Oweh"
+      ],
+      "espn_player_id": "5106270",
+      "player": "Otega Oweh",
+      "player_id": "name:otegaoweh"
+    },
+    {
+      "aliases": [
+        "Ousmane Dieng"
+      ],
+      "espn_player_id": "4997526",
+      "player": "Ousmane Dieng",
+      "player_id": "name:ousmanedieng"
+    },
+    {
+      "aliases": [
+        "Pacome Dadiet"
+      ],
+      "espn_player_id": "5211983",
+      "player": "Pacome Dadiet",
+      "player_id": "name:pacomedadiet"
+    },
+    {
+      "aliases": [
+        "Paolo Banchero"
+      ],
+      "espn_player_id": "4432573",
+      "nba_player_id": "1631094",
+      "player": "Paolo Banchero",
+      "player_id": "name:paolobanchero"
+    },
+    {
+      "aliases": [
+        "Pascal Siakam"
+      ],
+      "espn_player_id": "3149673",
+      "nba_player_id": "1627783",
+      "player": "Pascal Siakam",
+      "player_id": "name:pascalsiakam"
+    },
+    {
+      "aliases": [
+        "Patrick Williams"
+      ],
+      "espn_player_id": "4431687",
+      "nba_player_id": "1630172",
+      "player": "Patrick Williams",
+      "player_id": "name:patrickwilliams"
+    },
+    {
+      "aliases": [
+        "Pat Spencer"
+      ],
+      "espn_player_id": "4592714",
+      "player": "Pat Spencer",
+      "player_id": "name:patspencer"
+    },
+    {
+      "aliases": [
+        "Paul George"
+      ],
+      "espn_player_id": "4251",
+      "nba_player_id": "202331",
+      "player": "Paul George",
+      "player_id": "name:paulgeorge"
+    },
+    {
+      "aliases": [
+        "Paul Reed"
+      ],
+      "espn_player_id": "4278562",
+      "nba_player_id": "1630194",
+      "player": "Paul Reed",
+      "player_id": "name:paulreed"
+    },
+    {
+      "aliases": [
+        "Payton Pritchard"
+      ],
+      "espn_player_id": "4066354",
+      "nba_player_id": "1630202",
+      "player": "Payton Pritchard",
+      "player_id": "name:paytonpritchard"
+    },
+    {
+      "aliases": [
+        "Pelle Larsson"
+      ],
+      "espn_player_id": "4601025",
+      "nba_player_id": "1641796",
+      "player": "Pelle Larsson",
+      "player_id": "name:pellelarsson"
+    },
+    {
+      "aliases": [
+        "Peyton Watson"
+      ],
+      "espn_player_id": "4576087",
+      "nba_player_id": "1631212",
+      "player": "Peyton Watson",
+      "player_id": "name:peytonwatson"
+    },
+    {
+      "aliases": [
+        "PJ Hall"
+      ],
+      "espn_player_id": "4701225",
+      "player": "PJ Hall",
+      "player_id": "name:pjhall"
+    },
+    {
+      "aliases": [
+        "P.J. Washington"
+      ],
+      "espn_player_id": "4278078",
+      "nba_player_id": "1629023",
+      "player": "P.J. Washington",
+      "player_id": "name:pjwashington"
+    },
+    {
+      "aliases": [
+        "Precious Achiuwa"
+      ],
+      "espn_player_id": "4431679",
+      "player": "Precious Achiuwa",
+      "player_id": "name:preciousachiuwa"
+    },
+    {
+      "aliases": [
+        "Quentin Grimes"
+      ],
+      "espn_player_id": "4397014",
+      "nba_player_id": "1629656",
+      "player": "Quentin Grimes",
+      "player_id": "name:quentingrimes"
+    },
+    {
+      "aliases": [
+        "Quenton Jackson"
+      ],
+      "espn_player_id": "4592829",
+      "player": "Quenton Jackson",
+      "player_id": "name:quentonjackson"
+    },
+    {
+      "aliases": [
+        "Quinten Post"
+      ],
+      "espn_player_id": "4593016",
+      "nba_player_id": "1642366",
+      "player": "Quinten Post",
+      "player_id": "name:quintenpost"
+    },
+    {
+      "aliases": [
+        "Rasheer Fleming"
+      ],
+      "espn_player_id": "5105977",
+      "player": "Rasheer Fleming",
+      "player_id": "name:rasheerfleming"
+    },
+    {
+      "aliases": [
+        "Rayan Rupert"
+      ],
+      "espn_player_id": "5099752",
+      "player": "Rayan Rupert",
+      "player_id": "name:rayanrupert"
+    },
+    {
+      "aliases": [
+        "RayJ Dennis"
+      ],
+      "espn_player_id": "4431941",
+      "player": "RayJ Dennis",
+      "player_id": "name:rayjdennis"
+    },
+    {
+      "aliases": [
+        "Reece Beekman"
+      ],
+      "espn_player_id": "4432187",
+      "player": "Reece Beekman",
+      "player_id": "name:reecebeekman"
+    },
+    {
+      "aliases": [
+        "Reed Sheppard"
+      ],
+      "espn_player_id": "4711272",
+      "nba_player_id": "1642263",
+      "player": "Reed Sheppard",
+      "player_id": "name:reedsheppard"
+    },
+    {
+      "aliases": [
+        "Riley Minix"
+      ],
+      "espn_player_id": "5177362",
+      "player": "Riley Minix",
+      "player_id": "name:rileyminix"
+    },
+    {
+      "aliases": [
+        "RJ Barrett"
+      ],
+      "espn_player_id": "4395625",
+      "nba_player_id": "1629628",
+      "player": "RJ Barrett",
+      "player_id": "name:rjbarrett"
+    },
+    {
+      "aliases": [
+        "Robert Williams III"
+      ],
+      "espn_player_id": "4066211",
+      "nba_player_id": "1629057",
+      "player": "Robert Williams III",
+      "player_id": "name:robertwilliamsiii"
+    },
+    {
+      "aliases": [
+        "Rocco Zikarsky"
+      ],
+      "espn_player_id": "5157587",
+      "player": "Rocco Zikarsky",
+      "player_id": "name:roccozikarsky"
+    },
+    {
+      "aliases": [
+        "Ronald Holland II"
+      ],
+      "espn_player_id": "4683771",
+      "nba_player_id": "1641842",
+      "player": "Ronald Holland II",
+      "player_id": "name:ronaldhollandii"
+    },
+    {
+      "aliases": [
+        "Ron Harper Jr."
+      ],
+      "espn_player_id": "4397251",
+      "player": "Ron Harper Jr.",
+      "player_id": "name:ronharperjr"
+    },
+    {
+      "aliases": [
+        "Royce O'Neale"
+      ],
+      "espn_player_id": "2583632",
+      "nba_player_id": "1626220",
+      "player": "Royce O'Neale",
+      "player_id": "name:royceoneale"
+    },
+    {
+      "aliases": [
+        "Rudy Gobert"
+      ],
+      "espn_player_id": "3032976",
+      "nba_player_id": "203497",
+      "player": "Rudy Gobert",
+      "player_id": "name:rudygobert"
+    },
+    {
+      "aliases": [
+        "Rui Hachimura"
+      ],
+      "espn_player_id": "4066648",
+      "nba_player_id": "1629060",
+      "player": "Rui Hachimura",
+      "player_id": "name:ruihachimura"
+    },
+    {
+      "aliases": [
+        "Ryan Conwell"
+      ],
+      "espn_player_id": "5107157",
+      "player": "Ryan Conwell",
+      "player_id": "name:ryanconwell"
+    },
+    {
+      "aliases": [
+        "Ryan Dunn"
+      ],
+      "espn_player_id": "4888725",
+      "nba_player_id": "1642346",
+      "player": "Ryan Dunn",
+      "player_id": "name:ryandunn"
+    },
+    {
+      "aliases": [
+        "Ryan Kalkbrenner"
+      ],
+      "espn_player_id": "4576060",
+      "nba_player_id": "1641750",
+      "player": "Ryan Kalkbrenner",
+      "player_id": "name:ryankalkbrenner"
+    },
+    {
+      "aliases": [
+        "Ryan Nembhard"
+      ],
+      "espn_player_id": "4433629",
+      "player": "Ryan Nembhard",
+      "player_id": "name:ryannembhard"
+    },
+    {
+      "aliases": [
+        "Ryan Rollins"
+      ],
+      "espn_player_id": "4591725",
+      "nba_player_id": "1631157",
+      "player": "Ryan Rollins",
+      "player_id": "name:ryanrollins"
+    },
+    {
+      "aliases": [
+        "Saddiq Bey"
+      ],
+      "espn_player_id": "4397136",
+      "nba_player_id": "1630180",
+      "player": "Saddiq Bey",
+      "player_id": "name:saddiqbey"
+    },
+    {
+      "aliases": [
+        "Sam Hauser"
+      ],
+      "espn_player_id": "4065804",
+      "nba_player_id": "1630573",
+      "player": "Sam Hauser",
+      "player_id": "name:samhauser"
+    },
+    {
+      "aliases": [
+        "Sam Merrill"
+      ],
+      "espn_player_id": "4066757",
+      "nba_player_id": "1630241",
+      "player": "Sam Merrill",
+      "player_id": "name:sammerrill"
+    },
+    {
+      "aliases": [
+        "Sandro Mamukelashvili"
+      ],
+      "espn_player_id": "4278580",
+      "player": "Sandro Mamukelashvili",
+      "player_id": "name:sandromamukelashvili"
+    },
+    {
+      "aliases": [
+        "Scoot Henderson"
+      ],
+      "espn_player_id": "4683678",
+      "nba_player_id": "1630703",
+      "player": "Scoot Henderson",
+      "player_id": "name:scoothenderson"
+    },
+    {
+      "aliases": [
+        "Scottie Barnes"
+      ],
+      "espn_player_id": "4433134",
+      "nba_player_id": "1630567",
+      "player": "Scottie Barnes",
+      "player_id": "name:scottiebarnes"
+    },
+    {
+      "aliases": [
+        "Scotty Pippen Jr."
+      ],
+      "espn_player_id": "4431785",
+      "nba_player_id": "1630590",
+      "player": "Scotty Pippen Jr.",
+      "player_id": "name:scottypippenjr"
+    },
+    {
+      "aliases": [
+        "Sean Pedulla"
+      ],
+      "espn_player_id": "4709131",
+      "player": "Sean Pedulla",
+      "player_id": "name:seanpedulla"
+    },
+    {
+      "aliases": [
+        "Sergio de Larrea"
+      ],
+      "espn_player_id": "5279129",
+      "player": "Sergio de Larrea",
+      "player_id": "name:sergiodelarrea"
+    },
+    {
+      "aliases": [
+        "Shai Gilgeous-Alexander"
+      ],
+      "espn_player_id": "4278073",
+      "nba_player_id": "1628983",
+      "player": "Shai Gilgeous-Alexander",
+      "player_id": "name:shaigilgeousalexander"
+    },
+    {
+      "aliases": [
+        "Sidy Cissoko"
+      ],
+      "espn_player_id": "5081727",
+      "player": "Sidy Cissoko",
+      "player_id": "name:sidycissoko"
+    },
+    {
+      "aliases": [
+        "Simone Fontecchio"
+      ],
+      "espn_player_id": "3899664",
+      "player": "Simone Fontecchio",
+      "player_id": "name:simonefontecchio"
+    },
+    {
+      "aliases": [
+        "Sion James"
+      ],
+      "espn_player_id": "4602025",
+      "nba_player_id": "1642883",
+      "player": "Sion James",
+      "player_id": "name:sionjames"
+    },
+    {
+      "aliases": [
+        "Stephen Curry"
+      ],
+      "espn_player_id": "3975",
+      "nba_player_id": "201939",
+      "player": "Stephen Curry",
+      "player_id": "name:stephencurry"
+    },
+    {
+      "aliases": [
+        "Stephon Castle"
+      ],
+      "espn_player_id": "4845367",
+      "nba_player_id": "1642264",
+      "player": "Stephon Castle",
+      "player_id": "name:stephoncastle"
+    },
+    {
+      "aliases": [
+        "Steven Adams"
+      ],
+      "espn_player_id": "2991235",
+      "nba_player_id": "203500",
+      "player": "Steven Adams",
+      "player_id": "name:stevenadams"
+    },
+    {
+      "aliases": [
+        "Svi Mykhailiuk"
+      ],
+      "espn_player_id": "3133602",
+      "player": "Svi Mykhailiuk",
+      "player_id": "name:svimykhailiuk"
+    },
+    {
+      "aliases": [
+        "Tacko Fall"
+      ],
+      "espn_player_id": "3904625",
+      "player": "Tacko Fall",
+      "player_id": "name:tackofall"
+    },
+    {
+      "aliases": [
+        "Tari Eason"
+      ],
+      "espn_player_id": "4433192",
+      "nba_player_id": "1631106",
+      "player": "Tari Eason",
+      "player_id": "name:tarieason"
+    },
+    {
+      "aliases": [
+        "Tarris Reed Jr."
+      ],
+      "espn_player_id": "5105809",
+      "player": "Tarris Reed Jr.",
+      "player_id": "name:tarrisreedjr"
+    },
+    {
+      "aliases": [
+        "Taurean Prince"
+      ],
+      "espn_player_id": "2990962",
+      "nba_player_id": "1627752",
+      "player": "Taurean Prince",
+      "player_id": "name:taureanprince"
+    },
+    {
+      "aliases": [
+        "Taylor Hendricks"
+      ],
+      "espn_player_id": "4684806",
+      "player": "Taylor Hendricks",
+      "player_id": "name:taylorhendricks"
+    },
+    {
+      "aliases": [
+        "Terance Mann"
+      ],
+      "espn_player_id": "3907823",
+      "nba_player_id": "1629611",
+      "player": "Terance Mann",
+      "player_id": "name:terancemann"
+    },
+    {
+      "aliases": [
+        "Terrence Shannon Jr."
+      ],
+      "espn_player_id": "4432847",
+      "player": "Terrence Shannon Jr.",
+      "player_id": "name:terrenceshannonjr"
+    },
+    {
+      "aliases": [
+        "Thomas Bryant"
+      ],
+      "espn_player_id": "3934723",
+      "nba_player_id": "1628418",
+      "player": "Thomas Bryant",
+      "player_id": "name:thomasbryant"
+    },
+    {
+      "aliases": [
+        "Tidjane Salaun"
+      ],
+      "espn_player_id": "5211176",
+      "player": "Tidjane Salaun",
+      "player_id": "name:tidjanesalaun"
+    },
+    {
+      "aliases": [
+        "Tim Hardaway Jr."
+      ],
+      "espn_player_id": "2528210",
+      "nba_player_id": "203501",
+      "player": "Tim Hardaway Jr.",
+      "player_id": "name:timhardawayjr"
+    },
+    {
+      "aliases": [
+        "Tobe Awaka"
+      ],
+      "espn_player_id": "5105555",
+      "player": "Tobe Awaka",
+      "player_id": "name:tobeawaka"
+    },
+    {
+      "aliases": [
+        "Tobi Lawal"
+      ],
+      "espn_player_id": "5106040",
+      "player": "Tobi Lawal",
+      "player_id": "name:tobilawal"
+    },
+    {
+      "aliases": [
+        "Tolu Smith"
+      ],
+      "espn_player_id": "4397882",
+      "player": "Tolu Smith",
+      "player_id": "name:tolusmith"
+    },
+    {
+      "aliases": [
+        "Tony Bradley"
+      ],
+      "espn_player_id": "4065673",
+      "player": "Tony Bradley",
+      "player_id": "name:tonybradley"
+    },
+    {
+      "aliases": [
+        "Toumani Camara"
+      ],
+      "espn_player_id": "4431736",
+      "nba_player_id": "1641739",
+      "player": "Toumani Camara",
+      "player_id": "name:toumanicamara"
+    },
+    {
+      "aliases": [
+        "Trae Young"
+      ],
+      "espn_player_id": "4277905",
+      "nba_player_id": "1629027",
+      "player": "Trae Young",
+      "player_id": "name:traeyoung"
+    },
+    {
+      "aliases": [
+        "Trayce Jackson-Davis"
+      ],
+      "espn_player_id": "4431684",
+      "nba_player_id": "1631218",
+      "player": "Trayce Jackson-Davis",
+      "player_id": "name:traycejacksondavis"
+    },
+    {
+      "aliases": [
+        "Tre Johnson"
+      ],
+      "espn_player_id": "5238230",
+      "nba_player_id": "1642848",
+      "player": "Tre Johnson",
+      "player_id": "name:trejohnson"
+    },
+    {
+      "aliases": [
+        "Tre Jones"
+      ],
+      "espn_player_id": "4395626",
+      "nba_player_id": "1630200",
+      "player": "Tre Jones",
+      "player_id": "name:trejones"
+    },
+    {
+      "aliases": [
+        "Tre Mann"
+      ],
+      "espn_player_id": "4432819",
+      "player": "Tre Mann",
+      "player_id": "name:tremann"
+    },
+    {
+      "aliases": [
+        "Trendon Watford"
+      ],
+      "espn_player_id": "4431675",
+      "player": "Trendon Watford",
+      "player_id": "name:trendonwatford"
+    },
+    {
+      "aliases": [
+        "Trevon Brazile"
+      ],
+      "espn_player_id": "4698719",
+      "player": "Trevon Brazile",
+      "player_id": "name:trevonbrazile"
+    },
+    {
+      "aliases": [
+        "Trey Lyles"
+      ],
+      "espn_player_id": "3136196",
+      "player": "Trey Lyles",
+      "player_id": "name:treylyles"
+    },
+    {
+      "aliases": [
+        "Trey Murphy III"
+      ],
+      "espn_player_id": "4397688",
+      "nba_player_id": "1630530",
+      "player": "Trey Murphy III",
+      "player_id": "name:treymurphyiii"
+    },
+    {
+      "aliases": [
+        "Tristan da Silva"
+      ],
+      "espn_player_id": "4702382",
+      "player": "Tristan da Silva",
+      "player_id": "name:tristandasilva"
+    },
+    {
+      "aliases": [
+        "Tristan Enaruna"
+      ],
+      "espn_player_id": "4431734",
+      "player": "Tristan Enaruna",
+      "player_id": "name:tristanenaruna"
+    },
+    {
+      "aliases": [
+        "Ty Jerome"
+      ],
+      "espn_player_id": "4065733",
+      "nba_player_id": "1629660",
+      "player": "Ty Jerome",
+      "player_id": "name:tyjerome"
+    },
+    {
+      "aliases": [
+        "Tyler Herro"
+      ],
+      "espn_player_id": "4395725",
+      "nba_player_id": "1629639",
+      "player": "Tyler Herro",
+      "player_id": "name:tylerherro"
+    },
+    {
+      "aliases": [
+        "Tyler Kolek"
+      ],
+      "espn_player_id": "4433225",
+      "player": "Tyler Kolek",
+      "player_id": "name:tylerkolek"
+    },
+    {
+      "aliases": [
+        "Tyrese Haliburton"
+      ],
+      "espn_player_id": "4396993",
+      "nba_player_id": "1630169",
+      "player": "Tyrese Haliburton",
+      "player_id": "name:tyresehaliburton"
+    },
+    {
+      "aliases": [
+        "Tyrese Maxey"
+      ],
+      "espn_player_id": "4431678",
+      "nba_player_id": "1630178",
+      "player": "Tyrese Maxey",
+      "player_id": "name:tyresemaxey"
+    },
+    {
+      "aliases": [
+        "Tyrese Proctor"
+      ],
+      "espn_player_id": "5023693",
+      "nba_player_id": "1642878",
+      "player": "Tyrese Proctor",
+      "player_id": "name:tyreseproctor"
+    },
+    {
+      "aliases": [
+        "Tyus Jones"
+      ],
+      "espn_player_id": "3135046",
+      "nba_player_id": "1626145",
+      "player": "Tyus Jones",
+      "player_id": "name:tyusjones"
+    },
+    {
+      "aliases": [
+        "Victor Wembanyama"
+      ],
+      "espn_player_id": "5104157",
+      "nba_player_id": "1641705",
+      "player": "Victor Wembanyama",
+      "player_id": "name:victorwembanyama"
+    },
+    {
+      "aliases": [
+        "Vit Krejci"
+      ],
+      "espn_player_id": "4578893",
+      "player": "Vit Krejci",
+      "player_id": "name:vitkrejci"
+    },
+    {
+      "aliases": [
+        "VJ Edgecombe"
+      ],
+      "espn_player_id": "5124612",
+      "nba_player_id": "1642845",
+      "player": "VJ Edgecombe",
+      "player_id": "name:vjedgecombe"
+    },
+    {
+      "aliases": [
+        "Walker Kessler"
+      ],
+      "espn_player_id": "4433136",
+      "nba_player_id": "1631117",
+      "player": "Walker Kessler",
+      "player_id": "name:walkerkessler"
+    },
+    {
+      "aliases": [
+        "Walter Clayton Jr."
+      ],
+      "espn_player_id": "4896372",
+      "player": "Walter Clayton Jr.",
+      "player_id": "name:walterclaytonjr"
+    },
+    {
+      "aliases": [
+        "Wendell Carter Jr."
+      ],
+      "espn_player_id": "4277847",
+      "nba_player_id": "1628976",
+      "player": "Wendell Carter Jr.",
+      "player_id": "name:wendellcarterjr"
+    },
+    {
+      "aliases": [
+        "Will Richard"
+      ],
+      "espn_player_id": "4897262",
+      "player": "Will Richard",
+      "player_id": "name:willrichard"
+    },
+    {
+      "aliases": [
+        "Will Riley"
+      ],
+      "espn_player_id": "5144126",
+      "player": "Will Riley",
+      "player_id": "name:willriley"
+    },
+    {
+      "aliases": [
+        "Yang Hansen"
+      ],
+      "espn_player_id": "5217746",
+      "player": "Yang Hansen",
+      "player_id": "name:yanghansen"
+    },
+    {
+      "aliases": [
+        "Yaxel Lendeborg"
+      ],
+      "espn_player_id": "5175737",
+      "player": "Yaxel Lendeborg",
+      "player_id": "name:yaxellendeborg"
+    },
+    {
+      "aliases": [
+        "Yves Missi"
+      ],
+      "espn_player_id": "5061589",
+      "nba_player_id": "1642274",
+      "player": "Yves Missi",
+      "player_id": "name:yvesmissi"
+    },
+    {
+      "aliases": [
+        "Zaccharie Risacher"
+      ],
+      "espn_player_id": "5211175",
+      "player": "Zaccharie Risacher",
+      "player_id": "name:zaccharierisacher"
+    },
+    {
+      "aliases": [
+        "Zach Collins"
+      ],
+      "espn_player_id": "4066650",
+      "nba_player_id": "1628380",
+      "player": "Zach Collins",
+      "player_id": "name:zachcollins"
+    },
+    {
+      "aliases": [
+        "Zach Edey"
+      ],
+      "espn_player_id": "4600663",
+      "nba_player_id": "1641744",
+      "player": "Zach Edey",
+      "player_id": "name:zachedey"
+    },
+    {
+      "aliases": [
+        "Zach LaVine"
+      ],
+      "espn_player_id": "3064440",
+      "nba_player_id": "203897",
+      "player": "Zach LaVine",
+      "player_id": "name:zachlavine"
+    },
+    {
+      "aliases": [
+        "Zeke Nnaji"
+      ],
+      "espn_player_id": "4431690",
+      "nba_player_id": "1630192",
+      "player": "Zeke Nnaji",
+      "player_id": "name:zekennaji"
+    },
+    {
+      "aliases": [
+        "Ziaire Williams"
+      ],
+      "espn_player_id": "4433137",
+      "player": "Ziaire Williams",
+      "player_id": "name:ziairewilliams"
+    },
+    {
+      "aliases": [
+        "Zion Williamson"
+      ],
+      "espn_player_id": "4395628",
+      "nba_player_id": "1629627",
+      "player": "Zion Williamson",
+      "player_id": "name:zionwilliamson"
+    },
+    {
+      "aliases": [
+        "Zuby Ejiofor"
+      ],
+      "espn_player_id": "5106262",
+      "player": "Zuby Ejiofor",
+      "player_id": "name:zubyejiofor"
+    },
+    {
+      "aliases": [
+        "Zyon Pullin"
+      ],
+      "espn_player_id": "4592979",
+      "player": "Zyon Pullin",
+      "player_id": "name:zyonpullin"
+    }
+  ],
+  "parts": [
+    {
+      "file": "history-001.jsonl.gz",
+      "sha256": "3442194f9792f4caed856f9b42174f91f97a3ed2c70ea40357ea88722388c8b8",
+      "bytes": 377932,
+      "records": 11189
+    },
+    {
+      "file": "history-002.jsonl.gz",
+      "sha256": "71e3bfc05601354bcf054b9de6e202a13802fc755b8822e037c2cb7d8cf7a49c",
+      "bytes": 438038,
+      "records": 10168
+    },
+    {
+      "file": "history-003.jsonl.gz",
+      "sha256": "783e0d03cf25965afd0c2ce51a076ffb666cdd88165a2797d8595422ae5e077d",
+      "bytes": 497873,
+      "records": 10122
+    },
+    {
+      "file": "history-004.jsonl.gz",
+      "sha256": "5ed946180488459c15119b83c75e66fa8174ac986bf5e2699a83c3805f861a74",
+      "bytes": 528479,
+      "records": 9609
+    },
+    {
+      "file": "history-005.jsonl.gz",
+      "sha256": "9c9474924d6dbb5993f084f554004ab8c2b9ba7379a262e95e52296c4ec59f7a",
+      "bytes": 531304,
+      "records": 9539
+    },
+    {
+      "file": "history-006.jsonl.gz",
+      "sha256": "8f342bbdc69d3d80f4b50282cf965dc5d4e0e683b2243a179b41c1c9c7d83cf7",
+      "bytes": 526116,
+      "records": 9547
+    },
+    {
+      "file": "history-007.jsonl.gz",
+      "sha256": "50842d7e45b939b74e8b211477b248cefac6af625897b0f785c6ebaba69c1897",
+      "bytes": 528854,
+      "records": 9078
+    },
+    {
+      "file": "history-008.jsonl.gz",
+      "sha256": "14b872e211c8feabe16b0e66498ab9bb44cb32f49970abe7c4047f228b0e2981",
+      "bytes": 519518,
+      "records": 9601
+    },
+    {
+      "file": "history-009.jsonl.gz",
+      "sha256": "f0f5f744fad2b19916cfa60fee2ff5a235948783aef0573d870c92dab37e8f67",
+      "bytes": 514642,
+      "records": 9608
+    },
+    {
+      "file": "history-010.jsonl.gz",
+      "sha256": "08a5618483121d4214375a0c2c9ab44beaed7c4e945390a91a8e0c85b27e0112",
+      "bytes": 530134,
+      "records": 9081
+    },
+    {
+      "file": "history-011.jsonl.gz",
+      "sha256": "5f6951eb3ce7faa419bd02cceb5e3c4b88c8941533ec58789f622a6f227588cc",
+      "bytes": 508174,
+      "records": 9602
+    },
+    {
+      "file": "history-012.jsonl.gz",
+      "sha256": "fa29685207cac8381e2e35b3b8ad8cfa81294512331e11fe8b1c016a14e82f81",
+      "bytes": 524226,
+      "records": 9075
+    },
+    {
+      "file": "history-013.jsonl.gz",
+      "sha256": "1d3ec02935506a0683a273f054372f4b24b14e7b99e33c48ee31d04350f505db",
+      "bytes": 512150,
+      "records": 9240
+    },
+    {
+      "file": "history-014.jsonl.gz",
+      "sha256": "c041239bb55731c959a37b20071606d4dad10e61549b49d6abe979921d6e107b",
+      "bytes": 508337,
+      "records": 9428
+    },
+    {
+      "file": "history-015.jsonl.gz",
+      "sha256": "1991871acddb9657d510e29d25c2d0664c7e97a4f5d44807ede5fce6997f7514",
+      "bytes": 513187,
+      "records": 9062
+    },
+    {
+      "file": "history-016.jsonl.gz",
+      "sha256": "185adfe85313a576fb2a4bfa0c9c5ede81d642fc709f1ba32281152abf48bb62",
+      "bytes": 492382,
+      "records": 9579
+    },
+    {
+      "file": "history-017.jsonl.gz",
+      "sha256": "9f214b1b521fbd2d0537d7ebda0a34dd135be506d6318abfbc549e83f5d84830",
+      "bytes": 512685,
+      "records": 9069
+    },
+    {
+      "file": "history-018.jsonl.gz",
+      "sha256": "2a50beddd8b73ced5ede2257456a7952a76a029d02b3215377d2cce7aa68ae5f",
+      "bytes": 507812,
+      "records": 9059
+    },
+    {
+      "file": "history-019.jsonl.gz",
+      "sha256": "172110a83380a7d65d4cd01a8e56e12835ae2026c4c31d3533fa3f4017d12637",
+      "bytes": 494697,
+      "records": 9107
+    },
+    {
+      "file": "history-020.jsonl.gz",
+      "sha256": "004b7bc469ecce9e1661814022b2ced37290df149f91f58deb513637c0dabbf1",
+      "bytes": 25779,
+      "records": 457
+    },
+    {
+      "file": "history-021.jsonl.gz",
+      "sha256": "6614fabe33d09a1b8ff328bf6df77430ad918d0d4e1c52ce6066ee855251e6a4",
+      "bytes": 15071,
+      "records": 274
+    }
+  ],
+  "sources": [
+    {
+      "name": "player_box_2004.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2004.parquet",
+      "source_published_at": "2026-05-30T11:00:13Z",
+      "sha256": "dd37c4d0fa22e3057e296cb0059bc9edbdea558ab1c7f400249d0de86fc42537",
+      "bytes": 600396
+    },
+    {
+      "name": "player_box_2005.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2005.parquet",
+      "source_published_at": "2026-05-30T11:08:49Z",
+      "sha256": "f75cf1e55ca5aa64a3fc626e6dd8560cdd5b30c59ddc449d04a47ec71e753546",
+      "bytes": 626542
+    },
+    {
+      "name": "player_box_2006.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2006.parquet",
+      "source_published_at": "2026-05-30T11:18:44Z",
+      "sha256": "d48fa4d1d321ac144ec32f2ff83bcf2b65055ae3bbcaa0b1d7c4864e0d37a2ae",
+      "bytes": 704999
+    },
+    {
+      "name": "player_box_2007.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2007.parquet",
+      "source_published_at": "2026-05-30T11:28:35Z",
+      "sha256": "eb039d22d2f5d8fdaab86079e5793a01f5837886dba764b7b71562eb0c8b4526",
+      "bytes": 705886
+    },
+    {
+      "name": "player_box_2008.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2008.parquet",
+      "source_published_at": "2026-05-30T11:38:41Z",
+      "sha256": "e6bb0c1b3c86cc4a5d06187c7a680db98c281587c9171bad9e0768ea33cbadfc",
+      "bytes": 723087
+    },
+    {
+      "name": "player_box_2009.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2009.parquet",
+      "source_published_at": "2026-05-30T11:48:54Z",
+      "sha256": "c5b5ba836c1dad922df4a8a69ad147c32a4966dfe8a5f2ef36900f84eb422d74",
+      "bytes": 727965
+    },
+    {
+      "name": "player_box_2010.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2010.parquet",
+      "source_published_at": "2026-05-30T11:58:52Z",
+      "sha256": "7348037e2eecf56e404a9e9cab1e57ff7e323f0f880012efde08f032fa089b28",
+      "bytes": 724995
+    },
+    {
+      "name": "player_box_2011.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2011.parquet",
+      "source_published_at": "2026-05-30T12:08:50Z",
+      "sha256": "e39dbca5de9de0147b72fdf46e11d2df4f54c834a1da05334d268825a5750214",
+      "bytes": 713756
+    },
+    {
+      "name": "player_box_2012.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2012.parquet",
+      "source_published_at": "2026-05-30T12:17:12Z",
+      "sha256": "bd1409a0379717c88580e262ea89be4ddda3fcf985de6366f6eae1daff1bd1f5",
+      "bytes": 608340
+    },
+    {
+      "name": "player_box_2013.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2013.parquet",
+      "source_published_at": "2026-05-30T12:27:08Z",
+      "sha256": "411477c53159f1234e7655ae1f6e40c4f3a8c39077443095f1f423630e84bd80",
+      "bytes": 711104
+    },
+    {
+      "name": "player_box_2014.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2014.parquet",
+      "source_published_at": "2026-05-30T12:36:14Z",
+      "sha256": "7c91f80eb2ecc67a5ac2ea55aa3b65bf0d1509c6d9420b5929c9f63fdfffb559",
+      "bytes": 712064
+    },
+    {
+      "name": "player_box_2015.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2015.parquet",
+      "source_published_at": "2026-05-30T12:45:10Z",
+      "sha256": "1138c91bf6c1a47065add90725337b23a30aafdfff9c3d8f898d8e73d8b88238",
+      "bytes": 711239
+    },
+    {
+      "name": "player_box_2016.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2016.parquet",
+      "source_published_at": "2026-05-30T12:54:14Z",
+      "sha256": "89dcf2e4a86fd71b11e2b60b1a6cef91ea6c3080c500d571b4295cf396b37336",
+      "bytes": 717997
+    },
+    {
+      "name": "player_box_2017.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2017.parquet",
+      "source_published_at": "2026-05-30T13:03:11Z",
+      "sha256": "c11d6a2d8dc9946ed4f0f2f9584c5e8e20b4fd4cc8c2ebcc3809a163b6605388",
+      "bytes": 721623
+    },
+    {
+      "name": "player_box_2018.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2018.parquet",
+      "source_published_at": "2026-05-30T13:12:22Z",
+      "sha256": "0345e02855da65ed7fa9536fe195ef592356c5d74e8c2745721b79fd9dc261e4",
+      "bytes": 724896
+    },
+    {
+      "name": "player_box_2019.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2019.parquet",
+      "source_published_at": "2026-05-30T13:21:35Z",
+      "sha256": "dbdf7f55fc5b3929c48f56ee2e962c0e3b7b503a7cf1be916e8efbf444dd4dbe",
+      "bytes": 721558
+    },
+    {
+      "name": "player_box_2020.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2020.parquet",
+      "source_published_at": "2026-05-30T13:29:40Z",
+      "sha256": "9d9cb6be4517107d48745270102557b719f052b1dcc3cc90e3b8a3594e6b1eaa",
+      "bytes": 635116
+    },
+    {
+      "name": "player_box_2021.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2021.parquet",
+      "source_published_at": "2026-08-26T06:14:40Z",
+      "sha256": "50133d2a044dd9736e05b2c779e3faa3f0a03ed5f18219cf9f44962427c421c8",
+      "bytes": 546479
+    },
+    {
+      "name": "player_box_2022.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2022.parquet",
+      "source_published_at": "2026-08-26T06:15:12Z",
+      "sha256": "474d15255f2a908f2c0ac0f7104b504c3cf2815b02dd0b0097c69cb634fe4395",
+      "bytes": 605985
+    },
+    {
+      "name": "player_box_2023.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2023.parquet",
+      "source_published_at": "2026-08-26T06:15:44Z",
+      "sha256": "968d835cd04b10533c5b5af8c0e41bf0154a73782e9446c76f765109223e8679",
+      "bytes": 595949
+    },
+    {
+      "name": "player_box_2024.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2024.parquet",
+      "source_published_at": "2026-08-26T06:16:16Z",
+      "sha256": "1e500a538ec45ddbcb58d9789b5494f8db4f25658eafd01d90f2d09600921665",
+      "bytes": 610610
+    },
+    {
+      "name": "player_box_2025.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2025.parquet",
+      "source_published_at": "2026-08-26T06:16:57Z",
+      "sha256": "e89f7fbc1124092c715b722e6d72d9dd1b9d28776ca6888b508fd2831cd705e2",
+      "bytes": 610289
+    },
+    {
+      "name": "player_box_2026.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2026.parquet",
+      "source_published_at": "2026-09-09T05:17:36Z",
+      "sha256": "29a29dc9efd055a93e069a0382ac830d98a13274bee655beba69d95cff099713",
+      "bytes": 606444
+    },
+    {
+      "name": "player_box_2027.parquet",
+      "url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
+      "source_published_at": "2026-11-03T13:28:31Z",
+      "sha256": "60bb94003b9a6e218160b4fdbdc4d72d73150bcca49391e8fc6a72f10613d09b",
+      "bytes": 88543
+    },
+    {
+      "name": "espn_summary_401810169.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810169",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:03.037003+00:00",
+      "sha256": "8f35b4745627b574d9ec544ef298d76af4cbe2772181cf356bf1866084421f0e",
+      "bytes": 414452
+    },
+    {
+      "name": "espn_summary_401810184.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810184",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:03.264810+00:00",
+      "sha256": "975f10aeba547bfdc08ccdca65233d4b51a36c2bb96e684d5a8d32386d5b1a96",
+      "bytes": 401455
+    },
+    {
+      "name": "espn_summary_401810200.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810200",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:03.640890+00:00",
+      "sha256": "48f056ac0e0c990ff260a5604e09d11d4466c86c9d66865b3bf58517a0edae2f",
+      "bytes": 383635
+    },
+    {
+      "name": "espn_summary_401810216.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810216",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:04.329699+00:00",
+      "sha256": "d4299f8fa95a6e1a0b4e0ec247d88a91e77023622c8cf1544c1fa0c448fb267c",
+      "bytes": 398139
+    },
+    {
+      "name": "espn_summary_401810358.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810358",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:04.470361+00:00",
+      "sha256": "8a67f78c409b8044eda5bda5a2041c0707bb144b55fbbebd37c3e14cb8e07231",
+      "bytes": 388198
+    },
+    {
+      "name": "espn_summary_401810401.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810401",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:05.326690+00:00",
+      "sha256": "a2789d8f96c1019693ce1430e19223ae6230aac07017f0ada5998f077d2fe14b",
+      "bytes": 409802
+    },
+    {
+      "name": "espn_summary_401810458.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810458",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:05.792516+00:00",
+      "sha256": "a40b3c0f768bee552ed7beafa8fb588d7218820def99d67db889cc3f0adec7ec",
+      "bytes": 378322
+    },
+    {
+      "name": "espn_summary_401810469.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810469",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:06.124102+00:00",
+      "sha256": "e31eadd01bdc45a61b9b971dea81da49e08afba017ff046463bc4031cd717ade",
+      "bytes": 336541
+    },
+    {
+      "name": "espn_summary_401810516.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810516",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:06.445319+00:00",
+      "sha256": "230e69476bb6a1893c9e82c49d354d048e666fd901183554887f03c28a1f25d3",
+      "bytes": 377210
+    },
+    {
+      "name": "espn_summary_401810591.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810591",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:08.065859+00:00",
+      "sha256": "d5d106eaec88523fbd5a33822f44e32632bcde769e84e84effc9e3bd366fce7e",
+      "bytes": 376210
+    },
+    {
+      "name": "espn_summary_401810607.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810607",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:08.530817+00:00",
+      "sha256": "64c13b84827e71f0b5f5e6827e632fe779515b73e3e6f7924263fa9e45f26e58",
+      "bytes": 401971
+    },
+    {
+      "name": "espn_summary_401810691.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810691",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:09.309194+00:00",
+      "sha256": "653f688c026a58db4b07449f4e0aa04946ea50f78b573885255eb0bfbb301ebd",
+      "bytes": 383792
+    },
+    {
+      "name": "espn_summary_401810725.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810725",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:53:09.646793+00:00",
+      "sha256": "ad74f46a72f270bc2ac45d40af2217b9b26095ecf74eda0cb41950b817523c0d",
+      "bytes": 393096
+    },
+    {
+      "name": "espn_summary_401810744.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810744",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:50:42.478313+00:00",
+      "sha256": "fa299946d5202cd388edfb2d238524810aa3c0fdef4b1f7f3c39efc050d5b497",
+      "bytes": 414815
+    },
+    {
+      "name": "espn_summary_401810785.json",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401810785",
+      "source_published_at": null,
+      "retrieved_at": "2026-11-05T03:50:42.781884+00:00",
+      "sha256": "a3b5466a315bbddf5f97180a67bcffc33ec6577c4c75f5d9de66595a8316ea27",
+      "bytes": 416164
+    }
+  ],
+  "history_scope": "Available careers of current published NBA roster identities, 2003-04 onward; original master retained.",
+  "phase_policy": "Regular Season, Playoffs, Play-In separately labeled; exhibitions and Cup finals excluded.",
+  "limits": [
+    "Coverage is the published source inventory, not an independently reconciled all-NBA game inventory.",
+    "Only current 2026-27 roster identities in the published asset are backfilled; a never-listed/injured/unsigned player can be absent.",
+    "No claim of complete careers: source omissions and failed full-game validations are explicitly recorded.",
+    "Regular season, playoffs and play-in remain separate; Cup championships and All-Star/exhibitions excluded.",
+    "Original master rows always win conflicts; this includes unknown game status and differing statistics until reviewed.",
+    "Historical pregame injuries, expected starters, tentative defenders, prop offers and payouts cannot be recovered from box scores.",
+    "Source publication dates and covered game dates are distinct. Current source ends 2026-11-02.",
+    "Historical final values include later scorer corrections; original point-in-time source versions are not reconstructed."
+  ],
+  "repair_updated_at": "2026-11-05T03:55:13.626386+00:00",
+  "repair_summary": {
+    "original_rejected_games": 105,
+    "independently_validated_games": 15,
+    "remaining_unrepaired_games": 90,
+    "selected_player_observations": 259,
+    "source": "Independent ESPN event summaries; identity, season, phase and full team score reconciliation checked.",
+    "source_publication_date": "Not reported; actual retrieval times retained separately.",
+    "original_parts_unchanged": true,
+    "provenance_sha256": "1364302447043c42e0ca7c56194c48258076697a16bf33319a28e680558c4c7a"
+  }
+}

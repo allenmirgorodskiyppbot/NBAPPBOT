@@ -241,7 +241,7 @@ class MirrorScopeBoundaryTests(BoundaryFixtures):
                     'team_abbreviation':team,'opponent_team_abbreviation':'CLE' if team=='PHI' else 'PHI',
                     'team_score':60,'opponent_team_score':60,'game_id':'fixture-game',
                     'game_date_time':'2026-10-29T23:00:00Z','athlete_display_name':name,
-                    'athlete_id':str(index),'did_not_play':'false','minutes':30,'points':10,
+                    'athlete_id':next((str(p['espn_player_id']) for p in self.scope['players'] if p['player']==name and p.get('espn_player_id')),str(9000000+index)),'did_not_play':'false','minutes':30,'points':10,
                     'season':'2027','rebounds':3,'assists':2})
         return buffer.getvalue().encode()
 

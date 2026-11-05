@@ -32,10 +32,11 @@ logging.getLogger('httpcore').setLevel(logging.WARNING)
 log = logging.getLogger('knicks.telegram')
 
 MAX_UPLOAD = 8 * 1024 * 1024
+MAX_MASTER_UPLOAD = 20 * 1024 * 1024
 TYPING_INTERVAL_SECONDS = 4
 MAX_ACTIVE_COMMANDS = 10
 RESPONSIVE_COMMANDS = {'/start', '/help', '/status', '/ai_status', '/clear', '/newboard',
-                       '/reminder', '/usage', '/freshness'}
+                       '/reminder', '/usage', '/freshness', '/strategy'}
 
 
 class TelegramAPIError(RuntimeError):
@@ -97,6 +98,8 @@ HELP = '''Knicks Research bot
 /clear — clear this chat's recent conversation context
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
+/importmaster — attach an updated master Excel with this caption to merge missing data
+/strategy — explain the current selection strategy
 /stats <JSON list> — import manually supplied box-score rows
 /newsnote HEADLINE then optional details — save an unverified personal news note
 /boards — uploaded PrizePicks boards
@@ -673,16 +676,18 @@ class TelegramBot:
             self._set_state('last_delivery_error', '')
             self._set_state('delivery_retry_at', '0')
 
-    async def _download(self, file_id, declared_size=0):
-        if declared_size and int(declared_size) > MAX_UPLOAD:
-            raise ValueError('Upload is too large. Please send an image or board file under 8 MB.')
+    async def _download(self, file_id, declared_size=0, *, max_bytes=MAX_UPLOAD):
+        limit_message = (f'Upload is too large. The limit is {max_bytes // (1024 * 1024)} MB. '
+                         'Larger master workbooks can be imported from the bot website.')
+        if declared_size and int(declared_size) > max_bytes:
+            raise ValueError(limit_message)
         metadata = await self._api('getFile', {'file_id': file_id})
         file_path = str(metadata.get('file_path', ''))
         if (not re.fullmatch(r'[A-Za-z0-9_./-]+', file_path)
                 or '..' in file_path.split('/') or not file_path):
             raise RuntimeError('Telegram returned an invalid file path.')
-        if metadata.get('file_size', 0) > MAX_UPLOAD:
-            raise ValueError('Upload is too large. Please send an image or board file under 8 MB.')
+        if metadata.get('file_size', 0) > max_bytes:
+            raise ValueError(limit_message)
         payload = bytearray()
         try:
             async with self.client.stream('GET', f'https://api.telegram.org/file/bot{self.token}/{file_path}') as response:
@@ -690,8 +695,8 @@ class TelegramBot:
                     raise RuntimeError('Could not download the Telegram upload.')
                 async for part in response.aiter_bytes():
                     payload.extend(part)
-                    if len(payload) > MAX_UPLOAD:
-                        raise ValueError('Upload exceeds 8 MB. Send a smaller file.')
+                    if len(payload) > max_bytes:
+                        raise ValueError(limit_message)
         except httpx.HTTPError:
             raise RuntimeError('Telegram file download failed; please try the upload again.') from None
         return bytes(payload)
@@ -741,6 +746,9 @@ class TelegramBot:
             constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
             shortlist = await asyncio.to_thread(enrich_shortlist, self.store, report,
                 count=constraints.get('pick_count', 3), constraints=constraints)
+            from pregame_archive import record_research
+            await asyncio.to_thread(record_research, self.store, shortlist,
+                                    owner_key=f'telegram:{chat_id}', kind='board_shortlist', source_report=report)
             return format_shortlist(shortlist)
         import analysis_engine
         formatter = getattr(analysis_engine, 'format_analysis', None)
@@ -755,6 +763,9 @@ class TelegramBot:
             if original_text is not None:
                 request = parse_picks_request(original_text, default_count=constraints.get('pick_count', 4)) or request
             report = await asyncio.to_thread(build_independent_picks, self.store, **request, constraints=constraints)
+            from pregame_archive import record_research
+            await asyncio.to_thread(record_research, self.store, report,
+                                    owner_key=f'telegram:{chat_id}', kind='independent')
             return format_independent_picks(report)
         finally:
             typing.cancel()
@@ -892,6 +903,22 @@ class TelegramBot:
             caption = str(message.get('caption', '')).strip()
             caption_parts = caption.split(maxsplit=1)
             caption_command = caption_parts[0].split('@', 1)[0].lower() if caption_parts else ''
+            if caption_command == '/importmaster':
+                if len(caption_parts) > 1 or not filename.lower().endswith('.xlsx'):
+                    raise ValueError('Attach the updated .xlsx master file with only /importmaster as its caption.')
+                from master_upgrade import merge_enriched_workbook
+                payload = await self._download(document['file_id'], document.get('file_size', 0),
+                                               max_bytes=MAX_MASTER_UPLOAD)
+                self._queue(message['chat']['id'],
+                    'File received. Validating and merging the master dataset. A large file can take several minutes. '
+                    'Keep your original file until the completion reply arrives.',
+                    event_key=f'master-import-start:{update_id}')
+                report = await asyncio.to_thread(merge_enriched_workbook, self.store, payload,
+                                                 filename=filename)
+                if report.get('skipped'):
+                    return 'This master file was already imported. No changes were made.'
+                return ('Master merge complete. Existing entries, conversations and observations were retained. '
+                        'A database backup was saved before the merge.\n' + self._compact(report, 3000))
             import_stats_file = caption_command == '/importstats'
             if import_stats_file and len(caption_parts) > 1:
                 raise ValueError('Use only /importstats as the file caption; box scores must be in the attached CSV/JSON file.')
@@ -917,6 +944,14 @@ class TelegramBot:
         argument = argument.strip()
         if command in {'/start', '/help'}:
             return HELP
+        if command == '/strategy':
+            from strategy_info import strategy_summary
+            return strategy_summary()
+        if command == '/importmaster':
+            return ('Attach the updated NBA master .xlsx file with /importmaster as its caption. '
+                    'The bot backs up its database and merges missing observations while retaining existing records. '
+                    'For files over 20 MB, use Import master Excel on the bot website. '
+                    'Importing history does not verify today’s schedule or injuries.')
         if command == '/picks':
             return await self._independent_picks_reply(parse_picks_request(text), message['chat']['id'], text)
         if command == '/clear':

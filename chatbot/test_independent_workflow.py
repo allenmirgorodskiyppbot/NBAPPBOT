@@ -119,7 +119,7 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         seed_calendar(self.store)
         for player, team in [('Jalen Brunson', 'NYK'), ('Karl-Anthony Towns', 'NYK'),
                              ('Tyrese Maxey', 'PHI'), ('Joel Embiid', 'PHI')]:
-            for number in range(12):
+            for number in range(20):
                 date = (dt.date(2026, 10, 29)-dt.timedelta(days=number)).isoformat()
                 game = canonical_game(date, team, 'BOS')
                 self.store.upsert_game({'id': game, 'date': date, 'home_team': team, 'away_team': 'BOS',

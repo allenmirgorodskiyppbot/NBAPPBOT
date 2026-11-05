@@ -547,7 +547,8 @@ def build_export_tables(master, now=None):
         {'topic':'Missing values','value':'Missing or DNP observations are never substituted with zeros. Empty samples/rate denominators remain blank.'},
         {'topic':'Populations','value':'Historical seasons and phases stay separate except explicitly named Available career/Recent windows. Coappearance does not establish guarding.'},
         {'topic':'Freshness','value':'Export generation time is not data coverage. Read each source/last-game date and Refresh_Coverage.'}]
-    return tables
+    from master_upgrade import augment_export_tables
+    return augment_export_tables(master, tables, now=now)
 
 
 def _cell(value):
@@ -581,10 +582,32 @@ def export_master(master, directory, now=None):
                     with master.connect() as db:
                         columns=[r[0] for r in db.execute('SELECT * FROM '+name+' LIMIT 0').description]
                 else:
-                    columns=['status']
+                    from master_upgrade import STRUCTURED_EXPORTS
+                    table=next((table for table,sheet_name in STRUCTURED_EXPORTS.items() if sheet_name==name),None)
+                    if table:
+                        with master.connect() as db:
+                            columns=[r[0] for r in db.execute('SELECT * FROM '+table+' LIMIT 0').description]
+                    else:
+                        columns=['status']
             sheet.append([_cell(column) for column in columns])
+            sheet_rows=1
+            part=1
             for row in rows:
+                if sheet_rows >= 1048576:
+                    sheet.close()
+                    part += 1
+                    suffix='_'+str(part)
+                    sheet=workbook.create_sheet(name[:31-len(suffix)]+suffix)
+                    sheet.append([_cell(column) for column in columns])
+                    sheet_rows=1
                 sheet.append([_cell(row.get(key)) for key in columns])
+                sheet_rows+=1
+            sheet.close()
+        from master_upgrade import archived_export_sheets
+        for name, rows in archived_export_sheets(master, set(workbook.sheetnames)).items():
+            sheet=workbook.create_sheet(name)
+            for row in rows:
+                sheet.append([_cell(value) for value in row])
             sheet.close()
         workbook.save(temporary)
         temporary.replace(target)

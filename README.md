@@ -6,11 +6,62 @@ and can compare those with user-supplied PrizePicks lines. The chat model
 runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
+## November 5 history and strategy upgrade
+
+The current research benchmark is the **arithmetic mean of the latest 20 usable,
+completed regular-season games for the player's current team**, strictly before
+the game being assessed. Earlier seasons on that team can contribute; their dates
+and seasons remain visible. A ranked pick requires all 20 observations, positive
+played minutes and the requested statistic. DNPs, incomplete records, conflicting
+duplicates, other teams and other statistical phases are excluded. Shorter samples
+remain available for discussion without becoming ranked picks.
+
+The mean and median must support the same side of an exact offered line, with the
+disclosed research buffer. Small differences, opposing evidence, unavailable
+current data or inadequate samples produce **Pass**. Recent playing time,
+opponent history, rest and tentative defenders provide context; they do not add
+unsupported numerical bonuses to the mean. `/strategy` explains this policy in
+the bot. The bot can return fewer than four picks and still enforces the required
+team/player constraints for a complete lineup.
+
+The earlier simulated 20-game rule scored **53.6%**, compared with **53.7% for
+Always Less**. Those tests used invented reference lines and allowed shorter
+samples. They did not establish a profitable betting edge. The deployed variant
+requires 20 comparable games and additional current-data checks; those stricter
+filters have not established an edge either. Actual historical PrizePicks offers,
+available sides and payouts were absent, so the simulation is not a sportsbook
+ROI backtest. New pregame archives retain forecasts, supplied offers and passes
+for later evaluation; unavailable payouts remain unknown.
+
+The release also supplies the available careers of **468 current published roster
+identities**, while retaining 20 additional existing scope members. The earliest
+included career begins with LeBron James in **2003–04**. Historical teams,
+regular seasons, playoffs and play-in games stay separately labeled. ESPN player
+IDs prevent a current player from inheriting a retired namesake's records.
+The initial history extract rejected **105 source games** that failed identity or
+complete box-score validation. Separate ESPN event checks recovered **15 games**
+and 259 player observations; **90 games remain excluded**. Both source versions,
+validation failures and repair provenance are recorded. Published inventory has
+not been independently reconciled against every career game, so this is expanded
+history with documented gaps.
+
+After the deployment loads this release's `SOURCE_REF`, a background worker
+downloads its pinned, checksummed career-history bundle, backs up the master and
+adds missing observations. Existing records, entries, settlements, chat history
+and outbox state remain in the persistent database. The install is idempotent and
+retries failures hourly; `/status` shows its result. Daily collection continues
+afterward. Existing chat, screenshot intake, commands, browser/API routes,
+reminders, exports, backups and grading remain available.
+
 ## What refreshes
 
-The refresh scope is the existing workbook's **269 players, 30 teams and 928 named
-measured-pair definitions**. The bot does not automatically add players, metric
-types or unrelated matchup populations.
+Game observations cover the current published NBA player population across
+**30 teams**, plus previously authorized workbook entities. A validated
+current-season publication can add a newly observed player with an unambiguous
+provider identity. Conflicting identities are held for review, and a failed scope
+refresh retains the previous scope. The existing **928 named measured-pair
+definitions** remain a separate population; discovering a new player does not
+create a measured defender pairing or invent an unavailable statistic.
 
 - A tracked player's broad season statistics update from games against **any**
   opponent. For example, a Maxey appearance against Cleveland can update his
@@ -20,9 +71,10 @@ types or unrelated matchup populations.
   unrelated game cannot change Brunson–Maxey defensive FG%.
 - Historical seasons, current seasons, whole-game results and tracking samples stay
   separate. Missing values remain missing; DNPs do not become zero-stat appearances.
-- Imports validate scope, identities, dates and numeric values before publication.
-  Corrected observations replace the corresponding record rather than counting the
-  game twice. Season aggregates are not averaged together or added twice.
+- Daily source imports validate scope, identities, dates and numeric values before
+  publication. Verified publisher corrections update the corresponding record
+  without counting the game twice. Additive history/workbook imports preserve the
+  existing record. Season aggregates are not averaged together or added twice.
 
 The original **53-sheet Excel workbook remains a dated reference snapshot**. The
 persistent master database and regenerated `NBA_Master.xlsx` export contain the
@@ -37,9 +89,9 @@ already saved on your computer.
 ## Morning statistics refresh
 
 The application checks at **11:30 AM America/New_York** for the previous day's
-published data, including games unrelated to the Knicks when they update existing
-players or teams. It catches up after a restart and retries pending publication
-**hourly**. Daylight saving time follows the New York timezone.
+published data across the NBA, including existing and newly validated
+current-season players and teams. It catches up after a restart and retries
+pending publication **hourly**. Daylight saving time follows the New York timezone.
 
 After several missed daily runs, every skipped date is queued and retained across
 restarts. Catch-up processes at most three game dates per hourly batch, with the
@@ -58,16 +110,16 @@ The working free source is the public
 including its
 [ESPN NBA player observations](https://github.com/sportsdataverse/sportsdataverse-data/releases/tag/espn_nba_player_boxscores)
 and [NBA Stats extracts](https://github.com/sportsdataverse/sportsdataverse-data/releases/tag/nba_stats_leaguedash).
-The October 30 release check found game observations through **October 29, 2026**.
-The separate tracking extracts had October 29 publication timestamps but did not
-declare their covered game date. That coverage stays **unknown**; legacy dates
-inferred from the game feed are removed without deleting statistical values.
-An observation file's newer date cannot advance a tracking file's coverage.
+Source publication timestamps and covered game dates are retained independently.
+The seven collected tracking categories do not declare their covered game dates;
+that coverage stays **unknown**. Legacy dates inferred from the game feed are
+removed without deleting statistical values. An observation file's newer date
+cannot advance a tracking file's coverage.
 
-The repository's collection workflow converts the published extracts and retains
-only the existing dataset scope. The Akash bot imports the validated files and
-regenerates its master export when data changes. Source publication time, last
-retrieval and latest covered game date are recorded separately. Neither a newly
+The repository's collection workflow converts the published extracts and refreshes
+the validated current-season identity scope. The Akash bot imports the validated
+files and regenerates its master export when data changes. Source publication time,
+last retrieval and latest covered game date are recorded separately. Neither a newly
 started job nor a newly downloaded older file is labeled as today's completed data.
 GitHub scheduling and upstream publication can be delayed; this is a morning update
 with catch-up, not a guaranteed live feed.
@@ -90,17 +142,21 @@ Tracking fields, injuries and tentative defenders keep their own coverage limits
 a fresh Excel export or game-stat check does not establish that every field is current.
 
 Current selections also require an independent event-status check within fifteen
-minutes, matching the saved game and confirming a future tipoff. The bounded
-ESPN check runs independently of the morning statistics import and before pick
-research; it updates timing/state for existing games only. A scoreboard final
-without imported statistics cannot grade an entry. Missing, failed or conflicting
+minutes, matching the saved game and confirming a future tipoff. Bounded ESPN and
+official NBA schedule checks run independently of the morning statistics import
+and before pick research. A separate GitHub schedule relay is scheduled every
+**10 minutes**; only a genuinely recent, matching source check can satisfy the
+same freshness requirement. A relay download does not reset its source-check
+time. GitHub jobs can be delayed, and a stale relay leaves the pick held.
+A scoreboard final without imported statistics cannot grade an entry. Missing, failed or conflicting
 event checks hold current recommendations and prevent an unverified reminder.
 
 Available extracts support player production, shooting, team totals/opponent
 statistics, passing, rebounding, touches/possession and rim-related measurements.
-The current publication does **not** provide current overall player defended-FG or
-named measured-pair extracts. Those records retain their original dates and show
-unavailable/stale coverage. Rim defense, scoring totals and whole-game coappearance
+Four advanced categories remain unavailable in the current publication:
+**overall player defended-FG, named measured pairs, less-than-six-foot defense and
+hustle**. Those records retain their original dates and show unavailable/stale
+coverage. Rim defense, scoring totals and whole-game coappearance
 never substitute for those missing populations. Other unsupported tracking fields
 also keep their source dates. Inspect `/status` before interpreting a value as current.
 
@@ -159,11 +215,12 @@ The master includes **80 published Knicks regular-season games for 2026–27** f
 notice that two additional games depend on NBA Cup results. Unknown opponents,
 dates and tipoffs are not invented. Playoff matchups are not prefilled.
 
-The saved calendar supplies reminder timing even when a live NBA schedule recheck
-fails. Such use is labeled as a saved publication, since later changes could be
-missed. Known uncertainty windows are preserved; incomplete coverage cannot prove
-an off day or a player's rest/workload. Calendar records do not establish final
-scores or settle an entry.
+The saved calendar supplies the planned game and reminder time. Current picks
+and reminder queuing still require a successful recent independent timing check;
+a failed check leaves the saved calendar visible with its uncertainty. Known
+uncertainty windows are preserved; incomplete coverage cannot prove an off day or
+a player's rest/workload. Calendar records do not establish final scores or
+settle an entry.
 
 The default policy sends **one combined injury/availability/roster digest and
 PrizePicks upload reminder, 60 minutes before a Knicks tipoff**. A 7:30 PM Eastern
@@ -248,11 +305,10 @@ measured percentages and dated assignment lookups can answer without AI inferenc
 A tentative workbook pairing includes its date and source; it is not a confirmed
 lineup or proof of who will guard whom.
 
-Uploaded lines receive experimental context-aware research using comparable
-regular-season observations, recent workload, production per minute, supported
-opponent/rest cohorts, shot volume, source freshness and availability uncertainty.
-The report shows the reference projection, workload scenarios, sample scope,
-supporting evidence and counterarguments. Missing inputs are disclosed.
+Uploaded lines use the same 20-game mean and median rule described above. The
+report shows the reference mean, observed variation, sample scope, supporting
+context and counterarguments. Workload scenarios are illustrations and do not
+replace the reference mean. Missing inputs and current coverage holds are disclosed.
 
 Better-supported and higher-variance alternatives use the actual uploaded lines.
 An aggressive candidate needs supporting evidence; the engine can abstain rather
@@ -280,12 +336,12 @@ PrizePicks offers. The target buffer uses at least 0.5, 15% of the projection, o
 25% of the observed p10–p90 scenario spread, rounded outward to half points. This
 is an explicit heuristic, not a calibrated likelihood or a proven betting edge.
 
-The research uses saved same-team regular-season workload and production per
-minute, observed opponent/rest cohorts, freshness and collected availability
-reports. It chooses supported markets and distinct players, rather than adding a
-fourth name simply to reach the requested count. Missing opposing-team data is
-disclosed; a list supported by only one team is not a complete ordinary multi-team
-entry. No board, wager or master-stat record is created by independent research.
+The research uses the latest 20 valid same-team regular-season observations for
+each market, with freshness and collected availability checks. Opponent/rest
+cohorts and workload remain labeled context. It chooses supported markets and
+distinct players and can return fewer than the requested count. Missing
+opposing-team data is disclosed; a list supported by only one team is not a complete
+ordinary multi-team entry. No board, wager or master-stat record is created by independent research.
 
 Check the targets against the current PrizePicks card, active status and offer terms
 when available. Screenshots and `/board` remain optional ways to compare exact
@@ -338,6 +394,27 @@ actual credited **total return including stake** before recording account profit
 loss. Explicit settlement is idempotent; estimated outcomes do not become credited
 payouts merely because the model says they won.
 
+## Import an updated master workbook
+
+Career history installs automatically with the software release. To add an
+additional enriched master `.xlsx`, use **Import master Excel** on the bot website
+and wait for its import report. The browser accepts files up to **128 MB**. For a
+file up to **20 MB**, attach it to Telegram with `/importmaster` as the caption.
+Sending `/importmaster` alone displays these instructions.
+
+The importer validates the workbook, makes a consistent database backup, and
+merges accepted additions in one transaction. Existing game/player observations
+win conflicts. Entries, financial settlements, chat context, the outbox and live
+freshness checks are preserved. Re-importing the same workbook does not duplicate
+its observations. Original source sheets remain available as dated reference
+material alongside the regenerated export.
+
+An uploaded workbook establishes its saved observations and provenance; it does
+not verify today's schedule, current injuries, a tentative defender assignment or
+the latest completed game. `/freshness` continues to apply the independent checks.
+Daily source collection remains enabled after the merge and can apply verified
+publisher corrections through its normal refresh path.
+
 ## Efficiency, storage and cost
 
 News checks, reminders, imports, averages and grading do not call the chat model.
@@ -365,17 +442,24 @@ independent backup protection is needed.
 ## Apply the release and inspect it
 
 1. Open the running Akash deployment, then **Update → chatbot → Vars & secrets**.
-2. Set `SOURCE_REF` to the full application commit pinned in [deploy.yaml](deploy.yaml).
+2. Set `SOURCE_REF` to the full tested application commit supplied with the release,
+   also pinned in [deploy.yaml](deploy.yaml) after publication. Enter only the
+   40-character commit value in the value field.
 3. Set `OLLAMA_MODEL` to `qwen3:4b-instruct-2507-q4_K_M`. This is the explicit
    non-thinking instruction release; the older `qwen3:4b` tag is a different model.
 4. Retain the existing Telegram token, allowed user ID, chat password and `/data`
    storage settings, then apply the deployment update.
+5. Open `/status` to check career-history installation and worker health, then
+   `/freshness` for the actual game-data and schedule checks. `/strategy` shows
+   the current research rule; `/help` lists the commands.
 
 The bootstrap installs the pinned application modules and dependencies, reuses the
 approved workbook, imports the season calendar and applies additive database
-changes. Startup checks run automatically and are saved in `/status`; a source
-warning is not reported as a successful refresh. The model can take several
-minutes to download while the other services continue working. Data updates happen
+changes. The separate history worker checks the pinned bundle once per manifest,
+backs up the database before merging, and retains existing records. Restarting
+does not repeat a completed merge. Startup checks run automatically and are saved
+in `/status`; a source warning is not reported as a successful refresh. The model
+can take several minutes to download while the other services continue working. Data updates happen
 automatically; future software releases use a new source reference.
 
 Useful Telegram commands:
@@ -383,6 +467,8 @@ Useful Telegram commands:
 | Command | Purpose |
 | --- | --- |
 | `/status` | Dataset scope, refresh results, covered dates, source errors and Telegram health |
+| `/freshness` | Current publication coverage, schedule verification and reasons a pick is held |
+| `/strategy` | Current 20-game benchmark, minimum sample, pass rules and testing limits |
 | `/reminder` | Next Knicks game/send time, saved-calendar use or timing uncertainty |
 | `/usage` | AI work counters, cache reuse and the hosting-billing distinction |
 | `/ai_status` | Model readiness, active request and last sanitized failure |
@@ -395,6 +481,7 @@ Useful Telegram commands:
 | `/entries`, `/results` | Recorded entries, provisional outcomes and confirmed account results |
 | `/settle ENTRY_ID TOTAL_RETURN [note]` | Reconcile the actual credited return |
 | `/importstats` | Caption an explicit CSV/JSON statistics upload |
+| `/importmaster` | Instructions, or caption an enriched `.xlsx` for an additive merge with backup |
 | `/clear` | Clear recent chat context without deleting the dataset or entries |
 | `/help` | Upload formats and the remaining commands |
 

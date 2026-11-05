@@ -25,7 +25,7 @@ class PregameLineupTests(unittest.TestCase):
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')
         seed_calendar(self.store)
 
-    def observations(self, player, team, n=12):
+    def observations(self, player, team, n=20):
         other = 'BOS' if team != 'BOS' else 'TOR'
         for offset in range(n):
             day = (dt.date(2026, 10, 29) - dt.timedelta(days=offset)).isoformat()
@@ -86,7 +86,7 @@ class PregameLineupTests(unittest.TestCase):
     def test_actual_multi_market_board_honors_attempts_after_eligibility(self):
         self.observations('Jalen Brunson', 'NYK')
         self.observations('Tyrese Maxey', 'PHI')
-        legs = [self.leg(), self.leg(stat='fga', line=17.5),
+        legs = [self.leg(), self.leg(stat='fga', line=15.5),
                 self.leg('Tyrese Maxey', 'PHI')]
         before = self.financial_counts()
         ordinary = self.board(legs, count=2)
@@ -94,7 +94,7 @@ class PregameLineupTests(unittest.TestCase):
         first = {p['leg']['player']: p['leg'] for p in ordinary['shortlist']}
         changed = {p['leg']['player']: p['leg'] for p in preferred['shortlist']}
         self.assertEqual(first['Jalen Brunson']['stat'], 'pts')
-        self.assertEqual((changed['Jalen Brunson']['stat'], changed['Jalen Brunson']['line']), ('fga', 17.5))
+        self.assertEqual((changed['Jalen Brunson']['stat'], changed['Jalen Brunson']['line']), ('fga', 15.5))
         self.assertEqual(changed['Tyrese Maxey']['stat'], 'pts')
         self.assertTrue(preferred['lineup_complete'])
         self.assertEqual(preferred['lineup_constraints']['preferred_stat'], 'fga')
@@ -111,12 +111,12 @@ class PregameLineupTests(unittest.TestCase):
                          [('Jalen Brunson', 'pts')])
         self.assertFalse(data['lineup_complete'])
         self.assertEqual(data['missing_teams'], ['PHI'])
-        self.assertTrue(any('does not support' in p['reason'] for p in data['skipped'] if p['stat'] == 'fga'))
+        self.assertTrue(any('opposite offered side' in p['reason'] for p in data['skipped'] if p['stat'] == 'fga'))
 
     def test_preferred_market_cannot_resolve_conflicting_offer_variants(self):
         self.observations('Jalen Brunson', 'NYK')
-        data = self.board([self.leg(), self.leg(stat='fga', line=17.5, offer_variant='goblin'),
-                           self.leg(stat='fga', line=17.5, offer_variant='demon')], count=1,
+        data = self.board([self.leg(), self.leg(stat='fga', line=15.5, offer_variant='goblin'),
+                           self.leg(stat='fga', line=15.5, offer_variant='demon')], count=1,
                           constraints={'preferred_stat': 'fga'})
         self.assertEqual(data['shortlist'][0]['leg']['stat'], 'pts')
         self.assertTrue(any('Conflicting offer variants' in item['reason'] for item in data['skipped']))
@@ -196,7 +196,7 @@ class PregameLineupTests(unittest.TestCase):
         with self.store.connect() as db:
             db.execute('UPDATE player_games SET fga=NULL WHERE player=? AND date=?',
                        ('Jalen Brunson', '2026-10-29'))
-        board = self.board([self.leg(stat='fga', line=17.5)], count=1)
+        board = self.board([self.leg(stat='fga', line=15.5)], count=1)
         research = build_independent_picks(self.store, DAY, count=1, now=NOW,
                                           constraints={'preferred_stat': 'fga'})
         self.assertFalse(board['shortlist'])

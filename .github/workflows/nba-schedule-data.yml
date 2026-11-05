@@ -1,0 +1,39 @@
+name: NBA current event timing
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/nba-schedule-data.yml'
+      - 'chatbot/game_schedule_check.py'
+      - 'chatbot/nba_daily_export.py'
+  schedule:
+    # An old relay stays ineligible; Actions scheduling does not guarantee freshness.
+    - cron: '7,17,27,37,47,57 * * * *'
+permissions:
+  contents: write
+concurrency:
+  group: nba-public-data
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install httpx==0.28.1
+      - name: Check current NBA event timing
+        run: python chatbot/nba_daily_export.py --output data/live --schedule-only
+      - name: Publish source timestamp and validated event response
+        run: |
+          git add data/live/schedule_today.json
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'NBAPPBOT data refresh'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Refresh current NBA event timing'
+          git pull --rebase origin main
+          git push origin HEAD:main

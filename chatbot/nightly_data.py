@@ -1,4 +1,4 @@
-"""Previous-day existing-dataset refresh at 11:30 AM Eastern with durable retries."""
+"""Previous-day authorized NBA dataset refresh at 11:30 AM Eastern with durable retries."""
 from __future__ import annotations
 
 import asyncio
@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from feeds import canonical_game, canonical_team, TEAM_WORDS
 from nba_daily_export import validate_final
+from game_phase import regular_phase_exclusion
 from news_digest import _aware
 
 EASTERN=ZoneInfo('America/New_York')
@@ -65,7 +66,7 @@ def import_daily_snapshot(store, document, day, now):
     published=_aware(document.get('published_at'))
     scope=store.get_checkpoint('dataset_refresh_scope',{})
     if not scope or document.get('scope_revision')!=scope.get('revision') or document.get('upstream_full_game_validated') is not True:
-        raise ValueError('Daily refresh is outside the existing authorized dataset scope.')
+        raise ValueError('Daily refresh is outside the authorized dataset scope.')
     if not published or published>now+dt.timedelta(minutes=5):
         raise ValueError('Daily NBA snapshot has an invalid retrieval timestamp.')
     expected=document.get('expected_games')
@@ -89,7 +90,7 @@ def import_daily_snapshot(store, document, day, now):
     from dataset_refresh import select_existing_rows
     selected=select_existing_rows(rows,scope)
     if len(selected)!=len(rows):
-        raise ValueError('Daily refresh contains a player outside the existing dataset.')
+        raise ValueError('Daily refresh contains a player outside the authorized dataset population.')
     by_game={game['id']:game for game in games}
     year=int(day[:4])-(int(day[5:7])<7)
     for row,canonical in zip(rows,selected):
@@ -98,7 +99,8 @@ def import_daily_snapshot(store, document, day, now):
             raise ValueError('Daily observation does not use its registered canonical identity.')
         if {canonical_team(row.get('team')),canonical_team(row.get('opponent'))}!={game['home_team'],game['away_team']}:
             raise ValueError('Player team/opponent do not match the actual source game.')
-        if row.get('season')!=f'{year}-{str(year+1)[-2:]}' or row.get('season_type')!='Regular Season':
+        if (row.get('season')!=f'{year}-{str(year+1)[-2:]}' or row.get('season_type')!='Regular Season'
+                or regular_phase_exclusion(row)):
             raise ValueError('Daily observation has a different season or statistical phase.')
     # The publisher validates complete source games before extracting the existing
     # tracked subset. A subset must never be mistaken for complete team totals.
@@ -278,6 +280,9 @@ class NightlyNBARefresh:
                 for day in batch:
                     try:
                         document=await self.worker.request(self.base+'/'+day+'.json')
+                        if document.get('scope_revision')!=self.store.get_checkpoint('dataset_refresh_scope',{}).get('revision'):
+                            from dataset_refresh import refresh_published_scope
+                            await refresh_published_scope(self.store,self.worker,now)
                         report=await asyncio.to_thread(import_daily_snapshot,self.store,document,day,now)
                         if report.get('ignored_older_publication'):
                             pending.append(day)
@@ -287,7 +292,7 @@ class NightlyNBARefresh:
                             # Only this validated date was imported. The upstream
                             # file may also contain later games or tracking data.
                             through=max(str(through or ''),day)
-                            self.store.feed_success('nba_daily_refresh',f"Existing scoped statistics for {day}: {report['games']} published games, {report['player_rows']} existing-player observations.")
+                            self.store.feed_success('nba_daily_refresh',f"Authorized NBA statistics for {day}: {report['games']} published games, {report['player_rows']} existing-player observations.")
                         else:
                             pending.append(day)
                     except asyncio.CancelledError:raise
@@ -302,6 +307,9 @@ class NightlyNBARefresh:
             if tracking_attempt:
                 try:
                     tracking=await self.worker.request(self.base+'/existing_tracking.json')
+                    if tracking.get('scope_revision')!=self.store.get_checkpoint('dataset_refresh_scope',{}).get('revision'):
+                        from dataset_refresh import refresh_published_scope
+                        await refresh_published_scope(self.store,self.worker,now)
                     from advanced_refresh import import_tracking
                     await asyncio.to_thread(import_tracking,self.store,tracking,now)
                     coverage=self.store.get_checkpoint('tracking_refresh_status',{}).get('coverage',[])
@@ -345,11 +353,11 @@ class NightlyNBARefresh:
                           target_inventory_verified=inventory_verified,
                           target_inventory_checked_at=target_inventory.get('inventory_verified_at'),
                           target_inventory_source=target_inventory.get('inventory_verification_source'),
-                          completeness_scope=('Independent day inventory matched; player rows are limited to existing workbook entities. '
+                          completeness_scope=('Independent day inventory matched; player rows are limited to the authorized source-identified NBA population. '
                               'Every tracking metric is not verified by this status.' if inventory_verified else
                               'Published game inventory processed; all NBA games and every tracking metric are not independently verified by this status.'),
                           tracking_retry_seconds=3600,
-                          source='Independently published public NBA extracts; existing workbook entities only',
+                          source='Independently published public NBA extracts; authorized NBA player population',
                           note='Game refresh status covers imported game observations only. Tracking metrics and tentative assignments have separate coverage and source dates; rebuilding Excel does not make every field current.')
             self.store.set_checkpoint('nightly_nba_refresh',status)
             # Persist current coverage before rebuilding, including failed or

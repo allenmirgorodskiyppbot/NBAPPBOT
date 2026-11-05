@@ -13,7 +13,8 @@ import math
 from zoneinfo import ZoneInfo
 
 from board_shortlist import MARKET_NAMES, player_availability
-from contextual_projection import projection_for_leg
+from contextual_projection import (projection_for_leg, MIN_COMPARABLE_OBSERVATIONS,
+                                   benchmark_margin, baseline_offer_decision)
 from feeds import canonical_player, canonical_team
 from news_digest import _aware, _clean
 from lineup_selection import select_lineup
@@ -21,7 +22,7 @@ from pregame_freshness import assess_pregame_freshness
 
 EASTERN = ZoneInfo('America/New_York')
 MARKETS = ('pts', 'reb', 'ast', 'pra', 'fga')
-MIN_OBSERVATIONS = 8
+MIN_OBSERVATIONS = MIN_COMPARABLE_OBSERVATIONS
 MAX_SOURCE_LAG_DAYS = 7
 
 
@@ -74,20 +75,26 @@ def _targets(projection):
         return None
     # A heuristic research threshold, not a calibrated probability or bookmaker
     # prediction. Half-point rounding always moves away from the projection.
-    buffer = max(.5, .15 * value, .25 * (high - low))
-    more = math.floor(value - buffer - .5) + .5
-    less = math.ceil(value + buffer - .5) + .5
-    return {'more_at_or_below': more if more >= .5 else None, 'less_at_or_above': less,
+    median = float(projection['baseline_median'])
+    if not math.isfinite(median) or median < 0:
+        return None
+    buffer = benchmark_margin(value, low, high)
+    more = math.floor(min(value, median) - buffer - .5) + .5
+    less = math.ceil(max(value, median) + buffer - .5) + .5
+    if baseline_offer_decision(projection, less)['side'] != 'less':
+        return None
+    if more >= .5 and baseline_offer_decision(projection, more)['side'] != 'more':
+        more = None
+    return {'more_at_or_below': more if more is not None and more >= .5 else None, 'less_at_or_above': less,
             'buffer': round(buffer, 3),
-            'method': 'At least 0.5, 15% of the projection, or 25% of the observed p10–p90 spread; rounded outward to half points.'}
+            'method': 'At least 0.5, 15% of the mean, or 25% of the observed p10–p90 spread; mean and median must agree, rounded outward to half points. Heuristic research rule, not a proven edge.'}
 
 
 def _reason(projection):
     opponent = next((row for row in projection.get('cohorts', []) if row.get('type') == 'opponent_team'), None)
-    text = f"{projection['projected_minutes']:.1f} projected minutes; {projection['n']} saved games through {projection['last_date']}."
+    text = f"Same-team mean of {projection['n']} games through {projection['last_date']}; recent workload {projection['projected_minutes']:.1f} minutes (context only)."
     if opponent:
-        text += (f" {opponent['team']}: {opponent['n']} comparable games; " +
-                 ('small context adjustment.' if opponent.get('adjustment') else 'no matchup adjustment.'))
+        text += f" {opponent['team']}: {opponent['n']} comparable games; no matchup adjustment."
     if len(projection.get('seasons', [])) > 1:
         text += ' Mixed-season sample.'
     return text
@@ -108,7 +115,7 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     game, error = _select_game(store, date, team, now)
     result = {'mode': 'independent_projections', 'generated_at': now.isoformat(),
               'requested_count': count, 'requires_prizepicks_comparison': True,
-              'source_kind': 'saved statistics and schedule', 'picks': [], 'held': [],
+              'source_kind': 'saved statistics and schedule', 'picks': [], 'held': [], 'evaluated_candidates': [],
               'game': game, 'game_date': game['date'] if game else date,
               'two_team_coverage': False, 'note': error, 'research_only': True,
               'limits': ['These are own projections and conditional target lines, not current PrizePicks offers.',
@@ -140,33 +147,40 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
         if identity in seen:
             continue
         seen.add(identity)
+        opponent = game['away_team'] if player['team'] == game['home_team'] else game['home_team']
         availability = player_availability(news, player['player'], game['date'], now)
-        if availability['blocked']:
-            result['held'].append({'player': player['player'], 'reason': availability['note']})
-            continue
         freshness = team_freshness[player['team']]
-        if freshness['ready']:
+        if freshness['ready'] and not availability['blocked']:
             freshness = assess_pregame_freshness(store, game['date'], player['team'], now,
                                                  player=player['player'])
-        if not freshness['ready']:
-            result['held'].append({'player': player['player'],
-                'reason': 'Current game data is not ready: ' + ' '.join(freshness['reasons']),
-                'freshness': freshness})
-            continue
         choices, reasons = [], []
         for stat in MARKETS:
+            evaluated = {'player': player['player'], 'player_id': player['player_id'],
+                         'team': player['team'], 'opponent': opponent, 'date': game['date'],
+                         'stat': stat, 'availability': availability, 'freshness': freshness,
+                         'projection': None, 'disposition': 'pass', 'reason': None}
+            result['evaluated_candidates'].append(evaluated)
+            def hold(reason):
+                evaluated['reason'] = reason
+                reasons.append(reason)
+            if availability['blocked']:
+                hold(availability['note'])
+                continue
+            if not freshness['ready']:
+                hold('Current game data is not ready: ' + ' '.join(freshness['reasons']))
+                continue
             if stat not in freshness.get('current_player_stat_coverage', []):
-                reasons.append('The requested statistic is missing or conflicting in the player’s latest completed game.')
+                hold('The requested statistic is missing or conflicting in the player’s latest completed game.')
                 continue
             try:
                 projection = projection_for_leg(store, {'player': player['player'], 'player_id': player['player_id'],
-                    'team': player['team'], 'opponent': game['away_team'] if player['team'] == game['home_team'] else game['home_team'],
-                    'date': game['date'], 'stat': stat}, now)
+                    'team': player['team'], 'opponent': opponent, 'date': game['date'], 'stat': stat}, now)
             except (ValueError, TypeError, OverflowError, ZeroDivisionError):
-                reasons.append('Projection inputs could not be validated.')
+                hold('Projection inputs could not be validated.')
                 continue
+            evaluated['projection'] = projection
             if not projection.get('available'):
-                reasons.append(projection.get('reason') or 'Comparable observations are missing.')
+                hold(projection.get('reason') or 'Comparable observations are missing.')
                 continue
             try:
                 lag = (dt.date.fromisoformat(cutoff) - dt.date.fromisoformat(projection['last_date'])).days
@@ -175,29 +189,30 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
                 n = int(projection['n'])
                 targets = _targets(projection)
             except (ValueError, TypeError, KeyError):
-                reasons.append('Projection inputs are incomplete.')
+                hold('Projection inputs are incomplete.')
                 continue
             if n < MIN_OBSERVATIONS or not 0 <= lag <= MAX_SOURCE_LAG_DAYS or target_lag > MAX_SOURCE_LAG_DAYS:
-                reasons.append('Comparable workload data is too sparse or more than seven days behind the game.')
+                hold('Comparable workload data is too sparse or more than seven days behind the game.')
                 continue
             if not targets or not math.isfinite(minutes) or minutes < 20:
-                reasons.append('A stable, meaningful workload projection is unavailable.')
+                hold('A supported benchmark with at least 20 recent workload minutes is unavailable.')
                 continue
             if not projection.get('source_games') or any(not row.get('source') for row in projection['source_games']):
-                reasons.append('Source provenance is incomplete.')
+                hold('Source provenance is incomplete.')
                 continue
             expected = projection['reference_projection']
             spread = projection['empirical_scenario_range']
             relative_width = (spread['p90'] - spread['p10']) / max(expected, 1)
             # Rank research readiness, not a nonexistent edge against an offer.
-            support = sum(min(int(c.get('n') or 0), 8) for c in projection.get('cohorts', []))
-            rank = min(n, 20) / (1 + relative_width) + min(minutes, 40) / 8 + support / 8 - lag / 2
+            rank = min(n, 20) / (1 + relative_width) + min(minutes, 40) / 8 - lag / 2
             if availability.get('note'):
                 rank -= 4
+            reason = _reason(projection)
+            evaluated.update({'disposition': 'candidate', 'reason': reason, 'targets': targets})
             choices.append({'player': player['player'], 'player_id': player['player_id'],
                             'team': player['team'], 'opponent': projection['opponent'],
                             'stat': stat, 'projection': projection, 'targets': targets,
-                            'reason': _reason(projection), 'availability': availability,
+                            'reason': reason, 'availability': availability,
                             'caution': availability.get('note'), '_rank': rank})
         if choices:
             choices.sort(key=lambda value: (bool(preferred_stat and value['stat'] != preferred_stat),
@@ -211,6 +226,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     if preferred_stat:
         result['lineup_constraints']['preferred_stat'] = preferred_stat
     result['picks'] = [{k: v for k, v in row.items() if k != '_rank'} for row in chosen]
+    selected_keys = {(canonical_player(row['player']), row['stat']) for row in chosen}
+    for evaluated in result['evaluated_candidates']:
+        if (canonical_player(evaluated['player']), evaluated['stat']) in selected_keys:
+            evaluated['disposition'] = 'selected'
     result['note'] = (f"{len(chosen)} of {count} requested player projections are supported." if len(chosen) < count else
                       'Compare these independent targets with the actual offers before selecting sides.')
     if not chosen and any(not value['ready'] for value in team_freshness.values()):

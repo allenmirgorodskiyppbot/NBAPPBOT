@@ -76,7 +76,7 @@ class LineupCoverageIntegrationTests(unittest.TestCase):
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')
         seed_calendar(self.store)
 
-    def observations(self, player, team, n=12):
+    def observations(self, player, team, n=20):
         for offset in range(n):
             day = (dt.date(2026, 10, 29) - dt.timedelta(days=offset)).isoformat()
             identity = canonical_game(day, team, 'BOS')

@@ -81,3 +81,30 @@ class PregamePublicationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class StatisticalPhaseInventoryTests(unittest.TestCase):
+    def test_explicit_future_cup_label_excludes_only_named_game_without_assuming_a_date(self):
+        from test_pregame_schedule import event
+        future=dt.datetime(2026,12,18,17,tzinfo=dt.timezone.utc)
+        document=calendar();document['leagues'][0]['calendar']=['2026-12-17T08:00Z']
+        cup=event(home='NYK',away='CHI',status='STATUS_FINAL',tip='2026-12-18T00:30:00Z')
+        cup['competitions'][0]['notes']=[{'headline':'Emirates NBA Cup - Championship'}]
+        document['events']=[cup]
+        inventory=verified_day_inventory(document,'2026-12-17',future)
+        self.assertEqual(inventory['games'],[]);self.assertTrue(inventory['inventory_off_day_verified'])
+        identity=next(iter(inventory['statistical_phase_exclusions']))
+        snapshot={'expected_games':1,'games':[{'id':identity,'status':'final'}],
+                  'player_games':[{'game_id':identity,'pts':30}],'pending_game_ids':[],'errors':[],'complete':True}
+        result=reconcile_day_inventory(snapshot,inventory,'2026-12-17',{})
+        self.assertEqual(result['expected_games'],0);self.assertEqual(result['player_games'],[])
+        self.assertTrue(result['inventory_verified']);self.assertTrue(result['complete'])
+
+    def test_cup_semifinal_regular_game_is_not_excluded(self):
+        from game_phase import published_event_exclusion
+        event={'season':{'type':2},'competitions':[{'notes':[{'headline':'Emirates NBA Cup - Semifinals'}]}]}
+        game={'date':'2026-12-12','home_team':'NYK','away_team':'CHI'}
+        self.assertIsNone(published_event_exclusion(event,game))
+        for label in ('Emirates NBA Cup - Group Play','NBA Cup Championship Qualifier'):
+            event['competitions'][0]['notes']=[{'headline':label}]
+            self.assertIsNone(published_event_exclusion(event,game))

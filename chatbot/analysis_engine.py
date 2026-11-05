@@ -12,11 +12,14 @@ import statistics
 import uuid
 from zoneinfo import ZoneInfo
 
-from feeds import canonical_player, canonical_team
+from feeds import canonical_player, canonical_team, TEAM_WORDS
+from contextual_projection import (MIN_COMPARABLE_OBSERVATIONS, BENCHMARK_METHOD,
+                                   _comparable_observations, baseline_offer_decision)
 from master import STAT_COMPONENTS
+from pregame_freshness import assess_pregame_freshness
 
 MAX_OBSERVED = 20
-MIN_OBSERVED = 10
+MIN_OBSERVED = MIN_COMPARABLE_OBSERVATIONS
 MAX_SCAN = 200
 
 
@@ -112,25 +115,16 @@ def _analyze_leg(store, leg, now):
         gate_reasons.append('The matched game is already started or final; this is retrospective research.')
     if any(str(row[0]).lower() in {'postponed', 'canceled', 'cancelled', 'suspended'} for row in events):
         gate_reasons.append('The matched game is postponed/canceled/suspended; verify any replacement line manually.')
-    with store.connect() as db:
-        rows = [dict(row) for row in db.execute('''
-            SELECT p.*, g.status AS game_status
-            FROM player_games p JOIN games g ON g.id=p.game_id
-            WHERE p.player_id=? AND p.date<? AND g.status='final'
-              AND LOWER(p.appearance_state)='played'
-              AND COALESCE(p.season_type,'') != 'Preseason'
-            ORDER BY p.date DESC,p.game_id DESC LIMIT ?''', (player_id, cutoff, MAX_SCAN))]
-    values, used_rows, missing, considered = [], [], 0, 0
-    for row in rows:
-        considered += 1
-        if any(row.get(field) is None for field in components):
-            missing += 1
-            continue
-        value = sum(float(row[field]) for field in components)
-        values.append(value)
-        used_rows.append(row)
-        if len(values) >= MAX_OBSERVED:
-            break
+    team = canonical_team(leg.get('team'))
+    if team not in TEAM_WORDS:
+        gate_reasons.append('A current NBA team is required for a same-team benchmark.')
+        valid, quality = [], {}
+    else:
+        valid, quality = _comparable_observations(store, leg['player'], player_id, team, cutoff, components)
+    used_rows = valid[:MAX_OBSERVED]
+    values = [sum(float(row[field]) for field in components) for row in used_rows]
+    missing = quality.get('incomplete_games', 0)
+    considered = len(valid) + missing + quality.get('conflicting_games', 0)
     n = len(values)
     line = float(leg['line'])
     more = sum(v > line for v in values)
@@ -139,6 +133,7 @@ def _analyze_leg(store, leg, now):
     side_count = more if leg['side'] == 'more' else less
     result.update({
         'n': n, 'missing_games': missing, 'games_examined': considered,
+        'sample_quality': quality, 'required_observations': MIN_OBSERVED,
         'scan_limit': MAX_SCAN, 'observed_window_limit': MAX_OBSERVED,
         'mean': statistics.fmean(values) if values else None,
         'median': statistics.median(values) if values else None,
@@ -155,13 +150,13 @@ def _analyze_leg(store, leg, now):
         'eligible_for_ranking': n >= MIN_OBSERVED and not gate_reasons,
         'eligibility_blocks': gate_reasons,
         'warnings': ['Historical line-crossing frequency is descriptive, not a forecast win probability.',
-                     'The sample may include different teams, seasons and playoff phases; inspect its scope.',
+                     'The sample contains same-team regular-season appearances and can span seasons; stored coverage may be incomplete.',
                      'Opponent, injury and expected-minutes adjustments are not a validated predictive model.'],
     })
-    if n < MIN_OBSERVED:
-        result['reason'] = f'Only {n} observed prior games are available; at least {MIN_OBSERVED} are needed to rank.'
-    elif gate_reasons:
+    if gate_reasons:
         result['reason'] = ' '.join(gate_reasons)
+    elif n < MIN_OBSERVED:
+        result['reason'] = f'Only {n} valid same-team regular-season games are stored; {MIN_OBSERVED} are required. This is partial stored coverage, not a career-game count.'
     else:
         result['reason'] = 'Enough historical observations for a descriptive comparison only.'
     if not events:
@@ -232,11 +227,24 @@ def analyze_board(store, board_id, as_of=None):
     import hashlib
     from season_calendar import calendar_context
     from news_digest import _aware
+    from board_shortlist import _event, player_availability
+    news = store.recent_news(200)
+    current_checks = []
     stages=[]
     for leg in board['legs']:
+        context, event_issue = _event(store, leg, now)
+        event_date = _event_date(store, leg)
+        freshness = (assess_pregame_freshness(store, event_date, leg.get('team'), now,
+                     player=leg.get('player'), stat=leg.get('stat')) if event_date else
+                     {'ready': False, 'reasons': ['Game date is unresolved.']})
+        availability = (player_availability(news, leg.get('player', ''), event_date, now)
+                        if event_date else {'blocked': False, 'note': None, 'reports': []})
+        current_checks.append({'context': context, 'event_issue': event_issue,
+                               'freshness': freshness, 'availability': availability})
         cal=calendar_context(store,leg['date'],leg['team']) if leg.get('date') and leg.get('team') else {}
         tip=_aware(cal.get('tipoff'));stages.append(bool(tip and now>=tip))
-    revision=hashlib.sha256(json.dumps({'engine':'contextual-v2','data':data_revision(store),'event_started':stages,
+    revision=hashlib.sha256(json.dumps({'engine':BENCHMARK_METHOD,'data':data_revision(store),'event_started':stages,
+        'current_checks': [{**check, 'freshness': {key: value for key, value in check['freshness'].items() if key != 'checked_at'}} for check in current_checks],
         'board':board,'date':now.astimezone(ZoneInfo('America/New_York')).date().isoformat(),
         'fresh':_feed_health(store.status(),now)['fresh_feeds']},sort_keys=True,default=str).encode()).hexdigest()
     _report_tables(store)
@@ -249,9 +257,29 @@ def analyze_board(store, board_id, as_of=None):
     results = [_analyze_leg(store, leg, now) for leg in board['legs']]
     from contextual_projection import projection_for_leg
     from season_calendar import calendar_context
-    for item in results:
+    for item, checks in zip(results, current_checks):
         leg=item['leg']
-        item['projection']=projection_for_leg(store,leg,now)
+        item.update(checks)
+        projection_leg = {**leg, 'date': item.get('event_date') or leg.get('date')}
+        item['projection']=projection_for_leg(store,projection_leg,now)
+        decision = baseline_offer_decision(item['projection'], leg.get('line'))
+        item['offer_decision'] = decision
+        if item['eligible_for_ranking'] and decision['side'] != leg.get('side'):
+            item['eligible_for_ranking'] = False
+            item['reason'] = (decision['reason'] if decision['side'] is None else
+                              'The benchmark supports the opposite offered side.')
+            item.setdefault('eligibility_blocks', []).append(item['reason'])
+        current_holds = []
+        if checks['event_issue']:
+            current_holds.append(checks['event_issue'])
+        if not checks['freshness']['ready']:
+            current_holds.append('Current game data is not ready: ' + ' '.join(checks['freshness']['reasons']))
+        if checks['availability']['blocked']:
+            current_holds.append(checks['availability']['note'])
+        if current_holds:
+            item['eligible_for_ranking'] = False
+            item.setdefault('eligibility_blocks', []).extend(current_holds)
+            item['reason'] = ' '.join(current_holds)
         calendar=calendar_context(store,str(leg.get('date',''))[:10],leg.get('team')) if leg.get('date') and leg.get('team') else {}
         from news_digest import _aware
         tip=_aware(calendar.get('tipoff'))
@@ -268,11 +296,11 @@ def analyze_board(store, board_id, as_of=None):
     aggressive=[r for r in candidates if r['projection'].get('aggressive_research_candidate')]
     aggressive_entries,aggressive_note=_suggest_entries(aggressive)
     for option in aggressive_entries:
-        option['ranking_basis']='Positive experimental projection margin with documented opponent/rest support; higher-variance research, not a validated advantage.'
+        option['ranking_basis']='Positive benchmark margin passing the common research buffer; no validated advantage.'
     freshness = _feed_health(store.status(), now)
     report = {
         'id': uuid.uuid4().hex, 'board_id': board_id, 'generated_at': now.isoformat(),
-        'engine_version': 'contextual-v2', 'research_only': True,'input_revision':revision,'cache_hit':False,
+        'engine_version': BENCHMARK_METHOD, 'research_only': True,'input_revision':revision,'cache_hit':False,
         'board_created_at': board.get('created_at'), 'board_source': board.get('source'),
         'original_legs': board['legs'], 'legs': results, 'candidates': candidates,
         'suggested_entries': suggested_entries, 'lineup_note': lineup_note,
@@ -280,7 +308,7 @@ def analyze_board(store, board_id, as_of=None):
         'freshness': freshness,
         'recent_news': store.recent_news(10),
         'limitations': [
-            'Experimental workload and matchup scenarios rank research alternatives; they do not estimate calibrated win probabilities or expected return.',
+            'The same-team 20-game arithmetic mean is a research benchmark; it did not demonstrate an edge over the simulation control and does not estimate calibrated win probabilities or expected return.',
             'No parlay probability is calculated by multiplying leg hit rates; same-game and same-player legs may be dependent.',
             'These are manually uploaded line snapshots. Current PrizePicks availability and payout rules must be checked.',
             'The historical seed is only the embedded workbook subset; it is not the full companion ZIP.',
@@ -305,21 +333,30 @@ def analysis_history(store, board_id, limit=10):
 
 
 def format_analysis(report):
-    lines=['Matchup and workload research — '+report.get('engine_version','unknown'),
-           'Experimental projections and scenarios; these are not validated win probabilities.']
+    lines=['Same-team game-history research — '+report.get('engine_version','unknown'),
+           'The 20-game mean is a research benchmark, with no demonstrated betting edge.']
     candidates=report.get('candidates',[])
     if not candidates:
         lines.append('No eligible research candidates: '+str(report.get('lineup_note','Inspect missing data, availability and event status.')))
+        seen_holds = set()
+        for item in report.get('legs', []):
+            reason = item.get('reason')
+            key = (item.get('leg', {}).get('player'), reason)
+            if reason and key not in seen_holds:
+                seen_holds.add(key)
+                lines.append(f"Hold: {key[0]} — {reason}")
+            if len(seen_holds) == 3:
+                break
     for item in candidates[:3]:
         leg=item['leg'];projection=item.get('projection',{})
         block=f"{leg['player']} · {leg['side']} {leg['line']:g} {leg['stat']}"
         if projection.get('available'):
             spread=projection['empirical_scenario_range']
-            block+=(f"\nExperimental reference {projection['reference_projection']:g}; observed scenario spread "
-                    f"{spread['p10']:g}–{spread['p90']:g}; projected workload {projection['projected_minutes']:g} min."
+            block+=(f"\n20-game mean {projection['reference_projection']:g}; observed spread "
+                    f"{spread['p10']:g}–{spread['p90']:g}; recent workload {projection['projected_minutes']:g} min."
                     f"\nEvidence: {projection['n']} games, {projection['first_date']}–{projection['last_date']}; {projection['confidence']} confidence.")
             reasons=projection.get('supporting_reasons',[])
-            if reasons:block+='\nWhy: '+reasons[min(2,len(reasons)-1)]
+            if reasons:block+='\nWhy: '+reasons[0]
             block+='\nRisk: '+projection.get('risk_note','Availability and workload can change.')
         else:
             block+=f"\nStored descriptive support: {item['n']} games; projection unavailable: {projection.get('reason','missing inputs')}."

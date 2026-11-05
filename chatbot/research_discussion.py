@@ -5,7 +5,7 @@ import datetime as dt
 import math
 
 from board_shortlist import MARKET_NAMES, player_availability
-from contextual_projection import projection_for_leg
+from contextual_projection import projection_for_leg, MIN_COMPARABLE_OBSERVATIONS
 from feeds import canonical_team
 from independent_picks import _select_game, _targets
 from master import normalized_name
@@ -35,10 +35,10 @@ def _card(item, index):
     common = {'entity': player, 'metric': metric, 'scope': scope}
     facts = [
         {**common, 'fact_type': 'projection',
-         'text': f"{player}: experimental reference {projection['reference_projection']:g} {metric} from {projection['n']} stored games.",
+         'text': f"{player}: 20-game arithmetic mean {projection['reference_projection']:g} {metric} from {projection['n']} stored games.",
          'values': [projection['reference_projection'], projection['n']]},
         {**common, 'metric': 'minutes', 'fact_type': 'workload',
-         'text': f"{player}: workload reference {projection['projected_minutes']:g} minutes.",
+         'text': f"{player}: recent workload reference {projection['projected_minutes']:g} minutes; context only, without rescaling the mean.",
          'values': [projection['projected_minutes']]},
     ]
     more, less = targets['more_at_or_below'], targets['less_at_or_above']
@@ -58,7 +58,7 @@ def _card(item, index):
     # Fact text is bounded structurally. Never cut a number or its qualifier.
     return {'id': f'R{index}', 'kind': 'research_projection', 'entity': player,
             'text': body, 'approved_facts': facts,
-            'source': 'Experimental workload model from stored player games',
+            'source': 'Same-team 20-game arithmetic-mean benchmark from stored player games',
             'data_through_date': projection['last_date'], 'scope': scope,
             'line_kind': 'research_target', 'offer_verified': False, 'research_only': True,
             **({'decision': 'pass'} if item['status'] == 'held' else {})}
@@ -169,7 +169,7 @@ def build_research_discussion(store, picks, slots=None, now=None):
             age = (day - dt.date.fromisoformat(projection['last_date'])).days
             targets = _targets(projection)
             valid = (targets and all(_finite(projection.get(key)) for key in
-                    ('reference_projection', 'projected_minutes', 'n')) and projection['n'] >= 8
+                    ('reference_projection', 'projected_minutes', 'n')) and projection['n'] >= MIN_COMPARABLE_OBSERVATIONS
                      and projection['last_date'] < cutoff and isinstance(projection.get('seasons'), list))
         except (ValueError, TypeError, KeyError):
             valid = False
@@ -194,8 +194,9 @@ def build_research_discussion(store, picks, slots=None, now=None):
                 'date': day.isoformat(), 'status': 'held' if cautions else 'research_only',
                 'projection': projection, 'targets': targets, 'line_kind': 'research_target',
                 'offer_verified': False, 'cautions': cautions, 'data_readiness': readiness,
-                'reason': ('The shortlist used recorded workload and production per minute, with only supported '
-                           'opponent/rest adjustments. Its buffered targets are conditional research thresholds.'),
+                'reason': ('The shortlist uses the arithmetic mean of the last 20 valid same-team regular-season games. '
+                           'Workload, opponent history and rest are context only. Buffered targets require mean/median agreement; '
+                           'they are conditional research thresholds without a demonstrated betting edge.'),
                 'supporting_reasons': projection.get('supporting_reasons', [])[:3]}
         result['assessments'].append(item)
         result['cards'].append(_card(item, len(result['cards']) + 1))
@@ -212,13 +213,13 @@ def build_research_discussion(store, picks, slots=None, now=None):
         explanations = []
         for item in result['assessments']:
             p = item['projection']
-            explanations.append(f"{item['player']}: experimental reference {p['reference_projection']:g} "
-                f"{MARKET_NAMES[item['stat']]} at {p['projected_minutes']:g} minutes, using {p['n']} stored games "
+            explanations.append(f"{item['player']}: 20-game arithmetic mean {p['reference_projection']:g} "
+                f"{MARKET_NAMES[item['stat']]}; recent workload {p['projected_minutes']:g} minutes is context only, using {p['n']} stored games "
                 f"through {p['last_date']}." + (' ' + item['cautions'][0] if item['cautions'] else ''))
         result['fallback_answer'] = ('These were research targets, not confirmed PrizePicks offers.\n'
             + '\n'.join(explanations)
             + ''.join(f"\n{item['player']}: Hold. {item['reason']}" for item in result['held'])
-            + '\nThe reference combines observed production and workload; actual lines, current availability and payout still need checking.')
+            + '\nThe benchmark is an unadjusted historical mean, with no demonstrated betting edge; actual lines, current availability and payout still need checking.')
     else:
         reasons = '; '.join(f"{item['player']}: {item['reason']}" for item in result['held'][:2])
         result['fallback_answer'] = ('I can’t recompute that shortlist for this game yet. ' + reasons

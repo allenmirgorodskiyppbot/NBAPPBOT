@@ -59,6 +59,10 @@ def seed_workbook(store, path):
         existing_players = {(row[0], row[1]) for row in
                             db.execute('SELECT game_id,player_id FROM player_games')}
     workbook = openpyxl.load_workbook(workbook_path, read_only=True, data_only=True)
+    if 'games' in workbook.sheetnames and 'player_games' in workbook.sheetnames:
+        workbook.close()
+        from master_upgrade import merge_enriched_workbook
+        return merge_enriched_workbook(store, workbook_path)
     games, observations = {}, []
     observed, skipped = 0, 0
     today = dt.datetime.now(ZoneInfo('America/New_York')).date().isoformat()

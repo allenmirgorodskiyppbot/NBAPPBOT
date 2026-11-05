@@ -25,6 +25,8 @@ APP_FILES = [
     'independent_picks.py', 'assignment_refresh.py', 'refresh_export.py', 'current_research.py',
     'service_runtime.py', 'conversation.py', 'chat_flow.py', 'pick_discussion.py',
     'research_discussion.py', 'lineup_selection.py', 'pregame_freshness.py', 'game_schedule_check.py',
+    'strategy_info.py', 'master_upgrade.py', 'pregame_archive.py', 'game_phase.py', 'history_backfill.py',
+    'history_service.py', 'history_manifest.json',
 ]
 
 

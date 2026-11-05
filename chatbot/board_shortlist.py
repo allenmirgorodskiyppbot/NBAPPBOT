@@ -13,6 +13,7 @@ from collections import defaultdict
 from zoneinfo import ZoneInfo
 
 from feeds import TEAM_WORDS, canonical_player, canonical_team
+from contextual_projection import baseline_offer_decision
 from news_digest import _aware, _clean, _metadata, is_promotion
 from season_calendar import calendar_context, current_season
 from lineup_selection import select_lineup
@@ -254,14 +255,13 @@ def _reason(item):
     value = _number(p.get('reference_projection'))
     minutes = _number(p.get('projected_minutes'))
     last = _clean(p.get('last_date') or item.get('sample_last_date'), 10)
-    base = f"Experimental reference {value:g}"
+    base = f"20-game same-team mean {value:g}"
     if minutes is not None:
-        base += f" at {minutes:g} minutes"
+        base += f"; recent workload {minutes:g} minutes (context only)"
     base += f"; {int(p.get('n') or item.get('n') or 0)} saved games through {last}."
     opponent = next((c for c in p.get('cohorts', []) if c.get('type') == 'opponent_team'), None)
     if opponent:
-        base += (f" {opponent.get('team')}: {opponent.get('n', 0)} comparable games" +
-                 ('; no matchup adjustment.' if not opponent.get('adjustment') else '; small matchup adjustment.'))
+        base += f" {opponent.get('team')}: {opponent.get('n', 0)} comparable games; no matchup adjustment."
     seasons = p.get('seasons') or item.get('sample_seasons') or []
     if len(seasons) > 1:
         base += ' Sample spans seasons.'
@@ -420,6 +420,10 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
                     reason = 'Comparable workload statistics are more than seven days behind this game.'
             except (ValueError, TypeError, KeyError):
                 reason = 'Comparable workload freshness is unresolved.'
+        if not reason:
+            decision = baseline_offer_decision(projection, leg.get('line'))
+            if decision['side'] != leg.get('side'):
+                reason = decision['reason'] if decision['side'] is None else 'The benchmark supports the opposite offered side.'
         freshness = None
         if not reason:
             key = (leg.get('date'), leg.get('team'), leg.get('player'), leg.get('stat'))

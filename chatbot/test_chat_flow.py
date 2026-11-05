@@ -50,13 +50,18 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
         self.generate = AsyncMock(side_effect=self.explain)
 
     def add_player(self, player, team, values, stat):
-        for index, value in enumerate(values):
-            date = (dt.date(2026, 11, 1) - dt.timedelta(days=index)).isoformat()
+        samples = [(value, (dt.date(2026, 11, 1) - dt.timedelta(days=index)).isoformat(), '2026-27')
+                   for index, value in enumerate(values)]
+        if len(values) >= 6:
+            historical_value = {'pra': 18, 'tpm': 3, 'pts': 25}.get(stat, values[0])
+            samples += [(historical_value, (dt.date(2026, 4, 10) - dt.timedelta(days=index)).isoformat(), '2025-26')
+                        for index in range(max(0, 20 - len(values)))]
+        for value, date, season in samples:
             game_id = canonical_game(date, team, 'BOS')
             self.master.upsert_game({'id': game_id, 'date': date, 'home_team': team,
                 'away_team': 'BOS', 'status': 'final', 'source': 'synthetic completed games'})
             row = {'game_id': game_id, 'player_id': canonical_player(player), 'player': player,
-                'team': team, 'opponent': 'BOS', 'date': date, 'season': '2026-27',
+                'team': team, 'opponent': 'BOS', 'date': date, 'season': season,
                 'season_type': 'Regular Season', 'appearance_state': 'Played',
                 'source': 'synthetic player observations', 'minutes': 34,
                 'pts': 20, 'reb': 5, 'ast': 4, 'tpm': 2, 'tpa': 7, 'fga': 18}
@@ -254,6 +259,8 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(before, self.snapshot())
 
     async def test_research_target_with_insufficient_history_is_explained_without_model_invention(self):
+        with self.master.connect() as db:
+            db.execute("DELETE FROM player_games WHERE player='Josh Hart' AND season='2025-26'")
         history = [{'role': 'assistant', 'content': 'My projections — NYK vs BKN · Nov 02\n'
                    '1. Josh Hart · PTS+REB+AST: 20\n'
                    'More if line ≤15.5; Less if line ≥24.5.'}]

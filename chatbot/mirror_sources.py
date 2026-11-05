@@ -13,12 +13,14 @@ import json
 import email.utils
 import hashlib
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import httpx
 
-from dataset_refresh import load_scope,select_existing_rows
+from dataset_refresh import load_scope,select_existing_rows,expand_current_player_scope,validate_published_scope
 from feeds import canonical_game,canonical_player,canonical_team,numeric
 from nba_daily_export import validate_final
+from game_phase import regular_phase_exclusion
 
 REPO='sportsdataverse/sportsdataverse-data'
 CSV_TAG='espn_nba_player_boxscores'
@@ -54,10 +56,10 @@ def tracking_coverage(record, previous):
     return record
 
 
-def existing_game_snapshots(content,scope,published_at,source):
+def existing_game_snapshots(content,scope,published_at,source,discovered_scope=None):
     grouped={}
     for raw in csv.DictReader(io.StringIO(content.decode('utf-8-sig'))):
-        if raw.get('season_type')!='2':continue
+        if str(raw.get('season_type'))!='2' or regular_phase_exclusion(raw):continue
         day=raw['game_date'][:10];home_side=raw.get('home_away')=='home'
         team=canonical_team(raw.get('team_abbreviation'));opponent=canonical_team(raw.get('opponent_team_abbreviation'))
         home,away=(team,opponent) if home_side else (opponent,team)
@@ -71,7 +73,7 @@ def existing_game_snapshots(content,scope,published_at,source):
         minutes=numeric(raw.get('minutes'));points=numeric(raw.get('points'))
         state='Played' if played and minutes is not None and minutes>0 else 'DNP' if not played else 'Unknown'
         year=int(raw['season']);row={'game_id':game_id,'player_id':canonical_player(name),'player':name,
-            'provider_player_id':raw.get('athlete_id'),'team':team,'opponent':opponent,'date':day,
+            'provider_player_id':raw.get('athlete_id'),'espn_player_id':raw.get('athlete_id'),'team':team,'opponent':opponent,'date':day,
             'season':f'{year-1}-{str(year)[-2:]}','season_type':'Regular Season','appearance_state':state,
             'minutes':minutes if state!='DNP' else None,'source':source,
             'minute_precision':'Publisher numeric minutes; zero/absent minutes with no DNP flag remain unknown.'}
@@ -80,6 +82,8 @@ def existing_game_snapshots(content,scope,published_at,source):
             ('free_throws_made','ftm'),('free_throws_attempted','fta'),('offensive_rebounds','oreb'),
             ('defensive_rebounds','dreb'),('steals','stl'),('blocks','blk'),('turnovers','tov'),('fouls','fouls'),('plus_minus','plus_minus')]:
             row[field]=numeric(raw.get(column)) if state!='DNP' else None
+        starter=str(raw.get('starter','')).lower()
+        if starter in {'true','false'}:row['starter']=int(starter=='true')
         group['rows'].append(row)
     days={}
     for (day,game_id),group in grouped.items():
@@ -90,11 +94,16 @@ def existing_game_snapshots(content,scope,published_at,source):
         target['expected_games']+=1
         try:
             validate_final(group['game'],group['rows'])
-            target['games'].append(group['game']);target['player_games'].extend(select_existing_rows(group['rows'],scope))
+            target['games'].append(group['game']);target['player_games'].extend(group['rows'])
         except ValueError:
             target['pending_game_ids'].append(game_id);target['errors'].append({'game_id':game_id,'error_type':'SourceValidationError'})
+    if discovered_scope is not None:
+        scope=expand_current_player_scope(scope,[row for target in days.values() for row in target['player_games']])
+        discovered_scope.update(scope)
     through=max(days) if days else None
     for day,target in days.items():
+        target['player_games']=select_existing_rows(target['player_games'],scope)
+        target['scope_revision']=scope['revision']
         target['complete']=not target['pending_game_ids'];target['source_data_through_date']=day
         target['publisher_file_data_through_date']=through
         target['inventory_scope']='Games present in the published extract; complete NBA schedule not independently verified.'
@@ -103,7 +112,7 @@ def existing_game_snapshots(content,scope,published_at,source):
 
 class PublishedNBAData:
     def __init__(self,client,now):
-        self.client,self.now=client,now;self.scope=load_scope();self.assets={};self.days=None
+        self.client,self.now=client,now;self.scope=load_scope();self.bundled_scope=self.scope;self.assets={};self.days=None;self.scope_document=None
         year=now.year-(now.month<7);self.season=f'{year}-{str(year+1)[-2:]}';self.end_year=year+1
 
     async def release(self,tag):
@@ -125,13 +134,57 @@ class PublishedNBAData:
 
     async def day(self,day):
         if self.days is None:
-            content,meta=await self.asset(CSV_TAG,f'player_box_{self.end_year}.csv')
-            self.days=existing_game_snapshots(content,self.scope,meta['updated_at'],meta['browser_download_url'])
+            # Full-season CSV files grow beyond the bounded response size.
+            # Parquet is already a collector dependency and keeps transfer small.
+            content,meta=await self.asset(CSV_TAG,f'player_box_{self.end_year}.parquet')
+            import pyarrow.parquet as pq
+            table=pq.read_table(io.BytesIO(content))
+            if table.num_rows>100_000:
+                raise ValueError('Published season extract exceeds its row bound.')
+            raw_rows=table.to_pylist()
+            today=self.now.astimezone(ZoneInfo('America/New_York')).date()
+            if any(str(row.get('season'))!=str(self.end_year) or
+                   not dt.date(self.end_year-1,7,1)<=dt.date.fromisoformat(str(row.get('game_date'))[:10])<=today
+                   for row in raw_rows):
+                raise ValueError('Published current-season extract has an out-of-season or future observation.')
+            buffer=io.StringIO()
+            writer=csv.DictWriter(buffer,fieldnames=table.column_names);writer.writeheader()
+            writer.writerows(raw_rows)
+            discovered={}
+            days=existing_game_snapshots(buffer.getvalue().encode(),self.scope,meta['updated_at'],meta['browser_download_url'],discovered)
+            effective=discovered or self.scope
+            scope_document={'schema_version':1,'base_revision':self.bundled_scope['revision'],
+                'season':self.season,'scope':effective,'upstream_full_game_validated':True,
+                'source_url':meta['browser_download_url'],'source_published_at':meta['updated_at'],
+                'source_checked_at':self.now.isoformat(),'source_data_through_date':max(days) if days else None,
+                'source_content_sha256':hashlib.sha256(content).hexdigest(),
+                'validated_player_rows':sum(len(item['player_games']) for item in days.values()),
+                'rejected_game_ids':sorted({identity for item in days.values() for identity in item.get('pending_game_ids',[])}),
+                'coverage_note':'Published current-season game inventory; roster additions use validated complete boxes, not a claim of complete league history.'}
+            validate_published_scope(scope_document,self.bundled_scope,self.scope,self.now)
+            self.scope,self.days,self.scope_document=effective,days,scope_document
         return self.days.get(day)
+
+    def configure_scope(self, output):
+        target=Path(output)/'existing_dataset_scope.json'
+        if target.exists():
+            try:
+                self.scope=validate_published_scope(json.loads(target.read_text()),self.bundled_scope,
+                                                    self.bundled_scope,self.now)
+            except (ValueError,TypeError,KeyError):
+                # A changed release/season starts from its bundled authorized scope.
+                self.scope=self.bundled_scope
+
+    def publish_scope(self, output):
+        if self.scope_document is None:return
+        target=Path(output)/'existing_dataset_scope.json'
+        temporary=target.with_suffix('.json.tmp')
+        temporary.write_text(json.dumps(self.scope_document,indent=2,sort_keys=True)+'\n')
+        temporary.replace(target)
 
     async def tracking(self,output):
         import pyarrow.parquet as pq
-        from advanced_refresh import normalize_records,preserve_sparse_fields
+        from advanced_refresh import normalize_records,preserve_sparse_fields,direct_tracking_status
         from master import clear_unverified_tracking_coverage
         pair_scope=json.loads(Path(__file__).with_name('matchup_refresh_scope.json').read_text())
         assets=[('Player totals','player_stats_base'),('Team totals','team_stats_base'),('Team defense','team_stats_opponent'),
@@ -179,6 +232,7 @@ class PublishedNBAData:
         document={'schema_version':1,'scope_revision':self.scope['revision'],'season':self.season,
             'last_attempt':self.now.isoformat(),'source_published_at':max(published),'records':records,'coverage':coverage,
             'direct_tracking_attempted_at':old.get('direct_tracking_attempted_at'),
-            'source_data_through_date':through,'policy':'Only existing workbook entities/metrics; source publication lag is preserved.'}
+            'direct_tracking':direct_tracking_status(old,self.now),
+            'source_data_through_date':through,'policy':'Authorized NBA player/team populations and supported metrics; source publication lag is preserved.'}
         target.write_text(json.dumps(document,indent=2,sort_keys=True)+'\n')
         return True

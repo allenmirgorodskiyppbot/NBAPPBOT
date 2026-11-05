@@ -13,7 +13,8 @@ import statistics
 from zoneinfo import ZoneInfo
 
 from board_shortlist import MARKET_NAMES, player_availability
-from contextual_projection import _quantile, _weighted
+from contextual_projection import (_quantile, _weighted, projection_for_leg,
+                                   baseline_offer_decision, BENCHMARK_METHOD)
 from feeds import canonical_player, canonical_team
 from master import STAT_ALIASES, STAT_COMPONENTS, normalized_name
 from news_digest import _aware
@@ -192,7 +193,7 @@ def build_pick_discussion(store, pick, now=None):
               'requested_side': side, 'decision': 'pass', 'research_lean': None,
               'confidence': 'insufficient', 'missing': missing, 'reasons': [],
               'cautions': [], 'sources': [], 'evidence_cards': [], 'research_only': True,
-              'offer_verified': False, 'method': 'current-season-discussion-v1',
+              'offer_verified': False, 'method': BENCHMARK_METHOD,
               'generated_at': now.isoformat()}
     if missing:
         result['reason'] = 'I need the ' + ', '.join(missing) + ' to assess this line.'
@@ -379,16 +380,19 @@ def build_pick_discussion(store, pick, now=None):
         result['cautions'].append('The opponent is unresolved; no matchup adjustment was made.')
     elif len(opponents) < 3:
         result['cautions'].append(f'The sample against {opponent} is too small for a quantitative matchup adjustment.')
-    # Historical distribution, center, workload sensitivity and data quality
-    # must agree; an average alone never chooses a side.
-    margin = max(.25, sd * .08)
-    centers = [mean, median] + ([reference] if reference is not None else [])
-    lean = ('more' if above / n >= .6 and min(centers) - line >= margin else
-            'less' if below / n >= .6 and line - max(centers) >= margin else None)
+    # Current-season hit counts remain descriptive. Decisions use exactly the
+    # same benchmark and offer rule as /picks and screenshot comparisons.
+    baseline = projection_for_leg(store, {'player': player, 'team': team, 'stat': stat,
+        'date': day.isoformat(), 'opponent': opponent}, now)
+    if phase != 'Regular Season':
+        baseline = {'available': False, 'reason': 'The 20-game strategy is restricted to regular-season games.'}
+    offer_decision = baseline_offer_decision(baseline, line)
+    result.update(baseline=baseline, offer_decision=offer_decision)
+    lean = offer_decision['side']
     result['research_lean'] = lean
     blockers = []
-    if n < 5:
-        blockers.append('fewer than five complete current-season observations')
+    if not baseline.get('available'):
+        blockers.append(baseline.get('reason', 'The 20-game benchmark is unavailable.'))
     if len(minutes_rows) < min(n, 5):
         blockers.append('too few observations with known playing time')
     if age > 7:
@@ -410,11 +414,11 @@ def build_pick_discussion(store, pick, now=None):
     if blockers:
         result['reason'] = 'Pass for now: ' + '; '.join(blockers) + '.'
     elif not lean:
-        result['reason'] = 'Pass: the historical distribution and workload reference do not agree on a clear side.'
+        result['reason'] = 'Pass: ' + offer_decision['reason']
     else:
         result['decision'] = lean
-        result['reason'] = ('Tentative ' + lean.title() + ': the historical mean, median, observed outcomes '
-                            'and available workload reference agree. This is not a validated betting edge.')
+        result['reason'] = ('Tentative ' + lean.title() + ': ' + offer_decision['reason'] +
+                            ' Current playing-time and availability checks still apply.')
     result['reasons'].append(result['reason'])
     result['conditional_risks'] = [
         'Reduced minutes, including a possible blowout or foul trouble, can lower both shot attempts and counting statistics; no blowout is forecast here.',
@@ -458,6 +462,20 @@ def discussion_evidence(report):
     source = 'Stored player game observations; ' + scope + '.'
     cards = [{'id': 'P1', 'kind': 'prop_sample', 'text': ' '.join(f['text'] for f in facts),
               'source': source, 'entity': player, 'data_through_date': sample['last_date'], 'approved_facts': facts}]
+    baseline = report.get('baseline', {})
+    if baseline.get('available'):
+        baseline_scope = (f"Latest {baseline['n']} same-team regular-season observations, "
+                          f"{', '.join(baseline['seasons'])}; through {baseline['last_date']}")
+        baseline_facts = [{'entity': player, 'metric': metric, 'scope': baseline_scope,
+            'fact_type': 'projection',
+            'text': (f"{player}: the {baseline['n']}-game baseline average is {baseline['reference_projection']:g} "
+                     f"{metric}; median {baseline['baseline_median']:g}. This is the selection benchmark, "
+                     'not a calibrated prediction or win probability.'),
+            'values': [baseline['n'], baseline['reference_projection'], baseline['baseline_median']]}]
+        cards.append({'id': 'P5', 'kind': 'prop_baseline', 'entity': player,
+            'source': 'Stored game observations; ' + baseline_scope,
+            'data_through_date': baseline['last_date'], 'text': baseline_facts[0]['text'],
+            'approved_facts': baseline_facts})
     workload = report['workload']
     if workload.get('reference_minutes') is not None:
         wf = [
@@ -511,6 +529,11 @@ def format_pick_discussion(report):
     evidence = (f"In {sample['n']} stored games: {sample['more']} above, {sample['less']} below"
                 + (f", {sample['ties']} tied" if sample['ties'] else '')
                 + f"; median {sample['median']:g}.")
+    baseline = report.get('baseline', {})
+    if baseline.get('available'):
+        evidence = (f"20-game baseline: average {baseline['reference_projection']:g}, "
+                    f"median {baseline['baseline_median']:g}; same team, "
+                    f"{', '.join(baseline['seasons'])}.\nCurrent-season context: " + evidence)
     if report['decision'] != 'pass':
         risk = ('Made threes depend on both attempts and shooting accuracy.' if report['stat'] == 'tpm'
                 else 'Reduced minutes or a role change could overturn this lean.')

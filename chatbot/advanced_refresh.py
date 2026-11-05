@@ -142,15 +142,61 @@ def preserve_sparse_fields(record, previous):
     return record
 
 
+def direct_tracking_status(document, now):
+    """Expose the real direct-source checkpoint without refreshing source dates.
+
+    Mirror publications can change independently of optional NBA Stats checks.
+    Keep their last direct attempt details separately so a mirror refresh does
+    not hide the reason a missing category is still waiting for its retry.
+    """
+    from news_digest import _aware
+    checked = _aware(document.get('direct_tracking_attempted_at'))
+    cooldown = 6 * 3600
+    next_attempt = checked + dt.timedelta(seconds=cooldown) if checked else None
+    attempts = dict((document.get('direct_tracking') or {}).get('category_attempts') or {})
+    for category in document.get('coverage', []):
+        attempt = category.get('direct_attempt') or category
+        if attempt.get('attempts'):
+            attempts[category['category']] = {
+                key: attempt.get(key) for key in
+                ('status', 'last_attempt', 'records', 'attempts')}
+    state = ('never_attempted' if checked is None else
+             'invalid_future_checkpoint' if checked > now else
+             'cooldown' if next_attempt > now else 'due')
+    return {'state': state, 'evaluated_at': now.isoformat(),
+            'last_attempt': checked.isoformat() if checked else None,
+            'next_eligible_attempt': next_attempt.isoformat() if next_attempt else None,
+            'retry_cooldown_seconds': cooldown, 'category_attempts': attempts,
+            'note': 'Direct-source retry status only; this does not verify covered-game dates.'}
+
+
 async def collect_tracking(collector,output,categories=None):
     """Collect only requested original metric populations; preserve other sources."""
     now=collector.now;scope=load_scope();local=now.astimezone(ZoneInfo('America/New_York'))
     year=local.year-(local.month<7);season=f'{year}-{str(year+1)[-2:]}'
     target=Path(output)/'existing_tracking.json'
     old=json.loads(target.read_text()) if target.exists() else {}
+    scope_path=Path(output)/'existing_dataset_scope.json'
+    if scope_path.exists():
+        # Daily discovery can authorize new current NBA players. Reverting this
+        # revision during an optional direct attempt would make the already
+        # collected mirror records fail the runtime's expanded-scope import.
+        from dataset_refresh import validate_published_scope
+        try:
+            scope=validate_published_scope(json.loads(scope_path.read_text()),scope,scope,now)
+        except (ValueError,TypeError,KeyError):
+            # A release can replace the bundled scope before an old manifest
+            # is refreshed. The matching bundled snapshot is already authorized;
+            # an unknown expanded revision still fails the check below.
+            if old.get('scope_revision') not in {None,scope['revision']}:
+                raise ValueError('Direct tracking needs the validated scope matching the collected snapshot.') from None
+    if old.get('season')==season and old.get('scope_revision') not in {None,scope['revision']}:
+        raise ValueError('Direct tracking needs the validated scope matching the collected snapshot.')
     from news_digest import _aware
     checked=_aware(old.get('direct_tracking_attempted_at'))
     if checked and 0 <= (now-checked).total_seconds()<6*3600:
+        old['direct_tracking'] = direct_tracking_status(old, now)
+        target.write_text(json.dumps(old,indent=2,sort_keys=True)+'\n')
         return any(c.get('status')=='collected' for c in old.get('coverage',[]))
     pair_scope=json.loads(Path(__file__).with_name('matchup_refresh_scope.json').read_text())
     pairs=pair_scope['pairs'];team_ids=pair_scope.get('team_ids',{})
@@ -222,6 +268,7 @@ async def collect_tracking(collector,output,categories=None):
               'policy':'Existing workbook metrics and named pair definitions only; unsupported fields are never inferred.'}
     dates=[c.get('source_data_through_date') for c in coverage.values() if c.get('status')=='collected']
     document['source_data_through_date']=min(dates) if dates and all(dates) else None
+    document['direct_tracking']=direct_tracking_status(document,now)
     target.write_text(json.dumps(document,indent=2,sort_keys=True)+'\n')
     return any(c.get('status')=='collected' for c in coverage.values())
 
@@ -317,6 +364,7 @@ def import_tracking(store,document,now):
     dates=[item.get('source_data_through_date') for item in coverage if item.get('status')=='collected']
     store.set_checkpoint('tracking_refresh_status',{'last_attempt':document.get('last_attempt'),
                          'coverage':coverage,'existing_records':len(rows),
+                         'direct_tracking':direct_tracking_status(document,now),
                          'source_data_through_date':min(dates) if dates and all(dates) else None,
                          'note':'Prior values keep original timestamps when a tracking source is unavailable.'})
     if any(item.get('status')=='collected' for item in document.get('coverage',[])):

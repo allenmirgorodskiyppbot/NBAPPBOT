@@ -18,7 +18,8 @@ DATE = '2026-10-30'
 def candidate(player='Jalen Brunson', side='more', line=19.5, team='NYK', stat='pts', **changes):
     value = {'leg': {'player': player, 'side': side, 'line': line, 'team': team, 'stat': stat, 'date': DATE},
              'eligible_for_ranking': True, 'n': 20, 'reason': 'Enough observations.',
-             'projection': {'available': True, 'reference_projection': 25.5,
+             'projection': {'available': True, 'reference_projection': 25.5, 'baseline_median': 25,
+                            'empirical_scenario_range': {'p10': 20, 'p90': 30},
                             'selected_side_margin': 6 if side == 'more' else -6,
                             'standardized_margin': .75 if side == 'more' else -.75,
                             'projected_minutes': 34, 'n': 20, 'last_date': '2026-10-29',
@@ -41,12 +42,16 @@ class ShortlistTests(unittest.TestCase):
             'ready': True, 'reasons': [], 'current_player_stat_coverage': ['pts', 'reb', 'ast', 'pra', 'fga']})
         readiness.start()
         self.addCleanup(readiness.stop)
+        engine_readiness = patch('analysis_engine.assess_pregame_freshness', return_value={
+            'ready': True, 'reasons': []})
+        engine_readiness.start()
+        self.addCleanup(engine_readiness.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')
         seed_calendar(self.store)
 
-    def observations(self, player, team='NYK', n=10, minutes=32, pts=20, reb=6, ast=5):
+    def observations(self, player, team='NYK', n=20, minutes=32, pts=20, reb=6, ast=5):
         for offset in range(n):
             day = (dt.date(2026, 10, 29) - dt.timedelta(days=offset)).isoformat()
             other = 'BOS' if team != 'BOS' else 'PHI'
@@ -84,6 +89,16 @@ class ShortlistTests(unittest.TestCase):
         text = format_shortlist(result)
         self.assertIn('Only 5 observed', text)
         self.assertIn('Missing minutes', text)
+
+    def test_positive_margin_alone_does_not_bypass_mean_median_or_buffer(self):
+        close = candidate(line=24.5)
+        close['projection']['selected_side_margin'] = 1
+        disagrees = candidate('Josh Hart')
+        disagrees['projection']['baseline_median'] = 18
+        result = enrich_shortlist(self.store, report(close, disagrees), NOW)
+        self.assertEqual(result['shortlist'], [])
+        self.assertTrue(any('buffer' in row['reason'] for row in result['skipped']))
+        self.assertTrue(any('median' in row['reason'] for row in result['skipped']))
 
     def test_multiple_thresholds_require_offer_resolution(self):
         result = enrich_shortlist(self.store, report(candidate(line=19.5), candidate(line=29.5)), NOW)
@@ -296,9 +311,9 @@ class ShortlistTests(unittest.TestCase):
         self.assertIn('No entry placed', text)
 
     def test_real_engine_produces_clean_shortlist_without_entry(self):
-        self.observations('Jalen Brunson', n=15)
+        self.observations('Jalen Brunson', n=20)
         self.observations('Josh Hart', n=5, reb=9)
-        board = self.store.create_board([candidate()['leg'], candidate(side='less')['leg']])
+        board = self.store.create_board([candidate(line=15.5)['leg'], candidate(side='less', line=15.5)['leg']])
         actual = analyze_board(self.store, board['id'], as_of=NOW)
         value = enrich_shortlist(self.store, actual, NOW)
         self.assertEqual(len(value['shortlist']), 1)

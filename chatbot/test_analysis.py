@@ -17,6 +17,13 @@ class SeedAndAnalysisTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.root = Path(self.directory.name)
         self.store = MasterStore(self.root / 'master.sqlite')
+        readiness = patch('analysis_engine.assess_pregame_freshness', return_value={
+            'ready': True, 'reasons': []})
+        readiness.start()
+        self.addCleanup(readiness.stop)
+        self.store.upsert_game({'id': canonical_game('2025-01-21', 'NYK', 'BOS'),
+            'date': '2025-01-21', 'home_team': 'NYK', 'away_team': 'BOS',
+            'status': 'scheduled', 'start_time': '2025-01-21T23:30:00+00:00', 'source': 'fixture'})
 
     def tearDown(self):
         self.directory.cleanup()
@@ -44,7 +51,7 @@ class SeedAndAnalysisTests(unittest.TestCase):
         record = {'game_id': game_id, 'player_id': canonical_player(player), 'player': player,
                   'team': 'NYK', 'opponent': 'BOS', 'date': date, 'season': '2024-25',
                   'season_type': 'Regular Season', 'appearance_state': 'Played',
-                  'pts': day, 'reb': 3, 'ast': 2, 'source': 'fixture'}
+                  'minutes': 32, 'pts': day, 'reb': 3, 'ast': 2, 'source': 'fixture'}
         record.update(changes)
         self.store.upsert_player_game(record)
         return record
@@ -120,8 +127,8 @@ class SeedAndAnalysisTests(unittest.TestCase):
         self.observation(17, pts=999)
         self.store.upsert_game({'id': canonical_game('2025-01-16', 'NYK', 'BOS'), 'status': 'scheduled'})
         board = self.store.create_board([
-            {'player': 'Jalen Brunson', 'stat': 'pts', 'line': 9.5, 'side': 'more', 'date': '2025-01-16'},
-            {'player': 'Jalen Brunson', 'stat': 'pra', 'line': 20, 'side': 'less', 'date': '2025-01-16'},
+            {'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts', 'line': 9.5, 'side': 'more', 'date': '2025-01-16'},
+            {'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pra', 'line': 20, 'side': 'less', 'date': '2025-01-16'},
         ])
         report = analyze_board(self.store, board['id'], as_of='2025-01-16T17:00:00Z')
         points, combo = report['legs']
@@ -133,7 +140,8 @@ class SeedAndAnalysisTests(unittest.TestCase):
         self.assertEqual(combo['missing_games'], 2)
         self.assertIn(0, [r['value'] for r in combo['sample_games']])
         self.assertNotIn(999, [r['value'] for r in points['sample_games']])
-        self.assertTrue(points['eligible_for_ranking'])
+        self.assertFalse(points['eligible_for_ranking'])
+        self.assertIn('20 are required', points['projection']['reason'])
         self.assertTrue(report['research_only'])
         self.assertEqual(self.store.get_board(board['id']), board)
         self.assertEqual(self.store.list_entries(), [])
@@ -141,7 +149,7 @@ class SeedAndAnalysisTests(unittest.TestCase):
     def test_analysis_small_sample_abstains_and_ties_remain_separate(self):
         for day in range(1, 6):
             self.observation(day, player='Josh Hart', pts=10)
-        board = self.store.create_board([{'player': 'Josh Hart', 'stat': 'pts', 'line': 10,
+        board = self.store.create_board([{'player': 'Josh Hart', 'team': 'NYK', 'stat': 'pts', 'line': 10,
                                          'side': 'more', 'date': '2025-01-10'}])
         report = analyze_board(self.store, board['id'])
         leg = report['legs'][0]
@@ -153,7 +161,7 @@ class SeedAndAnalysisTests(unittest.TestCase):
     def test_versions_persist_after_corrections_and_restart(self):
         for day in range(1, 13):
             self.observation(day)
-        board = self.store.create_board([{'player': 'Jalen Brunson', 'stat': 'pts',
+        board = self.store.create_board([{'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts',
                                          'line': 10, 'side': 'more', 'date': '2025-01-20'}])
         first = analyze_board(self.store, board['id'])
         self.observation(12, pts=50)
@@ -175,7 +183,7 @@ class SeedAndAnalysisTests(unittest.TestCase):
 
     def test_freshness_does_not_present_seed_as_live_or_official_coverage(self):
         self.store.feed_success('workbook_seed', 'static')
-        board = self.store.create_board([{'player': 'Jalen Brunson', 'stat': 'pts',
+        board = self.store.create_board([{'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts',
                                          'line': 20, 'side': 'more', 'date': '2025-01-20'}])
         report = analyze_board(self.store, board['id'])
         self.assertEqual(report['freshness']['fresh_feeds'], [])
@@ -196,7 +204,7 @@ class SeedAndAnalysisTests(unittest.TestCase):
             self.store.upsert_game({'id': canonical_game('2025-01-16', 'NYK', 'BOS'),
                                    'date': '2025-01-16', 'home_team': 'NYK',
                                    'away_team': 'BOS', 'status': 'live'})
-            leg = {'player': 'Jalen Brunson', 'stat': 'pts', 'line': 10, 'side': 'more', **extra}
+            leg = {'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts', 'line': 10, 'side': 'more', **extra}
             board = self.store.create_board([leg])
             result = analyze_board(self.store, board['id'], as_of='2025-01-16T17:00:00Z')
             self.assertEqual(result['candidates'], [])
@@ -206,7 +214,7 @@ class SeedAndAnalysisTests(unittest.TestCase):
         for day in range(1, 16):
             self.observation(day, pts=day * 10)
         self.store.feed_success('local_backup')
-        board = self.store.create_board([{'player': 'Jalen Brunson', 'stat': 'pts',
+        board = self.store.create_board([{'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts',
                                          'line': 20, 'side': 'more', 'date': '2025-01-20'}])
         report = analyze_board(self.store, board['id'], as_of='2025-01-10T17:00:00Z')
         self.assertEqual(report['legs'][0]['n'], 9)
@@ -215,17 +223,17 @@ class SeedAndAnalysisTests(unittest.TestCase):
 
     def test_research_lineups_use_exact_lines_distinct_players_and_teams(self):
         for player in ['Jalen Brunson', 'Josh Hart', 'Jayson Tatum', 'Derrick White']:
-            for day in range(1, 13):
-                self.observation(day, player=player)
+            for day in range(1, 21):
+                self.observation(day, player=player, team='BOS' if player in {'Jayson Tatum', 'Derrick White'} else 'NYK', opponent='NYK' if player in {'Jayson Tatum', 'Derrick White'} else 'BOS')
         original = [
-            {'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts', 'line': 5.5, 'side': 'more', 'date': '2025-01-20'},
-            {'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'ast', 'line': 3.5, 'side': 'less', 'date': '2025-01-20'},
-            {'player': 'Josh Hart', 'team': 'NYK', 'stat': 'reb', 'line': 4.5, 'side': 'less', 'date': '2025-01-20'},
-            {'player': 'Jayson Tatum', 'team': 'BOS', 'stat': 'pts', 'line': 8.5, 'side': 'less', 'date': '2025-01-20'},
-            {'player': 'Derrick White', 'team': 'BOS', 'stat': 'ast', 'line': 3.5, 'side': 'less', 'date': '2025-01-20'},
+            {'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'pts', 'line': 5.5, 'side': 'more', 'date': '2025-01-21'},
+            {'player': 'Jalen Brunson', 'team': 'NYK', 'stat': 'ast', 'line': 3.5, 'side': 'less', 'date': '2025-01-21'},
+            {'player': 'Josh Hart', 'team': 'NYK', 'stat': 'reb', 'line': 4.5, 'side': 'less', 'date': '2025-01-21'},
+            {'player': 'Jayson Tatum', 'team': 'BOS', 'stat': 'pts', 'line': 18.5, 'side': 'less', 'date': '2025-01-21'},
+            {'player': 'Derrick White', 'team': 'BOS', 'stat': 'ast', 'line': 3.5, 'side': 'less', 'date': '2025-01-21'},
         ]
         board = self.store.create_board(original)
-        report = analyze_board(self.store, board['id'], as_of='2025-01-19T17:00:00Z')
+        report = analyze_board(self.store, board['id'], as_of='2025-01-21T17:00:00Z')
         self.assertEqual(len(report['suggested_entries']), 3)
         for suggestion in report['suggested_entries']:
             self.assertEqual(len({canonical_player(leg['player']) for leg in suggestion['legs']}), 2)
@@ -240,19 +248,48 @@ class SeedAndAnalysisTests(unittest.TestCase):
 
     def test_all_knicks_or_missing_team_lines_require_other_team_metadata(self):
         for player in ['Jalen Brunson', 'Josh Hart']:
-            for day in range(1, 13):
-                self.observation(day, player=player)
-        legs = [{'player': player, 'team': 'NYK', 'stat': 'pts', 'line': 8.5,
-                 'side': 'more', 'date': '2025-01-20'} for player in ['Jalen Brunson', 'Josh Hart']]
+            for day in range(1, 21):
+                self.observation(day, player=player, team='BOS' if player in {'Jayson Tatum', 'Derrick White'} else 'NYK', opponent='NYK' if player in {'Jayson Tatum', 'Derrick White'} else 'BOS')
+        legs = [{'player': player, 'team': 'NYK', 'stat': 'pts', 'line': 5.5,
+                 'side': 'more', 'date': '2025-01-21'} for player in ['Jalen Brunson', 'Josh Hart']]
         board = self.store.create_board(legs)
-        report = analyze_board(self.store, board['id'], as_of='2025-01-19T17:00:00Z')
+        report = analyze_board(self.store, board['id'], as_of='2025-01-21T17:00:00Z')
         self.assertEqual(report['suggested_entries'], [])
         self.assertIn('another team', report['lineup_note'])
         legs[0].pop('team')
         board = self.store.create_board(legs)
-        report = analyze_board(self.store, board['id'], as_of='2025-01-19T17:00:00Z')
+        report = analyze_board(self.store, board['id'], as_of='2025-01-21T17:00:00Z')
         self.assertEqual(report['suggested_entries'], [])
-        self.assertIn('explicit team', report['lineup_note'])
+        self.assertFalse(report['legs'][0]['eligible_for_ranking'])
+        self.assertTrue(any('current NBA team' in reason for reason in report['legs'][0]['eligibility_blocks']))
+
+    def test_direct_analysis_rechecks_freshness_before_returning_a_cached_candidate(self):
+        for day in range(1, 21):
+            self.observation(day, pts=24)
+        board = self.store.create_board([{'player': 'Jalen Brunson', 'team': 'NYK',
+            'stat': 'pts', 'line': 19.5, 'side': 'more', 'date': '2025-01-21'}])
+        first = analyze_board(self.store, board['id'], as_of='2025-01-21T17:00:00Z')
+        self.assertEqual(len(first['candidates']), 1)
+        with patch('analysis_engine.assess_pregame_freshness', return_value={
+                'ready': False, 'reasons': ['Current schedule verification expired.']}):
+            stale = analyze_board(self.store, board['id'], as_of='2025-01-21T17:16:00Z')
+        self.assertFalse(stale['cache_hit'])
+        self.assertEqual(stale['candidates'], [])
+        self.assertEqual(stale['suggested_entries'], [])
+        self.assertEqual(stale['legs'][0]['projection']['reference_projection'], 24)
+        self.assertIn('verification expired', stale['legs'][0]['reason'])
+
+    def test_direct_analysis_holds_a_published_out_report(self):
+        for day in range(1, 21):
+            self.observation(day, pts=24)
+        self.store.record_news({'id': 'out-analysis-fixture', 'title': 'Jalen Brunson: Ruled out today',
+            'published_at': '2025-01-21T16:50:00+00:00', 'body': 'Will not play.',
+            'source': 'fixture publisher', 'game_date': '2025-01-21'})
+        board = self.store.create_board([{'player': 'Jalen Brunson', 'team': 'NYK',
+            'stat': 'pts', 'line': 19.5, 'side': 'more', 'date': '2025-01-21'}])
+        report = analyze_board(self.store, board['id'], as_of='2025-01-21T17:00:00Z')
+        self.assertEqual(report['candidates'], [])
+        self.assertIn('reports this player out', report['legs'][0]['reason'])
 
 
 if __name__ == '__main__':

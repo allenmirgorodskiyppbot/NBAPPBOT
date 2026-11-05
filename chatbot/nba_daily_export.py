@@ -9,6 +9,7 @@ import argparse
 import asyncio
 import datetime as dt
 import json
+import hashlib
 from pathlib import Path
 import sys
 import time
@@ -43,17 +44,60 @@ def verified_day_inventory(document, day, checked_at):
     if not isinstance(calendar, list) or not calendar:
         raise ValueError('Independent calendar does not establish scheduled dates.')
     scheduled_days = {local_day(value) for value in calendar}
-    games = [parse_game(raw) for raw in document['events']]
-    if len(games) > 30 or len({g['id'] for g in games}) != len(games) or any(g['date'] != day for g in games):
+    from game_phase import published_event_exclusion
+    all_games = [parse_game(raw) for raw in document['events']]
+    excluded = {game['id']:reason for raw,game in zip(document['events'],all_games)
+                if (reason:=published_event_exclusion(raw,game))}
+    games = [game for game in all_games if game['id'] not in excluded]
+    if len(all_games) > 30 or len({g['id'] for g in all_games}) != len(all_games) or any(g['date'] != day for g in all_games):
         raise ValueError('Independent event identities do not match the requested date.')
-    if not games and day in scheduled_days:
+    if not all_games and day in scheduled_days:
         raise ValueError('Empty scoreboard conflicts with a scheduled game date.')
     return {'inventory_verified':True, 'inventory_verified_at':checked_at.isoformat(),
             'inventory_verification_source':ESPN+'scoreboard?dates='+day.replace('-',''),
             'inventory_game_ids':sorted(g['id'] for g in games),
-            'inventory_off_day_verified':not games and day not in scheduled_days,
-            'inventory_scope':'Independent ESPN NBA day inventory; existing workbook player rows only',
+            'inventory_off_day_verified':not games and (day not in scheduled_days or bool(excluded)),
+            'statistical_phase_exclusions':excluded,
+            'inventory_scope':'Independent ESPN NBA regular-season statistical day inventory; authorized NBA player rows',
             'games':games}
+
+
+def verified_nba_day_inventory(document, day, checked_at):
+    """An actually fetched official calendar can verify a completed day's inventory."""
+    from feeds import TEAM_WORDS
+    from game_phase import regular_phase_exclusion
+    league = document.get('leagueSchedule') if isinstance(document, dict) else None
+    dates = league.get('gameDates') if isinstance(league, dict) else None
+    year = int(day[:4]) - (int(day[5:7]) < 7)
+    season = f'{year}-{str(year + 1)[-2:]}'
+    if (not isinstance(dates, list) or not dates or league.get('seasonYear') != season
+            or day >= checked_at.astimezone(EASTERN).date().isoformat()):
+        raise ValueError('Official inventory is not a completed date within its season.')
+    calendar_days = []
+    games = []
+    for block in dates:
+        block_day = day_value(block.get('gameDate'))
+        if not isinstance(block.get('games'), list):
+            raise ValueError('Official calendar block has no event inventory.')
+        calendar_days.append(block_day)
+        if block_day != day:
+            continue
+        for raw in block['games']:
+            game = nba_game(raw, SCHEDULE_URL, block_day, season)
+            if game['date'] != day or game['home_team'] not in TEAM_WORDS or game['away_team'] not in TEAM_WORDS:
+                raise ValueError('Official inventory event has an unresolved identity.')
+            if regular_phase_exclusion(game):
+                continue
+            games.append(game)
+    if (not min(calendar_days) <= day <= max(calendar_days) or len(games) > 30
+            or len({g['id'] for g in games}) != len(games)):
+        raise ValueError('Official inventory date or duplicate event is unresolved.')
+    return {'inventory_verified': True, 'inventory_verified_at': checked_at.isoformat(),
+            'inventory_verification_source': SCHEDULE_URL,
+            'inventory_game_ids': sorted(g['id'] for g in games),
+            'inventory_off_day_verified': not games,
+            'inventory_scope': 'Independent official NBA regular-season day inventory; authorized player rows',
+            'games': games}
 
 
 def reconcile_day_inventory(snapshot, inventory, day, scope):
@@ -66,6 +110,16 @@ def reconcile_day_inventory(snapshot, inventory, day, scope):
                 'published_at':inventory['inventory_verified_at'], 'expected_games':0,
                 'games':[], 'player_games':[], 'pending_game_ids':[], 'errors':[], 'complete':True,
                 'scope_revision':scope['revision'], 'upstream_full_game_validated':True, **metadata}
+    excluded=inventory.get('statistical_phase_exclusions',{})
+    if excluded:
+        present={g['id'] for g in snapshot.get('games',[])}|set(snapshot.get('pending_game_ids',[]))
+        removed=present&set(excluded)
+        snapshot={**snapshot,'games':[g for g in snapshot.get('games',[]) if g['id'] not in excluded],
+                  'player_games':[r for r in snapshot.get('player_games',[]) if r['game_id'] not in excluded],
+                  'pending_game_ids':[identity for identity in snapshot.get('pending_game_ids',[]) if identity not in excluded],
+                  'errors':[e for e in snapshot.get('errors',[]) if e.get('game_id') not in excluded],
+                  'expected_games':snapshot.get('expected_games',0)-len(removed)}
+        snapshot['complete']=not snapshot['pending_game_ids'] and not snapshot['errors']
     expected = {g['id']:g for g in inventory['games']}
     actual = {g['id']:g for g in snapshot.get('games', [])}
     if (set(actual) != set(expected) or snapshot.get('expected_games') != len(expected)
@@ -156,8 +210,42 @@ class PublicCollector:
         return await self.boxes(day,games,'espn')
 
     async def inventory(self, day):
-        document = await self.request(ESPN+'scoreboard?dates='+day.replace('-',''))
-        return verified_day_inventory(document, day, self.now)
+        try:
+            document = await self.request(ESPN+'scoreboard?dates='+day.replace('-',''))
+            return verified_day_inventory(document, day, self.now)
+        except (httpx.HTTPError, RuntimeError, ValueError):
+            if self.schedule is None:
+                self.schedule = await self.request(SCHEDULE_URL)
+            return verified_nba_day_inventory(self.schedule, day, self.now)
+
+    async def publish_current_schedule(self, output):
+        """Publish the validated raw event response and its original check time."""
+        from game_schedule_check import _parse_today, _parse_nba_today
+        from nba_cdn import SCOREBOARD_URL
+        day = self.now.astimezone(EASTERN).date().isoformat()
+        failures = []
+        for source, parser in ((ESPN + 'scoreboard?dates=' + day.replace('-', ''), _parse_today),
+                               (SCOREBOARD_URL, _parse_nba_today)):
+            try:
+                document = await self.request(source)
+                games = parser(document, day)
+                result = {'schema_version': 1, 'date': day, 'source_url': source,
+                          'source_checked_at': self.now.isoformat(),
+                          'source_content_sha256': hashlib.sha256(json.dumps(document, sort_keys=True,
+                              separators=(',', ':')).encode()).hexdigest(),
+                          'document': document, 'game_ids': sorted(games),
+                          'scope': 'Current event timing only; no box-score, availability, or player verification.'}
+                target = Path(output) / 'schedule_today.json'
+                target.parent.mkdir(parents=True, exist_ok=True)
+                temporary = target.with_suffix('.json.tmp')
+                temporary.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
+                temporary.replace(target)
+                return {'status': 'success', 'games': len(games), 'source': source,
+                        'source_checked_at': self.now.isoformat()}
+            except (httpx.HTTPError, RuntimeError, ValueError) as error:
+                failures.append({'source': source, 'error_type': type(error).__name__,
+                    'http_status': getattr(getattr(error, 'response', None), 'status_code', None)})
+        return {'status': 'unavailable', 'attempts': failures}
 
     async def boxes(self,day,games,source):
         published=[]; observations=[]; pending=[]; errors=[]
@@ -196,7 +284,7 @@ class PublicCollector:
                     scope=load_scope()
                     result['player_games']=select_existing_rows(result['player_games'],scope)
                     result['scope_revision']=scope['revision']
-                    result['scope_policy']='Existing workbook players and observation fields only; games are source evidence, not new named matchup populations.'
+                    result['scope_policy']='Authorized NBA players and supported observation fields; games are source evidence, not new named matchup populations.'
                     result['upstream_full_game_validated']=True
                     return result
                 failures.append({'source':name,'error_type':'IncompleteBoxScores'})
@@ -215,8 +303,13 @@ async def main_async(args):
     async with httpx.AsyncClient(timeout=25,follow_redirects=True,
             headers={'User-Agent':'NBAPPBOT/3.0 personal research'}) as client:
         collector=PublicCollector(client)
+        schedule_report = await collector.publish_current_schedule(output)
+        print('Current schedule:', json.dumps(schedule_report), flush=True)
+        if getattr(args, 'schedule_only', False):
+            return 0 if schedule_report['status'] == 'success' else 1
         from mirror_sources import PublishedNBAData
         mirror=PublishedNBAData(client,collector.now)
+        mirror.configure_scope(output)
         for offset in range(args.days-1,-1,-1):
             day=(today-dt.timedelta(days=offset)).isoformat()
             path=output/(day+'.json')
@@ -225,6 +318,7 @@ async def main_async(args):
             # teams whose most recent game preceded a multi-day rest interval.
             try:
                 result=await mirror.day(day)
+                mirror.publish_scope(output)
             except Exception as error:
                 print('Published data source:',type(error).__name__,flush=True)
                 result=None
@@ -264,6 +358,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--output',default='data/live')
     parser.add_argument('--days',type=int,default=7)
+    parser.add_argument('--schedule-only',action='store_true',help='Publish only a current validated event inventory.')
     args=parser.parse_args()
     if not 1<=args.days<=14:parser.error('--days must be 1–14')
     sys.exit(asyncio.run(main_async(args)))

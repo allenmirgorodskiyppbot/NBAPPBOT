@@ -22,13 +22,16 @@ class ResearchDiscussionTests(unittest.TestCase):
             'away_team': 'BKN', 'status': 'scheduled', 'start_time': '2026-11-03T00:30:00+00:00',
             'source': 'test schedule'})
         for name, team in [('Jalen Brunson', 'NYK'), ('Julius Randle', 'BKN')]:
-            for i in range(12):
-                day = (dt.date(2026, 11, 1) - dt.timedelta(days=i)).isoformat()
+            samples = [(i, (dt.date(2026, 11, 1) - dt.timedelta(days=i)).isoformat(), '2026-27')
+                       for i in range(12)]
+            samples += [(i, (dt.date(2026, 4, 10) - dt.timedelta(days=i)).isoformat(), '2025-26')
+                        for i in range(8)]
+            for i, day, season in samples:
                 game = canonical_game(day, team, 'BOS')
                 self.master.upsert_game({'id': game, 'date': day, 'home_team': team,
                     'away_team': 'BOS', 'status': 'final', 'source': 'test game'})
                 self.master.upsert_player_game({'game_id': game, 'player': name, 'team': team,
-                    'opponent': 'BOS', 'date': day, 'season': '2026-27', 'season_type': 'Regular Season',
+                    'opponent': 'BOS', 'date': day, 'season': season, 'season_type': 'Regular Season',
                     'appearance_state': 'Played', 'minutes': 32 + i % 3,
                     'pts': 22 + i % 4, 'reb': 6 + i % 2, 'ast': 4 + i % 2, 'tpm': 2,
                     'source': 'test observations'})
@@ -50,7 +53,10 @@ class ResearchDiscussionTests(unittest.TestCase):
             self.assertEqual(card['line_kind'], 'research_target')
             self.assertIn('hypothetical', card['text'])
             self.assertLessEqual(len(card['text']), 500)
-            self.assertEqual(item['projection']['n'], 12)
+            self.assertEqual(item['projection']['n'], 20)
+            self.assertEqual(item['projection']['seasons'], ['2025-26', '2026-27'])
+            self.assertEqual(sum(row['season'] == '2026-27'
+                                 for row in item['projection']['source_games']), 12)
             self.assertNotIn('line', item)
         self.assertIn('not confirmed PrizePicks offers', result['fallback_answer'])
 
@@ -98,7 +104,8 @@ class ResearchDiscussionTests(unittest.TestCase):
             db.execute("DELETE FROM player_games WHERE date<'2026-10-30'")
         result = self.report()
         self.assertFalse(result['cards'])
-        self.assertIn('Fewer than eight', result['fallback_answer'])
+        self.assertIn('Only 3', result['fallback_answer'])
+        self.assertIn('20 are required', result['fallback_answer'])
 
     def test_available_evidence_can_explain_but_not_recommend_out_player(self):
         self.master.record_news({'id': 'out', 'title': 'Julius Randle: Ruled out for Monday',

@@ -61,6 +61,8 @@ class PregameChatFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Hold.', result['answer'])
 
     async def test_failed_research_leg_does_not_hide_behind_valid_priced_leg(self):
+        with self.master.connect() as db:
+            db.execute("DELETE FROM player_games WHERE player='Josh Hart' AND season='2025-26'")
         result = await self.run_turn([
             {'player':'Josh Hart','stat':'pra','line_kind':'research_target'},
             {'player':'Julius Randle','stat':'tpm','line':1.5,'side':'more'}])

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import hashlib
+import json
 from zoneinfo import ZoneInfo
 
 from feeds import ESPN, TEAM_WORDS, parse_game
@@ -11,6 +13,8 @@ from news_digest import _aware
 EASTERN = ZoneInfo('America/New_York')
 CHECKPOINT = 'nba_schedule_today'
 CHECK_SECONDS = 900
+SUCCESS_CACHE_SECONDS = 840
+RELAY_URL = 'https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/main/data/live/schedule_today.json'
 
 
 def _known_games(store, day):
@@ -42,6 +46,9 @@ def _parse_today(document, day):
         if not tip or tip.astimezone(EASTERN).date().isoformat() != day or state.get('name') not in names:
             raise ValueError('Current event date, timezone or status is unresolved.')
         game = parse_game(event)
+        from game_phase import published_event_exclusion
+        if published_event_exclusion(event,game):
+            raise ValueError('Current event is outside the regular-season strategy population.')
         if (game['date'] != day or game['home_team'] not in TEAM_WORDS or game['away_team'] not in TEAM_WORDS
                 or game['home_team'] == game['away_team'] or game['id'] in result):
             raise ValueError('Current event identity is invalid or duplicated.')
@@ -52,8 +59,72 @@ def _parse_today(document, day):
     return result
 
 
+def _parse_nba_today(document, day):
+    """The live NBA scoreboard has an explicit date; a saved calendar is not used."""
+    from nba_cdn import SCOREBOARD_URL, parse_game as nba_game
+    board = document.get('scoreboard') if isinstance(document, dict) else None
+    if (not isinstance(board, dict) or board.get('gameDate') != day
+            or not isinstance(board.get('games'), list) or len(board['games']) > 30):
+        raise ValueError('Official current NBA scoreboard date or inventory is unresolved.')
+    result = {}
+    for raw in board['games']:
+        game = nba_game(raw, SCOREBOARD_URL)
+        tip = _aware(game.get('start_time'))
+        if (not tip or game['date'] != day or game['home_team'] not in TEAM_WORDS
+                or game['away_team'] not in TEAM_WORDS or game['id'] in result
+                or game.get('nba_season_type') != 'Regular Season'):
+            raise ValueError('Official current NBA event identity or timing is unresolved.')
+        result[game['id']] = game
+    return result
+
+
+def _parse_relay(document, day, now):
+    from nba_cdn import SCOREBOARD_URL
+    if not isinstance(document, dict) or document.get('schema_version') != 1 or document.get('date') != day:
+        raise ValueError('Published schedule relay has the wrong schema or date.')
+    checked = _aware(document.get('source_checked_at'))
+    if not checked or not 0 <= (now - checked).total_seconds() < SUCCESS_CACHE_SECONDS:
+        raise ValueError('Published schedule relay is stale or has a future check time.')
+    payload = document.get('document')
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    if document.get('source_content_sha256') != digest:
+        raise ValueError('Published schedule relay content does not match its recorded digest.')
+    source = document.get('source_url')
+    if source == ESPN + 'scoreboard?dates=' + day.replace('-', ''):
+        games = _parse_today(payload, day)
+    elif source == SCOREBOARD_URL:
+        games = _parse_nba_today(payload, day)
+    else:
+        raise ValueError('Published schedule relay has an unsupported upstream source.')
+    return games, checked, source
+
+
+async def _current_events(worker, day, now):
+    """Try independent publishers once, then a timestamp-preserving trusted relay."""
+    from nba_cdn import SCOREBOARD_URL
+    attempts = []
+    for source, parser in ((ESPN + 'scoreboard?dates=' + day.replace('-', ''), _parse_today),
+                           (SCOREBOARD_URL, _parse_nba_today), (RELAY_URL, None)):
+        try:
+            async with asyncio.timeout(10):
+                document = await worker.request(source)
+            if parser is None:
+                games, checked, upstream = _parse_relay(document, day, now)
+                return games, checked, upstream, source, attempts
+            return parser(document, day), now, source, None, attempts
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            code = getattr(getattr(error, 'response', None), 'status_code', None)
+            detail = type(error).__name__ + (f': HTTP {code}' if code else '')
+            attempts.append({'source': source, 'error': detail})
+    error = RuntimeError('All current schedule sources are unavailable.')
+    error.schedule_attempts = attempts
+    raise error
+
+
 async def refresh_game_schedule(store, worker, now=None):
-    """Check only existing event IDs, sharing a 15-minute cache and worker lock.
+    """Check existing IDs; successful timing checks refresh before the 15-minute gate.
 
     A failed fetch retains previous observations but makes the check failed.
     No absence is interpreted as a cancellation or a verified league off day.
@@ -73,7 +144,8 @@ async def refresh_game_schedule(store, worker, now=None):
     async with worker._schedule_check_lock:
         prior = store.get_checkpoint(CHECKPOINT, {}) or {}
         checked = _aware(prior.get('checked_at'))
-        if (prior.get('date') == day and checked and 0 <= (now-checked).total_seconds() < CHECK_SECONDS
+        cache_seconds = SUCCESS_CACHE_SECONDS if prior.get('status') == 'success' else CHECK_SECONDS
+        if (prior.get('date') == day and checked and 0 <= (now-checked).total_seconds() < cache_seconds
                 and set(prior.get('expected_game_ids', [])) == set(known)):
             return prior
         source = ESPN + 'scoreboard?dates=' + day.replace('-', '')
@@ -82,9 +154,9 @@ async def refresh_game_schedule(store, worker, now=None):
                   'last_success_at':prior.get('last_success_at'), 'error':None}
         store.set_checkpoint(CHECKPOINT, {**report, 'status':'checking'})
         try:
-            async with asyncio.timeout(10):
-                document = await worker.request(source)
-            events = _parse_today(document, day)
+            events, verified_at, source, relay, attempts = await _current_events(worker, day, now)
+            report.update(checked_at=verified_at.isoformat(), attempted_at=now.isoformat(),
+                          source=source, relay_url=relay, attempts=attempts)
             missing = sorted(set(known)-set(events))
             conflicts = []
             matched = []
@@ -112,14 +184,16 @@ async def refresh_game_schedule(store, worker, now=None):
             if missing or conflicts:
                 report.update(status='partial', error='Current event inventory is missing or conflicts with saved events.')
             else:
-                report.update(status='success', last_success_at=now.isoformat())
+                report.update(status='success', last_success_at=verified_at.isoformat())
         except asyncio.CancelledError:
             store.set_checkpoint(CHECKPOINT, {**report, 'status':'failed', 'error':'CancelledError'})
             store.feed_failure('nba_schedule_today', 'CancelledError; current event timing is unverified.')
             raise
         except Exception as error:
             code = getattr(getattr(error, 'response', None), 'status_code', None)
-            report['error'] = type(error).__name__ + (f': HTTP {code}' if code else '')
+            attempts = getattr(error, 'schedule_attempts', [])
+            report['attempts'] = attempts
+            report['error'] = attempts[0]['error'] if attempts else type(error).__name__ + (f': HTTP {code}' if code else '')
         store.set_checkpoint(CHECKPOINT, report)
         if report['status'] == 'success':
             store.feed_success('nba_schedule_today', 'Current event timing checked; existing games only; no player statistics imported.')

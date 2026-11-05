@@ -131,16 +131,16 @@ class ProjectionFeatureTests(IsolatedMaster):
                 'date': '2026-10-30', 'stat': 'pts', 'side': 'more', 'line': 19.5, **changes}
 
     def fill(self):
-        for index in range(16):
-            day = (dt.date(2026, 10, 10) + dt.timedelta(days=index)).isoformat()
+        for index in range(20):
+            day = (dt.date(2026, 10, 6) + dt.timedelta(days=index)).isoformat()
             self.observation(day)
 
     def test_missing_minutes_prevents_a_projection_instead_of_imputing_workload(self):
         for index in range(10):
-            self.observation((dt.date(2026, 10, 10) + dt.timedelta(days=index)).isoformat(), minutes=None)
+            self.observation((dt.date(2026, 10, 6) + dt.timedelta(days=index)).isoformat(), minutes=None)
         result = projection_for_leg(self.store, self.leg(), NOW)
         self.assertFalse(result['available'])
-        self.assertIn('No missing minutes', result['missing_policy'])
+        self.assertIn('not imputed', result['missing_policy'])
 
     def test_future_live_playoff_and_old_team_observations_cannot_change_reference(self):
         self.fill()
@@ -152,22 +152,22 @@ class ProjectionFeatureTests(IsolatedMaster):
         result = projection_for_leg(self.store, self.leg(), NOW)
         self.assertTrue(result['available'])
         self.assertAlmostEqual(result['reference_projection'], 20)
-        self.assertEqual(result['n'], 16)
+        self.assertEqual(result['n'], 20)
         self.assertEqual(result['actual_teams'], ['NYK'])
         self.assertEqual(result['last_date'], '2026-10-25')
         self.assertTrue(all(game['date'] <= '2026-10-25' for game in result['source_games']))
 
     def test_opponent_signal_uses_only_actual_games_against_that_opponent(self):
-        for index in range(16):
-            day = (dt.date(2026, 10, 10) + dt.timedelta(days=index)).isoformat()
+        for index in range(20):
+            day = (dt.date(2026, 10, 6) + dt.timedelta(days=index)).isoformat()
             self.observation(day, points=30 if index < 4 else 20,
                              opponent='PHI' if index < 4 else 'ATL')
         against_phi = projection_for_leg(self.store, self.leg(), NOW)
         against_cha = projection_for_leg(self.store, self.leg(opponent='CHA'), NOW)
         self.assertEqual(against_phi['cohorts'][0]['n'], 4)
         self.assertEqual(against_cha['cohorts'][0]['n'], 0)
-        self.assertGreater(against_phi['reference_projection'], against_cha['reference_projection'])
-        self.assertLessEqual(against_phi['cohorts'][0]['adjustment'], .08)
+        self.assertEqual(against_phi['reference_projection'], against_cha['reference_projection'])
+        self.assertEqual(against_phi['cohorts'][0]['adjustment'], 0.0)
 
     def test_aggressive_pick_is_not_forced_when_line_has_no_supported_margin(self):
         self.fill()
@@ -177,8 +177,8 @@ class ProjectionFeatureTests(IsolatedMaster):
         self.assertIn('not a calibrated forecast interval', result['empirical_scenario_range']['meaning'])
 
     def test_future_assignment_is_not_used_in_an_earlier_as_of_projection(self):
-        for index in range(16):
-            self.observation((dt.date(2026, 10, 1) + dt.timedelta(days=index)).isoformat())
+        for index in range(20):
+            self.observation((dt.date(2026, 9, 27) + dt.timedelta(days=index)).isoformat())
         with self.store.connect() as db:
             db.execute('CREATE TABLE workbook_evidence (kind TEXT,entity TEXT,payload_json TEXT)')
             db.execute('INSERT INTO workbook_evidence VALUES (?,?,?)', ('assignments','Jalen Brunson',json.dumps({

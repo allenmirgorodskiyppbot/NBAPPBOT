@@ -35,14 +35,17 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
         seed_calendar(self.store)
         for player, team in [('Jalen Brunson', 'NYK'), ('Josh Hart', 'NYK'),
                              ('Tyrese Maxey', 'PHI'), ('Joel Embiid', 'PHI')]:
-            for offset in range(12):
-                day = (dt.date(2026, 10, 29) - dt.timedelta(days=offset)).isoformat()
+            samples = [(offset, (dt.date(2026, 10, 29) - dt.timedelta(days=offset)).isoformat(), '2026-27')
+                       for offset in range(12)]
+            samples += [(offset, (dt.date(2026, 4, 10) - dt.timedelta(days=offset)).isoformat(), '2025-26')
+                        for offset in range(8)]
+            for offset, day, season in samples:
                 game = canonical_game(day, team, 'BOS')
                 self.store.upsert_game({'id': game, 'date': day, 'home_team': team,
                     'away_team': 'BOS', 'status': 'final', 'source': 'conversation test fixture'})
                 self.store.upsert_player_game({'game_id': game, 'date': day,
                     'player': player, 'player_id': canonical_player(player), 'team': team,
-                    'opponent': 'BOS', 'season': '2026-27', 'season_type': 'Regular Season',
+                    'opponent': 'BOS', 'season': season, 'season_type': 'Regular Season',
                     'appearance_state': 'Played', 'minutes': 33, 'pts': 24 + offset % 3,
                     'reb': 6, 'ast': 4, 'fga': 18, 'source': 'conversation test fixture'})
         self.received = []
@@ -64,6 +67,17 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
     def last_output(self):
         with self.store.connect() as db:
             return db.execute('SELECT text FROM telegram_outbox ORDER BY id DESC LIMIT 1').fetchone()[0]
+
+    def analysis_fixture(self, store, board_id):
+        """Transport fixture retains the real immutable board and every offered side."""
+        board = store.get_board(board_id)
+        items = []
+        for leg in board['legs']:
+            item = candidate(leg['player'], side=leg['side'], line=leg['line'],
+                             team=leg.get('team', 'NYK'), stat=leg['stat'])
+            item['leg'] = dict(leg)
+            items.append(item)
+        return {**report(*items), 'board_id': board_id}
 
     async def test_history_preferences_survive_reopen_and_clear_explicitly(self):
         before = self.financial_counts()
@@ -116,10 +130,12 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
         await self.bot.process_update(update(20, 'I need four picks from both teams.'))
         items = [candidate('Jalen Brunson'), candidate('Josh Hart'),
                  candidate('Tyrese Maxey', team='PHI'), candidate('Joel Embiid', team='PHI')]
+        board = self.store.create_board([item['leg'] for item in items], source='conversation fixture')
+        analysis = {**report(*items), 'board_id': board['id']}
         from board_shortlist import enrich_shortlist
         with patch('board_shortlist.enrich_shortlist', wraps=enrich_shortlist) as enrich, \
              patch('board_shortlist._now', return_value=NOW):
-            text = await self.bot._shortlist_reply(report(*items), USER_ID)
+            text = await self.bot._shortlist_reply(analysis, USER_ID)
         self.assertEqual(enrich.call_args.kwargs['count'], 4)
         self.assertTrue(enrich.call_args.kwargs['constraints']['both_teams'])
         self.assertEqual(text.count('More 19.5 points'), 4)
@@ -140,8 +156,7 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
     async def test_board_and_analysis_commands_save_quoted_lines_for_followup(self):
         before = self.financial_counts()
         command = '/board ' + DAY + '\nJalen Brunson | points | more | 19.5'
-        analysis = report(candidate())
-        with patch('analysis_engine.analyze_board', return_value=analysis), \
+        with patch('analysis_engine.analyze_board', side_effect=self.analysis_fixture), \
              patch('board_shortlist._now', return_value=NOW):
             await self.bot.process_update(update(30, command))
             board = self.store.boards()[0]
@@ -162,7 +177,7 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
         photo['message'].update(caption=DAY, date=NOW.timestamp(),
             photo=[{'file_id': 'isolated-photo', 'width': 1000, 'height': 1500, 'file_size': 100}])
         with patch('screenshot_board.extract_screenshot', return_value=extraction(card(line=19.5))), \
-             patch('analysis_engine.analyze_board', return_value=report(candidate())), \
+             patch('analysis_engine.analyze_board', side_effect=self.analysis_fixture), \
              patch('board_shortlist._now', return_value=NOW):
             await self.bot.process_update(photo)
         self.assertEqual(len(self.store.boards()), 1)

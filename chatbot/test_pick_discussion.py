@@ -47,8 +47,14 @@ class PickDiscussionTests(unittest.TestCase):
         return build_pick_discussion(self.store, {'player': player, 'stat': stat,
             'line': line, **kwargs}, NOW)
 
+    def add_prior_history(self, player, values, *, stat='tpm', team='BKN'):
+        self.add(player, values, stat=stat, team=team, season='2025-26',
+                 dates=[(dt.date(2026, 4, 10) - dt.timedelta(days=i)).isoformat()
+                        for i in range(len(values))])
+
     def test_three_point_question_returns_qualified_lean_and_facts(self):
         self.add('Julius Randle', [4, 3, 0, 0, 2, 3])
+        self.add_prior_history('Julius Randle', [3] * 14)
         result = self.assess()
         self.assertEqual(result['stat'], 'tpm')
         self.assertEqual(result['decision'], 'more')
@@ -63,6 +69,7 @@ class PickDiscussionTests(unittest.TestCase):
 
     def test_hart_pra_correction_uses_complete_sum_and_can_choose_less(self):
         self.add('Josh Hart', [17, 19, 23, 21, 18, 19], stat='pra', team='NYK')
+        self.add_prior_history('Josh Hart', [18] * 14, stat='pra', team='NYK')
         result = self.assess('Josh Hart', 'points rebounds assists', 22.5)
         self.assertEqual(result['decision'], 'less')
         self.assertEqual(result['sample']['values'], [17, 19, 23, 21, 18, 19])
@@ -71,13 +78,16 @@ class PickDiscussionTests(unittest.TestCase):
 
     def test_average_outlier_alone_cannot_choose_over(self):
         self.add('Julius Randle', [0, 0, 0, 0, 0, 12])
+        self.add_prior_history('Julius Randle', [0] * 13 + [28])
         result = self.assess()
         self.assertGreater(result['sample']['mean'], result['line'])
         self.assertEqual(result['decision'], 'pass')
         self.assertIsNone(result['research_lean'])
+        self.assertEqual(result['baseline']['n'], 20)
 
     def test_integer_tie_is_not_a_more_or_less_hit(self):
         self.add('Jalen Brunson', [18, 19, 17, 20, 18, 21], stat='fga', team='NYK')
+        self.add_prior_history('Jalen Brunson', [18] * 14, stat='fga', team='NYK')
         result = self.assess('Jalen Brunson', 'FG attempts', 18)
         self.assertEqual((result['sample']['more'], result['sample']['less'], result['sample']['ties']), (3, 1, 2))
         self.assertEqual(result['decision'], 'pass')
@@ -121,10 +131,39 @@ class PickDiscussionTests(unittest.TestCase):
 
     def test_no_news_does_not_mean_healthy_or_force_all_queries_to_pass(self):
         self.add('Julius Randle', [4, 3, 3, 2, 2, 3])
+        self.add_prior_history('Julius Randle', [3] * 14)
         result = self.assess()
         self.assertEqual(result['decision'], 'more')
         self.assertFalse(result['availability_confirmed'])
         self.assertIn('not a complete', ' '.join(result['cautions']))
+
+    def test_twenty_game_chat_matches_board_benchmark_and_margin_pass(self):
+        from analysis_engine import analyze_board
+        self.add('Julius Randle', [4, 3, 0, 0, 2, 3])
+        self.add_prior_history('Julius Randle', [3] * 14)
+        for line, expected in ((1.5, 'more'), (2.5, 'pass')):
+            with self.subTest(line=line):
+                chat = self.assess(line=line)
+                board = self.store.create_board([{'player': 'Julius Randle', 'team': 'BKN',
+                    'date': '2026-11-02', 'game_id': 'target', 'stat': 'tpm',
+                    'side': 'more', 'line': line}])
+                report = analyze_board(self.store, board['id'], as_of=NOW)
+                projection = report['legs'][0]['projection']
+                self.assertEqual(chat['baseline']['reference_projection'], projection['reference_projection'])
+                self.assertEqual(chat['baseline']['source_games'], projection['source_games'])
+                self.assertEqual(chat['decision'], expected)
+                self.assertEqual(projection['selected_side_supported'], expected == 'more')
+                self.assertEqual(chat['sample']['n'], 6)
+                self.assertEqual(chat['baseline']['n'], 20)
+                self.assertEqual(chat['baseline']['seasons'], ['2025-26', '2026-27'])
+
+    def test_current_season_hot_streak_without_twenty_games_stays_a_pass(self):
+        self.add('Julius Randle', [4, 3, 3, 2, 2, 3])
+        result = self.assess()
+        self.assertEqual(result['sample']['n'], 6)
+        self.assertEqual(result['decision'], 'pass')
+        self.assertFalse(result['baseline']['available'])
+        self.assertEqual(result['baseline']['required_observations'], 20)
 
     def test_player_out_and_minutes_uncertainty_hold_both_sides(self):
         self.add('Julius Randle', [4, 3, 3, 2, 2, 3])

@@ -32,9 +32,10 @@
     <p id="login-error" role="alert"></p>
   </section>
   <div id="desk" hidden>
-    <section><h2>Research desk</h2><p class="muted">News monitoring runs in the background. Manual statistics mode needs your box-score uploads. Use Telegram for line screenshots and entry tracking.</p>
+    <section><h2>Research desk</h2><p class="muted">Game data and news refresh automatically. Check Feed status for source coverage and any pending updates. Use Telegram for line screenshots, pick explanations and entry tracking.</p>
       <div class="examples"><button id="live-health" type="button">Feed status</button><button id="live-news" type="button">Latest news</button><button id="live-results" type="button">Entry results</button><button id="live-export" type="button">Download master Excel</button><button id="live-backup" type="button">Download backup</button></div>
-      <p class="muted">Import player-game statistics (CSV/JSON, up to 2 MB). This does not upload PrizePicks lines or record a placed entry.</p><input id="stats-file" type="file" accept=".csv,.json"><button id="stats-import" type="button" style="margin-top:10px">Import game statistics</button><pre id="live-output" style="white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 system-ui"></pre>
+      <p class="muted">Import player-game statistics (CSV/JSON, up to 2 MB). This does not upload PrizePicks lines or record a placed entry.</p><input id="stats-file" type="file" accept=".csv,.json"><button id="stats-import" type="button" style="margin-top:10px">Import game statistics</button>
+      <p class="muted">Merge an updated master Excel (up to 128 MB). A backup is saved first. Your existing entries, conversations and observations are retained.</p><input id="master-file" type="file" accept=".xlsx"><button id="master-import" type="button" style="margin-top:10px">Import master Excel</button><pre id="live-output" style="white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 system-ui"></pre>
       <details class="muted"><summary>Upload PrizePicks lines in Telegram</summary><p>Send a screenshot to get an OCR draft, or use this dated text format. These examples show the format, not actual recommendations. For an opponent player, add the correct team in a fifth field.</p><pre style="white-space:pre-wrap">/board YYYY-MM-DD
 Jalen Brunson | points | more | LINE | NYK
 Opponent player | rebounds | less | LINE | TEAM
@@ -120,7 +121,7 @@ async function download(path,name){
   if(downloadBusy)return;
   downloadBusy=true;$('live-export').disabled=true;$('live-backup').disabled=true;
   try{
-    showLive('Preparing download… Please wait; large Excel files can take about a minute.');
+    showLive('Preparing download… Please wait; the full historical Excel can take several minutes.');
     const response=await fetch(path,{headers:{'X-Chat-Password':password}});
     if(!response.ok){let detail='Download unavailable. Check data readiness and password.';try{const error=await response.json();if(typeof error.detail==='string')detail=error.detail;}catch{}throw new Error(detail);}
     const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
@@ -129,6 +130,7 @@ async function download(path,name){
   finally{downloadBusy=false;$('live-export').disabled=false;$('live-backup').disabled=false;}
 }
 $('stats-import').addEventListener('click',async()=>{try{const file=$('stats-file').files[0];if(!file)throw new Error('Choose a CSV or JSON box-score file.');if(file.size>2000000)throw new Error('Use a file smaller than 2 MB.');showLive('Validating statistics…');const result=await api('/api/import/stats',{method:'POST',body:JSON.stringify({filename:file.name,content:await file.text()})});showLive(result);}catch(error){showLive(error.message);}});
+$('master-import').addEventListener('click',async()=>{const button=$('master-import');if(button.disabled)return;button.disabled=true;try{const file=$('master-file').files[0];if(!file||!file.name.toLowerCase().endsWith('.xlsx'))throw new Error('Choose the updated master .xlsx file.');if(file.size>128*1024*1024)throw new Error('Use a master workbook smaller than 128 MB.');showLive('Validating and merging master history… Keep this page open. Large workbooks can take several minutes.');const result=await api('/api/import/master',{method:'POST',headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},body:file});showLive(result);}catch(error){showLive(error.message);}finally{button.disabled=false;}});
 $('live-export').addEventListener('click',()=>download('/api/export/master.xlsx','NBA_Master.xlsx'));
 $('live-backup').addEventListener('click',()=>download('/api/export/backup.sqlite','NBA_Master_Backup.sqlite'));
 refresh();setInterval(refresh,5000);

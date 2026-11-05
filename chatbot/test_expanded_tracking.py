@@ -7,7 +7,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from advanced_refresh import import_tracking, normalize_records, preserve_sparse_fields, supplement_tracking
+from advanced_refresh import (direct_tracking_status, import_tracking, normalize_records,
+                              preserve_sparse_fields, supplement_tracking)
 from dataset_refresh import initialize_scope, load_scope
 from master import MasterStore
 
@@ -142,6 +143,104 @@ class ExpandedTrackingTests(unittest.TestCase):
         self.assertEqual(collector.calls, 1)
         asyncio.run(supplement_tracking(collector, self.root, ['Overall']))
         self.assertEqual(collector.calls, 1)
+        status = json.loads(path.read_text())['direct_tracking']
+        self.assertEqual(status['state'], 'cooldown')
+        self.assertEqual(status['last_attempt'], NOW.isoformat())
+        self.assertEqual(status['next_eligible_attempt'], (NOW + dt.timedelta(hours=6)).isoformat())
+        self.assertEqual(status['category_attempts']['Overall']['attempts'][0]['error_type'], 'RuntimeError')
+
+    def test_mirror_refresh_does_not_hide_direct_failure_or_restart_cooldown(self):
+        previous = self.document(self.record(data_through_date=None))
+        attempted = NOW - dt.timedelta(hours=2)
+        failure = {'status': 'unavailable', 'last_attempt': attempted.isoformat(), 'records': 0,
+                   'attempts': [{'status': 'unavailable', 'http_status': 403, 'endpoint': 'leaguedashptdefend'}]}
+        previous['direct_tracking_attempted_at'] = attempted.isoformat()
+        previous['direct_tracking'] = {'category_attempts': {'Overall': failure}}
+        # The independently published mirror reports its own availability and
+        # does not carry the previous direct endpoint error in coverage.
+        previous['coverage'] += [{'category': 'Overall', 'status': 'unavailable',
+                                 'reason': 'No current-season extract in this publication.'}]
+        path = self.root / 'existing_tracking.json'
+        path.write_text(json.dumps(previous))
+        class NoRequest:
+            now = NOW
+            async def request(inner, url):
+                self.fail('The direct source must not be requested during its cooldown.')
+        asyncio.run(supplement_tracking(NoRequest(), self.root, ['Overall']))
+        saved = json.loads(path.read_text())
+        self.assertEqual(saved['records'], previous['records'])
+        self.assertEqual(saved['last_attempt'], previous['last_attempt'])
+        self.assertEqual(saved['direct_tracking_attempted_at'], attempted.isoformat())
+        self.assertEqual(saved['direct_tracking']['category_attempts']['Overall'], failure)
+        self.assertEqual(saved['direct_tracking']['next_eligible_attempt'],
+                         (attempted + dt.timedelta(hours=6)).isoformat())
+        import_tracking(self.store, saved, NOW)
+        checkpoint = self.store.get_checkpoint('tracking_refresh_status')
+        self.assertEqual(checkpoint['direct_tracking']['state'], 'cooldown')
+        self.assertEqual(checkpoint['direct_tracking']['category_attempts']['Overall'], failure)
+        self.assertIsNone(checkpoint['source_data_through_date'])
+
+    def test_direct_retry_status_is_due_at_boundary_without_claiming_new_attempt(self):
+        document = {'direct_tracking_attempted_at': (NOW - dt.timedelta(hours=6)).isoformat()}
+        status = direct_tracking_status(document, NOW)
+        self.assertEqual(status['state'], 'due')
+        self.assertEqual(status['last_attempt'], document['direct_tracking_attempted_at'])
+        self.assertEqual(direct_tracking_status({}, NOW)['state'], 'never_attempted')
+
+    def test_direct_supplement_keeps_validated_expanded_roster_revision(self):
+        from dataset_refresh import scope_revision
+        from unittest.mock import patch
+        expanded = copy.deepcopy(self.scope)
+        expanded['players'].append({'player': 'New Rookie', 'player_id': 'name:newrookie',
+                                    'espn_player_id': '999999999', 'aliases': ['New Rookie']})
+        expanded['revision'] = scope_revision(expanded)
+        manifest = {'schema_version': 1, 'base_revision': self.scope['revision'],
+                    'season': '2026-27', 'scope': expanded, 'upstream_full_game_validated': True,
+                    'source_url': 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet',
+                    'source_published_at': '2026-10-31T15:00:00+00:00',
+                    'source_checked_at': NOW.isoformat(), 'source_data_through_date': '2026-10-30',
+                    'source_content_sha256': 'a' * 64}
+        (self.root / 'existing_dataset_scope.json').write_text(json.dumps(manifest))
+        previous = self.document(self.record())
+        previous['scope_revision'] = expanded['revision']
+        path = self.root / 'existing_tracking.json'
+        path.write_text(json.dumps(previous))
+        class Source:
+            now = NOW
+            async def request(inner, url):
+                return {'resultSets': [{'headers': ['PLAYER_NAME', 'G', 'CONTESTED_SHOTS'],
+                                        'rowSet': [['New Rookie', 1, 8]]}]}
+        with patch('advanced_refresh.load_scope', return_value=self.scope):
+            asyncio.run(supplement_tracking(Source(), self.root, ['Hustle']))
+        document = json.loads(path.read_text())
+        self.assertEqual(document['scope_revision'], expanded['revision'])
+        self.assertEqual(next(row for row in document['records'] if row['category'] == 'Hustle')['entity'], 'New Rookie')
+        self.store.set_checkpoint('dataset_refresh_scope', expanded)
+        self.assertEqual(import_tracking(self.store, document, NOW), 2)
+        # Without the validating roster manifest, refuse to regress the revision.
+        (self.root / 'existing_dataset_scope.json').unlink()
+        before = path.read_bytes()
+        with patch('advanced_refresh.load_scope', return_value=self.scope), self.assertRaisesRegex(ValueError, 'validated scope'):
+            asyncio.run(supplement_tracking(Source(), self.root, ['Hustle']))
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_old_release_manifest_cannot_block_matching_bundled_snapshot(self):
+        # A new release may have an authorized bundled snapshot while the old
+        # dynamic-scope manifest has not yet been replaced by a game refresh.
+        previous = self.document(self.record())
+        path = self.root / 'existing_tracking.json'
+        path.write_text(json.dumps(previous))
+        (self.root / 'existing_dataset_scope.json').write_text(json.dumps({'base_revision': 'prior-release'}))
+        player_id = self.player['nba_player_id']
+        class Source:
+            now = NOW
+            async def request(inner, url):
+                return {'resultSets': [{'headers': ['PLAYER_ID', 'G', 'CONTESTED_SHOTS'],
+                                        'rowSet': [[player_id, 1, 8]]}]}
+        asyncio.run(supplement_tracking(Source(), self.root, ['Hustle']))
+        document = json.loads(path.read_text())
+        self.assertEqual(document['scope_revision'], self.scope['revision'])
+        self.assertTrue(any(row['category'] == 'Hustle' for row in document['records']))
 
     def test_direct_success_has_retrieval_time_without_invented_publication_or_coverage(self):
         player_id = self.player['nba_player_id']

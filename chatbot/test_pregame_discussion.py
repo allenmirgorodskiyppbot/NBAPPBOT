@@ -59,13 +59,17 @@ class PregameDiscussionTests(unittest.TestCase):
         record_fixture_refresh(self.master)
 
     def add_player(self, player, team, count):
-        for index in range(count):
-            day = (dt.date(2026, 11, 1) - dt.timedelta(days=index)).isoformat()
+        samples = [(index, (dt.date(2026, 11, 1) - dt.timedelta(days=index)).isoformat(), '2026-27')
+                   for index in range(count)]
+        if count >= 8:
+            samples += [(index, (dt.date(2026, 4, 10) - dt.timedelta(days=index)).isoformat(), '2025-26')
+                        for index in range(12)]
+        for index, day, season in samples:
             game = canonical_game(day, team, 'BOS')
             self.master.upsert_game({'id': game, 'date': day, 'home_team': team,
                 'away_team': 'BOS', 'status': 'final', 'source': 'saved game'})
             self.master.upsert_player_game({'game_id': game, 'player': player,
-                'team': team, 'opponent': 'BOS', 'date': day, 'season': '2026-27',
+                'team': team, 'opponent': 'BOS', 'date': day, 'season': season,
                 'season_type': 'Regular Season', 'appearance_state': 'Played',
                 'pts': 15 + index % 3, 'reb': 7, 'ast': 4, 'minutes': 34,
                 'source': 'saved observations'})
@@ -152,7 +156,7 @@ class PregameDiscussionTests(unittest.TestCase):
                          {'Josh Hart', 'Julius Randle'})
         held = next(card for card in result['cards'] if card['entity'] == 'Julius Randle')
         self.assertEqual(held['decision'], 'pass')
-        self.assertIn('Fewer than eight', held['text'])
+        self.assertIn('20', held['text'])
         self.assertIn('Julius Randle', result['fallback_answer'])
         from grounded_reply import natural_prompt_evidence
         prompt = natural_prompt_evidence(result['cards'])
@@ -182,7 +186,7 @@ class PregameDiscussionTests(unittest.TestCase):
             'source': 'incorrect player ID fixture'})
         result = build_research_discussion(self.master,
             [{'player': 'Josh Hart', 'stat': 'pts'}], {}, NOW)
-        self.assertEqual(result['assessments'][0]['projection']['n'], 8)
+        self.assertEqual(result['assessments'][0]['projection']['n'], 20)
         self.assertLess(result['assessments'][0]['projection']['reference_projection'], 18)
         self.assertNotIn(game, {row['game_id'] for row in result['assessments'][0]['projection']['source_games']})
 
@@ -192,7 +196,8 @@ class PregameDiscussionTests(unittest.TestCase):
         result = build_research_discussion(self.master,
             [{'player': 'Josh Hart', 'stat': 'pts'}], {}, NOW)
         self.assertFalse(result['cards'])
-        self.assertIn('Fewer than eight', result['fallback_answer'])
+        self.assertIn('20', result['fallback_answer'])
+        self.assertIn('Only 19', result['held'][0]['reason'])
 
     def test_six_leg_research_discussion_preserves_each_selected_identity(self):
         names = ['Josh Hart', 'Jalen Brunson', 'Julius Randle',

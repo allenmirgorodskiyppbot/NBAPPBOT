@@ -1,5 +1,6 @@
 """Pregame game-source rechecks keep freshness separate from saved data."""
 import asyncio
+import re
 import copy
 import datetime as dt
 import tempfile
@@ -207,13 +208,13 @@ class PregameRefreshTests(unittest.TestCase):
         self.now[0]=NOW+dt.timedelta(hours=1)
         service,worker=self.service(documents)
         asyncio.run(service.tick())
-        first=[url.rsplit('/',1)[-1][:-5] for url in worker.calls if url.endswith('.json') and not url.endswith('existing_tracking.json')]
+        first=[url.rsplit('/',1)[-1][:-5] for url in worker.calls if re.search(r'/\d{4}-\d{2}-\d{2}\.json$',url)]
         self.assertEqual(set(first),{DAY,older,oldest})
         self.assertEqual(len(first),3)
         self.assertIn(backfill,self.store.get_checkpoint('nightly_nba_refresh')['pending_dates'])
         worker.calls.clear();self.now[0]+=dt.timedelta(hours=1)
         asyncio.run(service.tick())
-        second=[url.rsplit('/',1)[-1][:-5] for url in worker.calls if url.endswith('.json') and not url.endswith('existing_tracking.json')]
+        second=[url.rsplit('/',1)[-1][:-5] for url in worker.calls if re.search(r'/\d{4}-\d{2}-\d{2}\.json$',url)]
         self.assertEqual(second[0],DAY)
         self.assertIn(backfill,second)
         self.assertLessEqual(len(second),3)
@@ -248,7 +249,7 @@ class PregameRefreshTests(unittest.TestCase):
         self.now[0]+=dt.timedelta(hours=1);worker.calls.clear()
         asyncio.run(service.tick())
         self.assertTrue(self.store.get_checkpoint('daily_nba:'+backfill)['complete'])
-        self.assertLessEqual(len([u for u in worker.calls if u.endswith('.json') and not u.endswith('existing_tracking.json')]),3)
+        self.assertLessEqual(len([u for u in worker.calls if re.search(r'/\d{4}-\d{2}-\d{2}\.json$',u)]),3)
 
     def legacy_checkpoints(self):
         older='2026-10-28'

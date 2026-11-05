@@ -124,7 +124,7 @@ class PregameScheduleTests(unittest.TestCase):
         reports=asyncio.run(run())
         self.assertTrue(all(report['status']=='success' for report in reports))
         self.assertEqual(len(self.calls),1)
-        self.now+=dt.timedelta(minutes=14);self.check();self.assertEqual(len(self.calls),1)
+        self.now+=dt.timedelta(minutes=13);self.check();self.assertEqual(len(self.calls),1)
         self.now+=dt.timedelta(minutes=1);self.check();self.assertEqual(len(self.calls),2)
 
     def test_failed_recheck_preserves_observations_but_invalidates_success(self):

@@ -17,7 +17,7 @@ import time
 import uuid
 from typing import Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 import httpx
 from pydantic import BaseModel, Field
@@ -45,6 +45,8 @@ DATA_DIR = Path(os.getenv('DATA_DIR', str(ROOT.parent / 'runtime')))
 COMPACT_AI_TIMEOUT_SECONDS = 180
 MODEL_CONTEXT = 4096
 _EXPORT_LOCK = threading.Lock()
+_MASTER_IMPORT_LOCK = asyncio.Lock()
+MAX_MASTER_BYTES = 128 * 1024 * 1024
 
 
 def model_options(output_tokens=192):
@@ -426,6 +428,9 @@ async def initialize(application):
             start('nightly-nba-refresh', state.nightly.run)
             start('grading-backups', lambda: maintenance(application))
             start('telegram', state.telegram.run)
+            from history_service import history_upgrade_service
+            start('career-history-upgrade', lambda: history_upgrade_service(
+                state.master, DATA_DIR, ready=lambda: state.data_ready, exporter=export_master))
             log.info('Data collection, entry grading and backups started; Telegram configured=%s', state.telegram.enabled)
         state.phase, state.detail = 'workbook', 'Reading the Knicks workbook'
         if state.store is None:
@@ -439,6 +444,8 @@ async def initialize(application):
         await asyncio.to_thread(initialize_scope, state.master)
         await asyncio.to_thread(index_workbook_evidence, state.master, state.store)
         await asyncio.to_thread(supplement_existing_observation_fields, state.master, state.store)
+        from master_upgrade import archive_workbook_sheets
+        await asyncio.to_thread(archive_workbook_sheets, state.master, WORKBOOK_PATH)
         from assignment_refresh import refresh_assignments
         try:
             await asyncio.to_thread(refresh_assignments, state.master)
@@ -1359,7 +1366,11 @@ async def get_boards():
 
 @app.post('/api/boards/{board_id}/analyze', dependencies=[Depends(authenticate)])
 async def get_board_analysis(board_id: str):
-    return await call_service(analyze_board, app.state.master, board_id)
+    report = await call_service(analyze_board, app.state.master, board_id)
+    from pregame_archive import record_research
+    await call_service(record_research, app.state.master, report,
+                       owner_key='web:authenticated', kind='board_analysis')
+    return report
 
 
 @app.post('/api/entries', dependencies=[Depends(authenticate)])
@@ -1445,6 +1456,49 @@ class StatsImportRequest(BaseModel):
     filename: str = Field(default='statistics.csv', max_length=120)
     content: str | None = Field(default=None, max_length=2000000)
     rows: list[dict] | None = Field(default=None, max_length=2000)
+
+
+@app.post('/api/import/master', dependencies=[Depends(authenticate)])
+async def import_master_workbook(request: Request):
+    """Stream a workbook to disk; an interrupted request never applies half a merge."""
+    if _MASTER_IMPORT_LOCK.locked():
+        raise HTTPException(409, 'A master import is already running. Wait for it to finish.')
+    await _MASTER_IMPORT_LOCK.acquire()
+    directory = DATA_DIR / 'imports' / uuid.uuid4().hex
+    path = directory / 'NBA_Master.xlsx'
+    task = None
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        size = 0
+        with path.open('wb') as output:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > MAX_MASTER_BYTES:
+                    raise HTTPException(413, 'Use a master workbook smaller than 128 MB.')
+                output.write(chunk)
+        if not size:
+            raise HTTPException(422, 'Choose a master .xlsx workbook first.')
+        from master_upgrade import merge_enriched_workbook
+
+        async def merge():
+            try:
+                return await call_service(merge_enriched_workbook, app.state.master, path)
+            finally:
+                shutil.rmtree(directory, ignore_errors=True)
+                _MASTER_IMPORT_LOCK.release()
+
+        task = asyncio.create_task(merge(), name='master-import')
+        try:
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            task.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
+            raise
+        except ValueError as error:
+            raise HTTPException(422, str(error)[:500]) from None
+    finally:
+        if task is None:
+            shutil.rmtree(directory, ignore_errors=True)
+            _MASTER_IMPORT_LOCK.release()
 
 
 @app.post('/api/import/stats', dependencies=[Depends(authenticate)])

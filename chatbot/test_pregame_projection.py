@@ -4,13 +4,13 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from contextual_projection import _comparable_observations, projection_for_leg
+from contextual_projection import _comparable_observations, projection_for_leg, baseline_offer_decision
 from feeds import canonical_game, canonical_player
 from master import MasterStore
 
 
-NOW = dt.datetime(2026, 11, 4, 19, tzinfo=dt.timezone.utc)
-DAY = '2026-11-04'
+NOW = dt.datetime(2026, 12, 4, 19, tzinfo=dt.timezone.utc)
+DAY = '2026-12-04'
 PLAYER = 'Jalen Brunson'
 
 
@@ -35,8 +35,8 @@ class PregameProjectionTests(unittest.TestCase):
         self.store.upsert_player_game(row)
         return row
 
-    def base(self, n=8):
-        return [self.add((dt.date(2026, 11, 3) - dt.timedelta(days=i)).isoformat())
+    def base(self, n=20):
+        return [self.add((dt.date(2026, 12, 3) - dt.timedelta(days=i)).isoformat())
                 for i in range(n)]
 
     def alias(self, row, player_id='provider:alias', **changes):
@@ -83,7 +83,7 @@ class PregameProjectionTests(unittest.TestCase):
         result = self.project()
         self.assert_sample_unchanged(result, before)
         self.assertEqual(result['sample_quality']['duplicate_rows'], len(rows))
-        self.assertEqual(len(result['source_games']), 8)
+        self.assertEqual(len(result['source_games']), 20)
 
     def test_provider_only_identity_is_resolved_from_exact_normalized_name(self):
         self.base()
@@ -106,7 +106,7 @@ class PregameProjectionTests(unittest.TestCase):
         self.alias(rows[0], pts=90)
         result = self.project()
         self.assertFalse(result['available'])
-        self.assertEqual(result['observations'], 7)
+        self.assertEqual(result['observations'], 19)
         self.assertEqual(result['sample_quality']['conflicting_games'], 1)
 
     def test_partial_alias_with_a_conflicting_component_cannot_be_cherry_picked(self):
@@ -114,7 +114,7 @@ class PregameProjectionTests(unittest.TestCase):
         self.alias(rows[0], pts=None, reb=90)
         result = self.project(stat='pra')
         self.assertFalse(result['available'])
-        self.assertEqual(result['observations'], 7)
+        self.assertEqual(result['observations'], 19)
         self.assertEqual(result['sample_quality']['conflicting_games'], 1)
 
     def test_conflicting_minutes_exclude_the_game_even_when_statistics_agree(self):
@@ -124,14 +124,14 @@ class PregameProjectionTests(unittest.TestCase):
                 self.alias(rows[0], minutes=minutes)
                 result = self.project()
                 self.assertFalse(result['available'])
-                self.assertEqual(result['observations'], 7)
+                self.assertEqual(result['observations'], 19)
                 self.assertEqual(result['sample_quality']['conflicting_games'], 1)
 
     def test_complete_alias_can_replace_missing_values_without_combining_partial_rows(self):
         rows = self.base()
         self.alias(rows[0], pts=None, minutes=None)
         valid, quality = self.sample()
-        self.assertEqual(len(valid), 8)
+        self.assertEqual(len(valid), 20)
         self.assertEqual(quality['conflicting_games'], 0)
         with self.store.connect() as db:
             db.execute('UPDATE player_games SET pts=NULL WHERE game_id=? AND player_id=?',
@@ -140,7 +140,7 @@ class PregameProjectionTests(unittest.TestCase):
                        (rows[0]['game_id'], 'provider:alias'))
         incomplete = self.project()
         self.assertFalse(incomplete['available'])
-        self.assertEqual(incomplete['observations'], 7)
+        self.assertEqual(incomplete['observations'], 19)
 
     def test_conflicting_optional_fga_is_not_quoted_as_shot_volume(self):
         rows = self.base()
@@ -152,10 +152,10 @@ class PregameProjectionTests(unittest.TestCase):
         self.assert_sample_unchanged(result, before)
         self.assertFalse(any('Recent shot volume:' in reason for reason in result['supporting_reasons']))
         # For an actual FGA projection the same discrepancy is a required-stat
-        # conflict, so those games cannot support the eight-game minimum.
+        # conflict, so those games cannot support the twenty-game minimum.
         fga = self.project(stat='fga')
         self.assertFalse(fga['available'])
-        self.assertEqual(fga['observations'], 3)
+        self.assertEqual(fga['observations'], 15)
 
     def test_provider_game_aliases_for_the_same_event_count_once(self):
         rows = self.base()
@@ -164,7 +164,7 @@ class PregameProjectionTests(unittest.TestCase):
             self.add(row['date'], game_id='provider-game:' + str(number))
         result = self.project()
         self.assert_sample_unchanged(result, before)
-        self.assertEqual(result['sample_quality']['duplicate_rows'], 8)
+        self.assertEqual(result['sample_quality']['duplicate_rows'], 20)
 
     def test_all_aliases_of_an_included_game_are_checked_before_sampling(self):
         rows = self.base()
@@ -172,12 +172,12 @@ class PregameProjectionTests(unittest.TestCase):
             self.alias(rows[0], player_id='provider:' + str(number))
         result = self.project()
         self.assertTrue(result['available'])
-        self.assertEqual(result['n'], 8)
+        self.assertEqual(result['n'], 20)
         self.assertEqual(result['sample_quality']['duplicate_rows'], 105)
         self.alias(rows[0], player_id='provider:last-conflict', pts=99)
         conflict = self.project()
         self.assertFalse(conflict['available'])
-        self.assertEqual(conflict['observations'], 7)
+        self.assertEqual(conflict['observations'], 19)
         self.assertEqual(conflict['sample_quality']['conflicting_games'], 1)
 
     def test_same_team_bubble_regular_season_rows_preserve_multiseason_fallback(self):
@@ -185,7 +185,7 @@ class PregameProjectionTests(unittest.TestCase):
         self.add('2020-08-13', season='2019-20')
         self.add('2020-07-30', season='2019-20')
         rows, quality = self.sample()
-        self.assertEqual(len(rows), 10)
+        self.assertEqual(len(rows), 22)
         self.assertEqual({row['season'] for row in rows}, {'2019-20', '2026-27'})
         self.assertEqual(quality['invalid_season_rows'], 0)
 
@@ -205,7 +205,7 @@ class PregameProjectionTests(unittest.TestCase):
             db.execute('UPDATE player_games SET opponent=NULL')
         result = self.project(opponent='BOS')
         self.assertTrue(result['available'])
-        self.assertEqual(result['cohorts'][0]['n'], 8)
+        self.assertEqual(result['cohorts'][0]['n'], 20)
 
     def test_invalid_season_labels_are_excluded_without_breaking_valid_history(self):
         self.base()
@@ -213,9 +213,71 @@ class PregameProjectionTests(unittest.TestCase):
             self.add('2026-10-' + str(20 - index), season=season, pts=90)
         result = self.project()
         self.assertTrue(result['available'])
-        self.assertEqual(result['n'], 8)
+        self.assertEqual(result['n'], 20)
         self.assertEqual(result['seasons'], ['2026-27'])
         self.assertEqual(result['sample_quality']['invalid_season_rows'], 4)
+
+    def test_exact_twenty_game_mean_does_not_rescale_for_minutes_or_opponent(self):
+        rows = self.base(n=21)
+        for index, row in enumerate(rows):
+            self.store.upsert_player_game({**row, 'pts': index + 10, 'minutes': 20 + index})
+        first = self.project(opponent='BOS')
+        second = self.project(opponent='PHI')
+        self.assertEqual(first['reference_projection'], 19.5)
+        self.assertEqual(first['baseline_median'], 19.5)
+        self.assertEqual(first['empirical_scenario_range']['p10'], 11.9)
+        self.assertEqual(first['empirical_scenario_range']['p90'], 27.1)
+        self.assertEqual(second['reference_projection'], first['reference_projection'])
+        self.assertTrue(all(cohort['adjustment'] == 0 for cohort in first['cohorts']))
+        self.assertEqual(len(first['source_games']), 20)
+        self.assertEqual(sum(row['value'] for row in first['source_games']) / 20, 19.5)
+        self.assertTrue(all(row['minutes'] and row['observed_at'] for row in first['source_games']))
+
+    def test_dnp_playoff_trade_and_future_rows_do_not_fill_partial_history(self):
+        rows = self.base(n=19)
+        for day, changes in [('2026-11-10', {'appearance_state': 'DNP'}),
+                             ('2026-11-09', {'season_type': 'Playoffs'})]:
+            record = self.add(day, pts=99)
+            self.store.upsert_player_game({**record, **changes})
+        self.add('2026-11-08', team='DAL', home='DAL', pts=99)
+        self.add(DAY, pts=99)
+        self.add('2026-12-05', pts=99)
+        result = self.project()
+        self.assertFalse(result['available'])
+        self.assertEqual(result['observations'], 19)
+        self.assertEqual(result['partial_sample']['mean'], 24)
+        self.assertIn('not a career-game count', result['reason'])
+        self.assertEqual(len(result['source_games']), len(rows))
+
+    def test_confirmed_cup_final_does_not_complete_regular_season_sample(self):
+        self.base(n=19)
+        self.add('2025-12-16', opponent='SAS', away='SAS', season='2025-26', pts=50)
+        result = self.project()
+        self.assertFalse(result['available'])
+        self.assertEqual(result['observations'], 19)
+        self.assertEqual(result['sample_quality']['invalid_event_rows'], 1)
+
+    def test_offer_passes_near_mean_and_requires_median_agreement(self):
+        self.base()
+        projection = self.project()
+        self.assertIsNone(baseline_offer_decision(projection, 23.5)['side'])
+        self.assertEqual(baseline_offer_decision(projection, 19.5)['side'], 'more')
+        self.assertEqual(baseline_offer_decision(projection, 28.5)['side'], 'less')
+        disagreement = {**projection, 'baseline_median': 18}
+        self.assertIsNone(baseline_offer_decision(disagreement, 19.5)['side'])
+
+    def test_past_and_stale_samples_remain_descriptive_but_do_not_choose_side(self):
+        self.base(n=30)
+        past = self.project(date='2026-12-03', line=19.5, side='more')
+        self.assertTrue(past['available'])
+        self.assertFalse(past['selected_side_supported'])
+        self.assertTrue(all(row['date'] < '2026-12-03' for row in past['source_games']))
+        later = projection_for_leg(self.store, {'player': PLAYER, 'team': 'NYK',
+            'date': '2026-12-20', 'stat': 'pts', 'line': 19.5, 'side': 'more'},
+            dt.datetime(2026, 12, 20, 19, tzinfo=dt.timezone.utc))
+        self.assertTrue(later['available'])
+        self.assertFalse(later['selected_side_supported'])
+        self.assertIn('seven days', later['offer_decision']['reason'])
 
 
 if __name__ == '__main__':

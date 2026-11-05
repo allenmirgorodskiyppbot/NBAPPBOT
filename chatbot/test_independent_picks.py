@@ -29,7 +29,7 @@ class IndependentPickTests(unittest.TestCase):
         self.store = MasterStore(Path(self.directory.name) / 'master.sqlite')
         seed_calendar(self.store)
 
-    def observations(self, name, team, n=12, days_ago=1, source='synthetic independent fixture', minutes=33):
+    def observations(self, name, team, n=20, days_ago=1, source='synthetic independent fixture', minutes=33):
         for offset in range(n):
             day = (dt.date(2026, 10, 30)-dt.timedelta(days=days_ago+offset)).isoformat()
             other = 'BOS'
@@ -62,6 +62,30 @@ class IndependentPickTests(unittest.TestCase):
         self.assertEqual(self.table_counts(), before)
         self.assertEqual(before['boards'], 0)
         self.assertTrue(report['requires_prizepicks_comparison'])
+
+    def test_archive_keeps_every_market_and_pass_without_filling_a_lineup(self):
+        self.observations('Jalen Brunson', 'NYK', n=19)
+        self.observations('Tyrese Maxey', 'PHI')
+        report = build_independent_picks(self.store, date=DATE, now=NOW)
+        evaluated = report['evaluated_candidates']
+        self.assertEqual(len(evaluated), 10)
+        short = [row for row in evaluated if row['player'] == 'Jalen Brunson']
+        self.assertTrue(all(row['disposition'] == 'pass' for row in short))
+        self.assertTrue(all(row['projection']['observations'] == 19 for row in short))
+        self.assertEqual(sum(row['disposition'] == 'selected' for row in evaluated), 1)
+        self.assertFalse(report['lineup_complete'])
+        self.assertTrue(all(row['freshness']['ready'] for row in evaluated))
+
+    def test_archive_keeps_freshness_holds_for_all_five_markets(self):
+        self.observations('Jalen Brunson', 'NYK')
+        with patch('independent_picks.assess_pregame_freshness', return_value={
+                'ready': False, 'reasons': ['Schedule verification unavailable.']}):
+            report = build_independent_picks(self.store, DATE, now=NOW)
+        self.assertEqual(report['picks'], [])
+        self.assertEqual(len(report['evaluated_candidates']), 5)
+        self.assertTrue(all(row['disposition'] == 'pass' and row['projection'] is None
+                            and 'Schedule verification' in row['reason']
+                            for row in report['evaluated_candidates']))
 
     def test_projection_without_line_has_no_fabricated_offer_or_margin(self):
         self.observations('Jalen Brunson', 'NYK')
@@ -96,7 +120,7 @@ class IndependentPickTests(unittest.TestCase):
         self.assertNotIn('win_probability', json.dumps(report))
 
     def test_small_projection_never_clamps_negative_more_target_to_fake_edge(self):
-        value = _targets({'reference_projection': .2, 'empirical_scenario_range': {'p10':0,'p90':2}})
+        value = _targets({'available': True, 'n': 20, 'reference_projection': .2, 'baseline_median': 0, 'empirical_scenario_range': {'p10':0,'p90':2}})
         self.assertIsNone(value['more_at_or_below'])
         self.assertGreater(value['less_at_or_above'], .2)
 
@@ -139,7 +163,7 @@ class IndependentPickTests(unittest.TestCase):
     def test_opponent_supported_player_is_retained_in_shortlist(self):
         for i in range(4):
             self.observations('Knicks Fixture '+str(i),'NYK',n=20)
-        self.observations('Opponent Fixture','PHI',n=8)
+        self.observations('Opponent Fixture','PHI',n=20)
         report = build_independent_picks(self.store, DATE, count=4, now=NOW)
         self.assertTrue(report['two_team_coverage'])
         self.assertEqual(len(report['picks']),4)

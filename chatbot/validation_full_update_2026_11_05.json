@@ -1,0 +1,27 @@
+{
+  "release_date": "2026-11-05",
+  "full_regression": {
+    "tests": 976,
+    "failed": 0,
+    "seconds": 83.932
+  },
+  "strategy": "same-team-mean20-v1",
+  "strategy_limit": "Simulation did not beat Always Less; no betting edge established. Live filters require20comparable games.",
+  "history": {
+    "players": 488,
+    "player_game_rows": 160929,
+    "games": 20833,
+    "oldest": "2003-10-29",
+    "latest_observed": "2026-11-02",
+    "initial_source_rejects": 105,
+    "independently_repaired_games": 15,
+    "remaining_source_rejects": 90
+  },
+  "sources": [
+    "Public ESPN NBA box scores",
+    "Public SportsDataverse NBA extracts"
+  ],
+  "preservation": "Existing master records/ledger/chat retained; actual current-source corrections recorded separately.",
+  "freshness": "Seven collected tracking categories have unknown covered-game dates; four unavailable. No verified defender invented.",
+  "deployment": "Pinned history installer, additive Excel merge, daily current-data refresh and10minute schedule relay."
+}
