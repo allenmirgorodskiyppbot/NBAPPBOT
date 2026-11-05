@@ -270,6 +270,44 @@ def _clock(stamp):
     return local.strftime('%I:%M %p').lstrip('0') + ' Eastern'
 
 
+def validate_game_context(store, context, now):
+    """A dialogue reference must still match the saved upcoming fixture."""
+    if (not isinstance(context, dict) or not isinstance(context.get('team'), str)
+            or context['team'] not in TEAM_NAMES or store is None):
+        return None
+    game = _schedule(store, context['team'], now)
+    fields = ('id', 'date', 'home_team', 'away_team')
+    if not game or any(context.get(key) != game.get(key) for key in fields):
+        return None
+    return {**{key:game[key] for key in fields}, 'team':context['team']}
+
+
+def preview_game_context(store, text, now):
+    """Read only an application preview heading, then verify its saved row.
+
+    Publication dates, coverage dates and model prose are outside this clause
+    and can never become the target date of a later prop discussion.
+    """
+    heading = str(text or '').split('\n', 1)[0]
+    match = re.match(r'^Next (?:game|saved matchup) for ([A-Z]{3}) \([^\n)]{1,80}\): '
+        r'([A-Z]{3}) at ([A-Z]{3}) — (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), '
+        r'([A-Z][a-z]{2}) (\d{1,2}), (20\d{2}),', heading)
+    if not match:
+        return None
+    team, away, home, weekday, month, day, year = match.groups()
+    months = {name:index for index,name in enumerate(
+        ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'), 1)}
+    try:
+        date = dt.date(int(year), months[month], int(day))
+    except (KeyError, ValueError):
+        return None
+    if date.strftime('%A') != weekday or team not in (home, away):
+        return None
+    context = {'id':canonical_game(date.isoformat(), home, away), 'date':date.isoformat(),
+               'home_team':home, 'away_team':away, 'team':team}
+    return validate_game_context(store, context, now)
+
+
 def build_preview(store, text='', history=None, *, now=None, team=None, resolved_intent=False):
     """Compute a saved preview after either explicit or validated semantic routing.
 

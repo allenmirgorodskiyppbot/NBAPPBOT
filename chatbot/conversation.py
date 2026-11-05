@@ -335,7 +335,8 @@ def _selection_preference(text, names):
 
 def _empty_state():
     return {'version': 1, 'slots': {}, 'constraints': {}, 'recent_picks': [], 'ambiguous_players': [],
-            'selected_pick_index': None, 'pending_clarification': None, 'upcoming_game_team': None}
+            'selected_pick_index': None, 'pending_clarification': None, 'upcoming_game_team': None,
+            'game_context': None, 'context_date_applied': False}
 
 
 def _pick_reference(text, cards):
@@ -387,6 +388,10 @@ def _clean_state(state, names, now):
         return result
     if isinstance(state.get('upcoming_game_team'), str) and state['upcoming_game_team'] in TEAM_NAMES:
         result['upcoming_game_team'] = state['upcoming_game_team']
+    if isinstance(state.get('game_context'), dict):
+        result['game_context'] = {key:state['game_context'].get(key)
+            for key in ('id','date','home_team','away_team','team')}
+        result['context_date_applied'] = state.get('context_date_applied') is True
     raw = state.get('slots', {})
     if isinstance(raw, dict):
         if raw.get('player') in names:
@@ -487,7 +492,7 @@ def _assistant_cards(text, names, now):
     return cards[:8]
 
 
-def _apply_user(text, state, names, now):
+def _apply_user(text, state, names, now, context_date=None):
     # Mobile dictation/typing commonly joins a comparison and its number.
     # Separate only known market syntax; never rewrite names or arbitrary prose.
     text = re.sub(r'\b(more|less|over|under|actually|not)(?=\d)', r'\1 ', text, flags=re.I)
@@ -522,6 +527,8 @@ def _apply_user(text, state, names, now):
     if players:
         state['upcoming_game_team'] = None
     game_date, date_error, spans = _date(text, now)
+    if not game_date and not date_error and context_date:
+        game_date = context_date
     pick_index, reference_error, reference_spans = _pick_reference(text, state['recent_picks'])
     spans += reference_spans
     stat, market_error = _market(text)
@@ -782,6 +789,54 @@ def _apply_user(text, state, names, now):
             'inherited': inherited, 'entities': entities}
 
 
+def _contextual_user(master, text, state, names, now):
+    """Supply a validated game reference without changing the user's text."""
+    explicit_date, date_error, _ = _date(text, now)
+    context = state.get('game_context')
+    players = _scan(text, names)['players']
+    player = players[0] if len(players) == 1 else state['slots'].get('player') if not players else None
+    context_date = None
+    mismatch = False
+    if explicit_date or date_error:
+        state['context_date_applied'] = False
+    elif context and player:
+        different = re.search(r'\b(?:different|new)\s+(?:game|matchup)\b', text, re.I)
+        if different:
+            if state.get('context_date_applied'):
+                state['slots'].pop('game_date', None)
+            state['game_context'] = None
+            state['context_date_applied'] = False
+        elif not state['slots'].get('game_date') or state.get('context_date_applied'):
+            with master.connect() as db:
+                rows = list(db.execute('SELECT p.team,p.date FROM player_games p JOIN games g ON g.id=p.game_id '
+                    "WHERE p.player=? AND p.date<=? AND g.status='final' ORDER BY p.date DESC,p.updated_at DESC LIMIT 2",
+                    (player,now.astimezone(EASTERN).date().isoformat())))
+            team = rows[0]['team'] if rows else None
+            conflict = len(rows)>1 and rows[0]['date']==rows[1]['date'] and rows[0]['team']!=rows[1]['team']
+            opponent = _opponent(text)
+            participants = {context['home_team'],context['away_team']}
+            mismatch = conflict or team not in participants or bool(opponent and opponent not in participants-{team})
+            if mismatch:
+                if state.get('context_date_applied'):
+                    state['slots'].pop('game_date', None)
+                state['context_date_applied'] = False
+            else:
+                context_date = context['date']
+    result = _apply_user(text, state, names, now, context_date=context_date)
+    if result['intent'] == 'upcoming_game':
+        state['game_context'] = None
+        state['context_date_applied'] = False
+    elif context_date and state['slots'].get('game_date') == context_date:
+        state['context_date_applied'] = True
+    if (mismatch and not explicit_date and not date_error and result['slots'].get('player')
+            and (result['slots'].get('line') is not None or result['intent'] in {'prop','explanation'})):
+        result['intent'] = 'clarification'
+        result['clarification'] = ('Which game date should I use for ' + result['slots']['player'] +
+            '? I can’t attach that player to the saved matchup we were discussing.')
+        result['errors'] = [*result.get('errors', []),'game_context_mismatch']
+    return result
+
+
 def resolve_conversation(store, master, text, history=None, state=None, now=None, preferences=None):
     """Resolve a turn using bounded conversation history or an existing state.
 
@@ -792,6 +847,12 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
     now = _now(now)
     names = _players(store, master)
     current = _clean_state(state, names, now)
+    from upcoming_game import preview_game_context, validate_game_context
+    if current.get('game_context'):
+        current['game_context'] = validate_game_context(master, current['game_context'], now)
+        if not current['game_context'] and current.get('context_date_applied'):
+            current['slots'].pop('game_date', None)
+            current['context_date_applied'] = False
     if state is None:
         saved = validated_lineup_preferences(preferences)
         current['constraints'].update({key: saved[key] for key in ('both_teams', 'preferred_stat') if key in saved})
@@ -802,8 +863,25 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
             if not item:
                 continue
             if item['role'] == 'user':
-                _apply_user(item['content'], current, names, now)
+                command = item['content'].lstrip().split(maxsplit=1)[0].split('@',1)[0].casefold()
+                if command.startswith('/') and command not in {'/board','/picks'}:
+                    # Health/data commands are not new prop offers or dates.
+                    continue
+                _contextual_user(master, item['content'], current, names, now)
             else:
+                game_context = preview_game_context(master, item['content'], now)
+                if game_context:
+                    keep_count = current['slots'].get('pick_count')
+                    current['slots'].clear()
+                    if keep_count is not None:
+                        current['slots']['pick_count'] = keep_count
+                    current['recent_picks'] = []
+                    current['ambiguous_players'] = []
+                    current['selected_pick_index'] = None
+                    current['pending_clarification'] = None
+                    current['game_context'] = game_context
+                    current['upcoming_game_team'] = game_context['team']
+                    current['context_date_applied'] = False
                 cards = _assistant_cards(item['content'], names, now)
                 if cards:
                     current['recent_picks'] = cards
@@ -814,7 +892,7 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
                         current['ambiguous_players'] = list(dict.fromkeys(card['player'] for card in cards))[:4]
                         for field in ('player', 'stat', 'line', 'side'):
                             current['slots'].pop(field, None)
-    result = _apply_user(str(text)[:3000], current, names, now)
+    result = _contextual_user(master, str(text)[:3000], current, names, now)
     result['original_question'] = str(text)[:3000]
     current['updated_at'] = now.isoformat()
     result['constraints'] = dict(current['constraints'])
