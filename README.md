@@ -8,11 +8,14 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 data and reliability upgrade
 
-Tested application `SOURCE_REF`: `d58bf21cadf741615b99ad9eb1e802681eaca49d`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42113271741)
-passed all **1,528 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `06372e67cebdc38938d27f934c78e5c0df69fd13`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42121382918)
+passed all **1,572 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
+The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
+
+Compact prop replies keep the calculated decision, exact quantities and citations in the application. The model writes only the explanation. Historical averages and hit counts remain context; they cannot replace the actual Hold reason or establish consistent performance. Future-game timing and current data verification remain separate from any prediction.
 
 The current research benchmark is the **arithmetic mean of the latest 20 usable,
 completed regular-season games for the player's current team**, strictly before

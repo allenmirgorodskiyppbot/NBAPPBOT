@@ -1,0 +1,257 @@
+{
+  "tested_source_ref": "06372e67cebdc38938d27f934c78e5c0df69fd13",
+  "ci": {
+    "run_id": 42121382918,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42121382918",
+    "status": "completed",
+    "conclusion": "success",
+    "job_id": 127574326565,
+    "passed": 1572,
+    "failed": 0,
+    "seconds": 153.695
+  },
+  "scope": "Local synthetic explanation controls; not a live Akash deployment test, source-freshness check, backtest, or broad model accuracy estimate.",
+  "method": "Five different questions through the actual production answer_conversation prop branch, generated_evidence_reply and efficient_prop_text. Slots were already resolved; semantic routing is outside this run. Observation wrappers did not change inference or validation.",
+  "source_sha256": {
+    "app.py": "9898186ea69a80ad61ec7d2105b032a4bd580a5e50e87f49c6eb82b8583a7b97",
+    "chat_flow.py": "d627d6cfa430e079fe5f4a87d90a5d4396acff6391e7ae3a5424fb1368492c10",
+    "grounded_reply.py": "1f8b6aeb45be327ce9fe1a23d0db06c1b4e53d4c830b8f8dff89385f1b4ecd17",
+    "pick_discussion.py": "77b8e5e9fd40548f45c39f7eba0e9bc654954bc67dcc935561de746493318fdc",
+    "efficient_ai.py": "c15c84c17f816a6d28be3d05a8151947763adfb4c634435297555e5cba439e13"
+  },
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "model_digest": "bea73b6912753ad23edfdc21d8a49ff9cc7abbabc4783c713ffc718ce0222574",
+  "runtime": {
+    "ollama": "0.40.13",
+    "cpus": 4,
+    "memory_gib": 8,
+    "downloaded": false
+  },
+  "fixture": {
+    "warning": "All observations and schedule rows are synthetic controls, not actual NBA claims.",
+    "player": "Jalen Brunson",
+    "line": 30,
+    "stat": "PRA",
+    "game_date": "2026-11-07",
+    "assessment_date": "2026-11-05",
+    "current_season_sample": {
+      "n": 8,
+      "above": 5,
+      "below": 3,
+      "median": 33
+    },
+    "same_team_baseline": {
+      "n": 20,
+      "mean": 35,
+      "median": 35
+    },
+    "actual_primary_hold_reason": "Current game-day verification is required; the requested game is future.",
+    "additional_supplied_hold_reason": "Complete recent team-game inventory is unverified.",
+    "verification_is_not_automatic_approval": "The historical margin of 5 is below the 5.25 strategy buffer; other filters still apply."
+  },
+  "warmup_separate_from_request_timings": {
+    "seconds": 2.137,
+    "load_seconds": 0.004995478,
+    "http_status": 200,
+    "model": "qwen3:4b-instruct-2507-q4_K_M"
+  },
+  "final_run_outcome": {
+    "generated_validated_and_delivered": 5,
+    "first_pass": 3,
+    "bounded_repair_successes": 2,
+    "fallbacks": 0,
+    "model_http_failures": 0,
+    "application_cache_hits": 0,
+    "all_requests_under_35_seconds": true,
+    "median_request_seconds": 8.749,
+    "maximum_request_seconds": 32.196
+  },
+  "independent_semantic_review": {
+    "reviewed_delivered_text_only": true,
+    "computed_gate_decision_date_line_and_source_quantities_correct_in_all_five": true,
+    "four_explanations_clear_and_source_consistent": true,
+    "fifth_explanation": "No explicit future-result guarantee or proven false claim; “verify performance” is imprecise about verification of historical inputs versus future results.",
+    "unsupported_consistency_sample_balance_cause_internal_ids_or_false_today_claim_delivered": false,
+    "interpretation": "Finite synthetic controls establish these observed outcomes, not a universal quality or reliability guarantee."
+  },
+  "data_protection": {
+    "observations_calendar_boards_entries_and_grades_unchanged": true,
+    "only_changed_fixture_table": "inference_usage",
+    "original_or_private_dataset_connected": false
+  },
+  "cases": [
+    {
+      "case": "original_assessment",
+      "question": "Jalen Brunson more 30 PRA for November 7, what do you think?",
+      "seconds": 32.196,
+      "delivered_model_explanation": "The decision is a pass because current game-day verification is required. Performance depends on real-time factors like minutes and shot opportunities, which aren't confirmed yet.",
+      "computed_decision": "pass",
+      "game_date": "2026-11-07",
+      "full_application_validation": "accepted",
+      "repair_attempts": 1,
+      "rejected_draft_reasons": [
+        "numerical_prose"
+      ],
+      "http_responses": [
+        {
+          "path": "/api/generate",
+          "status": 200
+        },
+        {
+          "path": "/api/generate",
+          "status": 200
+        }
+      ],
+      "exact_app_rendered_facts_checked": true,
+      "internal_evidence_ids_absent_from_prose": true,
+      "independent_semantic_note": "Clear and source-consistent after any listed repair."
+    },
+    {
+      "case": "historical_centers",
+      "question": "The average and median are above the line. Why are you still holding?",
+      "seconds": 8.749,
+      "delivered_model_explanation": "The historical mean and median are above the line, but this does not confirm future performance. The decision to hold is due to the need for a current game-day verification, not historical trends.",
+      "computed_decision": "pass",
+      "game_date": "2026-11-07",
+      "full_application_validation": "accepted",
+      "repair_attempts": 0,
+      "rejected_draft_reasons": [],
+      "http_responses": [
+        {
+          "path": "/api/generate",
+          "status": 200
+        }
+      ],
+      "exact_app_rendered_facts_checked": true,
+      "internal_evidence_ids_absent_from_prose": true,
+      "independent_semantic_note": "Clear and source-consistent after any listed repair."
+    },
+    {
+      "case": "recent_frequency",
+      "question": "He was above it in most recent games, so what is stopping the pick?",
+      "seconds": 7.114,
+      "delivered_model_explanation": "The decision is a pass because a current game-day verification is required. Historical data shows the mean and median are above the line, but this does not confirm future performance or guarantee outcomes.",
+      "computed_decision": "pass",
+      "game_date": "2026-11-07",
+      "full_application_validation": "accepted",
+      "repair_attempts": 0,
+      "rejected_draft_reasons": [],
+      "http_responses": [
+        {
+          "path": "/api/generate",
+          "status": 200
+        }
+      ],
+      "exact_app_rendered_facts_checked": true,
+      "internal_evidence_ids_absent_from_prose": true,
+      "independent_semantic_note": "Clear and source-consistent after any listed repair."
+    },
+    {
+      "case": "consistency_challenge",
+      "question": "Does having the mean and median above the line prove he is consistently clearing it?",
+      "seconds": 8.684,
+      "delivered_model_explanation": "No, having the mean and median above the line does not prove consistent performance. The decision to pass is due to unverified recent game data and the need for a current game-day refresh, not because of historical averages.",
+      "computed_decision": "pass",
+      "game_date": "2026-11-07",
+      "full_application_validation": "accepted",
+      "repair_attempts": 0,
+      "rejected_draft_reasons": [],
+      "http_responses": [
+        {
+          "path": "/api/generate",
+          "status": 200
+        }
+      ],
+      "exact_app_rendered_facts_checked": true,
+      "internal_evidence_ids_absent_from_prose": true,
+      "independent_semantic_note": "Clear and source-consistent after any listed repair."
+    },
+    {
+      "case": "explanation_followup",
+      "question": "Walk me through the thinking. What needs to happen before you can choose a side?",
+      "seconds": 18.506,
+      "delivered_model_explanation": "The decision is a pass because current game-day data is required to verify performance. Without real-time stats, past trends or averages cannot confirm future outcomes or support a side.",
+      "computed_decision": "pass",
+      "game_date": "2026-11-07",
+      "full_application_validation": "accepted",
+      "repair_attempts": 1,
+      "rejected_draft_reasons": [
+        "unsupported_metric"
+      ],
+      "http_responses": [
+        {
+          "path": "/api/generate",
+          "status": 200
+        },
+        {
+          "path": "/api/generate",
+          "status": 200
+        }
+      ],
+      "exact_app_rendered_facts_checked": true,
+      "internal_evidence_ids_absent_from_prose": true,
+      "independent_semantic_note": "Gate is correct and no outcome guarantee is made; verification wording could be clearer."
+    }
+  ],
+  "prior_variants": [
+    {
+      "variant": "native structured chat",
+      "scope": "KAT synthetic control",
+      "generated_delivered": 4,
+      "completed_cases": 5,
+      "issue": "One native PEG-format HTTP500; not merged with final results."
+    },
+    {
+      "variant": "known-Hold structured completion",
+      "scope": "Brunson synthetic control",
+      "generated_delivered": 2,
+      "completed_cases": 4,
+      "issue": "Two output-limit/fragmented-JSON safe fallbacks; one delivered Unicode ID presentation defect."
+    },
+    {
+      "variant": "prose v4",
+      "generated_delivered": 5,
+      "completed_cases": 5,
+      "independent_clear_explanations": 3,
+      "issue": "Unsupported typicality and future-date/result-validation wording prompted the final guards."
+    }
+  ],
+  "local_focused_regressions": {
+    "passed": 139,
+    "failed": 0,
+    "seconds": 11.858
+  },
+  "changes": [
+    "Mean/median and recent frequencies remain descriptive context, separate from the actual computed decision reason.",
+    "Compact prop explanations use prose-only generation with application-owned decision and source references; generic research retrieval remains separate.",
+    "Full factual, entity, scope, recommendation, stability and numerical checks remain active, including cache revalidation and one bounded repair.",
+    "Future/past timing comes from the readiness check; false present-day claims and unsupported verification-to-result claims are rejected."
+  ],
+  "live_selftest_observation": {
+    "source": "user-supplied Telegram report",
+    "passed": 16,
+    "failed": 0,
+    "warnings": 2,
+    "live_database_integrity_warning": {
+      "seconds": 46.875,
+      "reason": "TimeoutError"
+    },
+    "latest_backup_integrity_warning": {
+      "seconds": 64.182,
+      "reason": "TimeoutError"
+    },
+    "fixture_excel_export_seconds": 30.991,
+    "interpretation": "Report delivery works; these two full integrity scans remain unverified, not passed."
+  },
+  "activation": {
+    "live_deployment_verified": false,
+    "required_action": "Update only the existing Akash SOURCE_REF and retain persistent storage/private settings; verify /ai_status and repeat the conversation after ready.",
+    "freshness_requirements_changed": false,
+    "actual_reminder_delivery_tested": false
+  },
+  "known_data_limits": [
+    "Eight collected tracking categories have unknown covered-game dates.",
+    "Overall and Less Than 6Ft tracking extracts remain unavailable.",
+    "Current schedule/publication/availability checks can still hold picks."
+  ]
+}
