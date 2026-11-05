@@ -23,6 +23,15 @@ from nba_cdn import SCHEDULE_URL, BOX_URL, parse_game as nba_game, parse_players
 EASTERN=ZoneInfo('America/New_York')
 
 
+def write_schedule_status(output, report):
+    """Persist collection health separately from independently verified events."""
+    target = Path(output) / 'schedule_status.json'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix('.json.tmp')
+    temporary.write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
+    temporary.replace(target)
+
+
 def verified_day_inventory(document, day, checked_at):
     """Validate an independent day inventory, including explicit calendar offdays."""
     day = dt.date.fromisoformat(day).isoformat()
@@ -224,6 +233,11 @@ class PublicCollector:
         from nba_cdn import SCOREBOARD_URL
         day = self.now.astimezone(EASTERN).date().isoformat()
         failures = []
+        health = {'schema_version': 1, 'date': day, 'attempted_at': self.now.isoformat(),
+                  'retry_interval_seconds': 600,
+                  'next_retry_at': (self.now + dt.timedelta(minutes=10)).isoformat(),
+                  'next_retry_is_estimate': True,
+                  'scope': 'Collector health only; this file never verifies current game timing.'}
         for source, parser in ((ESPN + 'scoreboard?dates=' + day.replace('-', ''), _parse_today),
                                (SCOREBOARD_URL, _parse_nba_today)):
             try:
@@ -240,12 +254,18 @@ class PublicCollector:
                 temporary = target.with_suffix('.json.tmp')
                 temporary.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
                 temporary.replace(target)
-                return {'status': 'success', 'games': len(games), 'source': source,
-                        'source_checked_at': self.now.isoformat()}
+                report = {**health, 'status': 'success', 'games': len(games), 'source': source,
+                          'source_checked_at': self.now.isoformat(), 'attempts': failures}
+                write_schedule_status(output, report)
+                return report
             except (httpx.HTTPError, RuntimeError, ValueError) as error:
                 failures.append({'source': source, 'error_type': type(error).__name__,
                     'http_status': getattr(getattr(error, 'response', None), 'status_code', None)})
-        return {'status': 'unavailable', 'attempts': failures}
+        report = {**health, 'status': 'unavailable', 'attempts': failures,
+                  'source_checked_at': None,
+                  'note': 'No source was verified. Any prior event relay is retained with its original timestamp.'}
+        write_schedule_status(output, report)
+        return report
 
     async def boxes(self,day,games,source):
         published=[]; observations=[]; pending=[]; errors=[]
@@ -306,7 +326,13 @@ async def main_async(args):
         schedule_report = await collector.publish_current_schedule(output)
         print('Current schedule:', json.dumps(schedule_report), flush=True)
         if getattr(args, 'schedule_only', False):
-            return 0 if schedule_report['status'] == 'success' else 1
+            if schedule_report['status'] == 'unavailable':
+                print('::notice::NBA schedule sources are unavailable; recorded retry status. '
+                      'Current game timing remains unverified and no successful relay was fabricated.', flush=True)
+                return 0
+            if schedule_report['status'] != 'success':
+                raise ValueError('Unexpected schedule collection status.')
+            return 0
         from mirror_sources import PublishedNBAData
         mirror=PublishedNBAData(client,collector.now)
         mirror.configure_scope(output)

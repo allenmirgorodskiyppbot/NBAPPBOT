@@ -30,10 +30,12 @@ jobs:
         run: python chatbot/nba_daily_export.py --output data/live --schedule-only
       - name: Publish source timestamp and validated event response
         run: |
-          git add data/live/schedule_today.json
+          for path in data/live/schedule_today.json data/live/schedule_status.json; do
+            if [ -f "$path" ]; then git add -- "$path"; fi
+          done
           if git diff --cached --quiet; then exit 0; fi
           git config user.name 'NBAPPBOT data refresh'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Refresh current NBA event timing'
+          git commit -m 'Refresh NBA event timing and source health'
           git pull --rebase origin main
           git push origin HEAD:main
