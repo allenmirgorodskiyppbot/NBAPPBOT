@@ -90,7 +90,38 @@
       "status": "final"
     }
   ],
-  "inventory_scope": "Games present in the published extract; complete NBA schedule not independently verified.",
+  "inventory_date": "2026-10-31",
+  "inventory_game_ids": [
+    "nba:2026-10-31:ATL:NOP",
+    "nba:2026-10-31:CHA:PHI",
+    "nba:2026-10-31:CLE:MIL",
+    "nba:2026-10-31:HOU:OKC",
+    "nba:2026-10-31:MEM:SAC",
+    "nba:2026-10-31:MIN:SAS",
+    "nba:2026-10-31:POR:UTA"
+  ],
+  "inventory_off_day_verified": false,
+  "inventory_scope": "Nonempty historical NBA calendar date, corroborated by exact two-team NBA final results and independent complete ESPN boxes; no live schedule, off-day or unannounced Cup/TBD certification.",
+  "inventory_sources": [
+    {
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
+      "source_content_sha256": "5cd684d20ea833536b874ec519daa4a0bdc7a2b7b5eada73a59185d3bb3d663a",
+      "source_published_at": "2026-11-03T15:15:40Z"
+    },
+    {
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
+      "source_content_sha256": "8db99978ef3b3cafdb97cdc424cc0ece2ca6064c7b58c96fa54a4f2bcd62b795",
+      "source_published_at": "2026-11-05T15:14:41Z"
+    },
+    {
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
+      "source_content_sha256": "d907210f8b5d7dd21b67e592297843b81dccb4679e1cc8e51cd2c0166591389f",
+      "source_published_at": "2026-11-05T12:34:17+00:00"
+    }
+  ],
+  "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
+  "inventory_verified": true,
+  "inventory_verified_at": "2026-11-05T18:05:38.148986+00:00",
   "pending_game_ids": [],
   "player_games": [
     {
@@ -6167,11 +6198,12 @@
     }
   ],
   "publication_source": "SportsDataverse public ESPN extract",
-  "published_at": "2026-11-03T13:28:31+00:00",
-  "publisher_file_data_through_date": "2026-11-02",
+  "published_at": "2026-11-05T12:34:17+00:00",
+  "publisher_file_data_through_date": "2026-11-04",
   "schema_version": 1,
-  "scope_revision": "1c08292dd58e70d1f18d59b551cd8a470e448934e92f8d527c644cb3fc112237",
+  "scope_revision": "120b5516f0449fafdfdf8d3f2805c53bb6be9c1dc37d0d23e2737fdee9318d38",
   "source": "espn",
+  "source_content_sha256": "d907210f8b5d7dd21b67e592297843b81dccb4679e1cc8e51cd2c0166591389f",
   "source_data_through_date": "2026-10-31",
   "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
   "upstream_full_game_validated": true
