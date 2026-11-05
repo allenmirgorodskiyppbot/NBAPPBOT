@@ -1,0 +1,13 @@
+{
+  "attempted_at": "2026-11-05T13:44:10.691301+00:00",
+  "manifest_sha256": "adfe872825d7937c309af0d12ad2f69a7f7b4efd8e476cb3b03a456f99db2dd8",
+  "observations": 170973,
+  "parts": 21,
+  "players": 487,
+  "rejected_games": 107,
+  "requested_participants": 488,
+  "scope": "Career-history collection only; not current-game readiness.",
+  "source_data_through_date": "2026-11-04",
+  "status": "updated",
+  "unresolved_targets": []
+}
