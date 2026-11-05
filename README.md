@@ -8,8 +8,8 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 history and strategy upgrade
 
-Tested application `SOURCE_REF`: `b1e1f82c5b6be4dd83781dfd3cd73938aad608c1`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42038368133)
+Tested application `SOURCE_REF`: `c9ad749f7896140368cd38cd5baf61cdc781a48f`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42039885556)
 passed. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 
 The current research benchmark is the **arithmetic mean of the latest 20 usable,

@@ -20,7 +20,7 @@ services:
     - NBA_DATA_SOURCE=manual
     - DAILY_NBA_REFRESH=1
     - NEWS_SOURCE=rss
-    - SOURCE_REF=b1e1f82c5b6be4dd83781dfd3cd73938aad608c1
+    - SOURCE_REF=c9ad749f7896140368cd38cd5baf61cdc781a48f
     - DATA_DIR=/data
     - TELEGRAM_BOT_TOKEN=
     - TELEGRAM_ALLOWED_USER_ID=
