@@ -375,6 +375,9 @@ async def main_async(args):
         direct_ok=await supplement_tracking(collector,output)
         advanced_ok=bool(advanced_ok or direct_ok)
         print('Existing-statistics source collected:',advanced_ok,flush=True)
+        from career_history_refresh import refresh_career_history
+        career_report = await refresh_career_history(client, output, mirror.scope, now=collector.now)
+        print('Matchup career history:', json.dumps(career_report, sort_keys=True), flush=True)
     if failures:
         print('Some daily dates could not be collected; no success was fabricated.',flush=True)
     return 1 if failures==args.days and not advanced_ok else 0

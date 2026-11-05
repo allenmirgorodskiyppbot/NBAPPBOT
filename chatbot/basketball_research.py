@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import difflib
 import json
+import math
 import re
 import sqlite3
 import unicodedata
@@ -165,6 +166,11 @@ def resolve_question(store, master, question, history=None):
             if turn.get('role') != 'user':
                 continue
             previous = _scan(turn.get('content', ''), names)
+            if (not result.get('inherited_career_scope') and previous['players']
+                    and re.search(r'\b(?:career|lifetime|all[ -]time|all[ -]seasons)\b', turn.get('content', ''), re.I)):
+                prior_scope = _requested_population({'original_question': turn['content']})
+                if prior_scope['season_basis'] == 'available career':
+                    result['inherited_career_scope'] = prior_scope
             if pronoun_comparison and previous['players']:
                 # "How does he compare to Maxey?" names a new player without
                 # replacing the unambiguous player referenced by the pronoun.
@@ -185,6 +191,9 @@ def resolve_question(store, master, question, history=None):
                 result['teams'] = previous['teams']
             if result['players'] and result['teams']:
                 break
+    from career_identity import resolve_career_identity
+    result['players'] = list(dict.fromkeys(resolve_career_identity(master, name)['player']
+                                          for name in result['players']))
     result['original_question'] = str(question)
     return result
 
@@ -196,12 +205,25 @@ def canonical_history(store, master, history):
 
 
 def _opponent(resolved, master):
+    text = str(resolved.get('original_question') or resolved.get('question') or '')
+    # NYK can be the requested opponent of an opposing player. The historical
+    # Knicks-focused default must not discard an explicit "against the Knicks".
+    explicit = list(re.finditer(r'\b(?:against|versus|vs\.?)\s+(?:the\s+)?', text, re.I))
+    named = {team for match in explicit for team, aliases in TEAM_NAMES.items()
+             if any(re.match(r'^' + re.escape(_key(alias)) + r'\b', _key(text[match.end():]))
+                    for alias in (team, *aliases))}
+    if named:
+        return next(iter(named)) if len(named) == 1 else None
+    # A named player's team is not a substitute for that player's measured
+    # guarding history, even when the question mentions both names and a team.
+    if explicit and any(_has(text[match.end():], name) for match in explicit
+                        for name in resolved.get('players', [])):
+        return None
     teams = [team for team in resolved['teams'] if team != 'NYK']
     if len(teams) == 1:
         return teams[0]
     if teams or master is None:
         return None
-    text = resolved['original_question']
     if not re.search(r'\b(today|tonight|tomorrow|next game)\b', text, re.I):
         return None
     snapshot = master.get_checkpoint('knicks_digest_schedule_v1', {})
@@ -317,10 +339,37 @@ def _requested_population(resolved):
     relative_previous = not seasons and bool(re.search(r'\b(?:last|previous|prior)\s+season\b', text, re.I))
     if relative_previous:
         year -= 1
-    return {'seasons': list(dict.fromkeys(seasons))[:2] or [f'{year}-{str(year+1)[-2:]}'],
+    explicit_career = bool(re.search(r'\b(?:career|lifetime|all[ -]time|all[ -]seasons)\b', text, re.I))
+    inherited = resolved.get('inherited_career_scope', {}) if not explicit_career and not re.search(
+        r'\b(?:(?:this|current|last|previous|prior)\s+season|today|tonight|tomorrow|latest)\b', text, re.I) else {}
+    career = explicit_career or bool(inherited)
+    result = {'seasons': list(dict.fromkeys(seasons))[:2] or ([] if career and not relative_previous else [f'{year}-{str(year+1)[-2:]}']),
             'season_type': 'Playoffs' if re.search(r'\bplayoffs?\b', text, re.I) else
+                           'Play-In' if re.search(r'\bplay[ -]ins?\b', text, re.I) else
                            'Preseason' if re.search(r'\bpreseason\b', text, re.I) else 'Regular Season',
-            'season_basis': 'explicit request' if seasons else 'previous season' if relative_previous else 'current season'}
+            'season_basis': 'explicit request' if seasons else 'previous season' if relative_previous else 'available career' if career else 'current season'}
+    if result['season_basis'] == 'available career':
+        result.update(as_of_date=current.date().isoformat(), cutoff_exclusive=current.date().isoformat())
+        result.update({key: inherited[key] for key in ('as_of_date', 'cutoff_exclusive', 'from_date') if key in inherited})
+        upper = re.search(r'\b(as\s+of|before|prior\s+to|through)\s+(\d{4}-\d{2}-\d{2})\b', text, re.I)
+        lower = re.search(r'\b(since|after|from)\s+(\d{4}-\d{2}-\d{2})\b', text, re.I)
+        try:
+            if upper:
+                date = dt.date.fromisoformat(upper.group(2))
+                result['as_of_date'] = date.isoformat()
+                if upper.group(1).casefold() == 'through':
+                    date += dt.timedelta(days=1)
+                result['cutoff_exclusive'] = min(date, current.date()).isoformat()
+            if lower:
+                date = dt.date.fromisoformat(lower.group(2))
+                if lower.group(1).casefold() == 'after':
+                    date += dt.timedelta(days=1)
+                result['from_date'] = date.isoformat()
+        except ValueError:
+            result['scope_error'] = 'The requested career date is invalid. Use a real YYYY-MM-DD date.'
+        result['aggregation'] = ('totals' if re.search(r'\b(?:totals?|how\s+many)\b', text, re.I) else
+                                 'averages' if re.search(r'\baverag\w*\b', text, re.I) else inherited.get('aggregation', 'averages'))
+    return result
 
 
 def _context_assignments(store, players, opponent, population, master=None):
@@ -406,6 +455,134 @@ def _tracking_context(record):
             'population': population}
 
 
+def _career_metrics(question):
+    """Dimensions supported by the stored career calculation, not a forecast."""
+    from grounded_reply import requested_metrics
+    selected = requested_metrics(question)
+    raw = {'fga': r'\b(?:fga|field[- ]goals?\s+attempt(?:ed|s)?|fg\s+attempt(?:ed|s)?|shots?\s+attempted)\b',
+           'tpa': r'\b(?:tpa|3pta|three[- ]point\s+attempts?)\b',
+           'fgm': r'\b(?:fgm|field[- ]goals?\s+made)\b',
+           'ftm': r'\b(?:ftm|free[- ]throws?\s+made)\b',
+           'fta': r'\b(?:fta|free[- ]throws?\s+attempt(?:ed|s)?)\b',
+           'oreb': r'\boffensive\s+rebounds?\b|\boreb\b',
+           'dreb': r'\bdefensive\s+rebounds?\b|\bdreb\b',
+           'fouls': r'\b(?:fouls?|pf)\b', 'plus_minus': r'\bplus[ -]minus\b'}
+    explicit = [key for key, pattern in raw.items() if re.search(pattern, question, re.I)]
+    compounds = [key for key in ('pra', 'pr', 'pa', 'ra', 'stocks')
+                 if re.search(r'\b' + key + r'\b', question, re.I)]
+    return list(dict.fromkeys(compounds or explicit or selected))
+
+
+def _career_names(master, player):
+    """Use explicit collected identity bindings; never suffix/fuzzy-merge people."""
+    from career_identity import resolve_career_identity
+    identity = resolve_career_identity(master, player)
+    if identity.get('ambiguous'):
+        return []
+    bound = {identity.get('player') or player, *identity.get('aliases', [])}
+    scope = master.get_checkpoint('dataset_refresh_scope', {}) or {}
+    key = _key(player)
+    matches = [row for row in scope.get('players', []) if key in
+               {_key(value) for value in [row.get('player', ''), *row.get('aliases', [])]}]
+    ids = {str(row['espn_player_id']) for row in matches if row.get('espn_player_id')}
+    if len(ids) > 1 or (ids and identity.get('espn_player_id') and identity['espn_player_id'] not in ids):
+        return []
+    aliases = {player, *bound}
+    for row in matches:
+        aliases.update(value for value in [row.get('player'), *row.get('aliases', [])] if value)
+    return sorted(aliases)
+
+
+def _career_sample(db, player, population, metrics, names, opponent=None):
+    """Aggregate available dated game observations once, across actual teams."""
+    from history_backfill import history_exclusion
+    from master import STAT_COMPONENTS
+    from feeds import canonical_game, canonical_team
+    from grounded_reply import METRICS
+    requested = list(dict.fromkeys(metrics))
+    raw_fields = ('pts', 'reb', 'ast', 'minutes', 'tpm', 'stl', 'blk', 'tov',
+                  'fga', 'tpa', 'fgm', 'ftm', 'fta', 'oreb', 'dreb', 'fouls', 'plus_minus')
+    fields = set(raw_fields)
+    filters = ['p.player IN (' + ','.join('?' for _ in names) + ')', 'p.season_type=?',
+               "g.status='final'", "LOWER(p.appearance_state)='played'", 'g.date=p.date', 'p.date<?']
+    args = [*names, population['season_type'], population['cutoff_exclusive']]
+    if population.get('from_date'):
+        filters.append('p.date>=?'); args.append(population['from_date'])
+    if opponent:
+        filters.append('p.opponent=?'); args.append(opponent)
+    rows = [dict(row) for row in db.execute(
+        'SELECT p.*,g.home_team AS event_home,g.away_team AS event_away '
+        'FROM player_games p JOIN games g ON g.id=p.game_id WHERE ' + ' AND '.join(filters)
+        + ' ORDER BY p.date DESC,p.game_id DESC,p.updated_at DESC', args)]
+    grouped, rejected = {}, 0
+    for row in rows:
+        try:
+            day = dt.date.fromisoformat(row['date'])
+            season = re.fullmatch(r'(\d{4})-(\d{2})', str(row.get('season') or ''))
+            if (not season or int(season[2]) != (int(season[1]) + 1) % 100
+                    or day.year not in {int(season[1]), int(season[1]) + 1}
+                    or history_exclusion(row)):
+                rejected += 1; continue
+        except (TypeError, ValueError):
+            rejected += 1; continue
+        team, other = canonical_team(row.get('team')), canonical_team(row.get('opponent'))
+        home, away = canonical_team(row.get('event_home')), canonical_team(row.get('event_away'))
+        if not home or not away or {team, other} != {home, away} or team == other:
+            rejected += 1; continue
+        minutes = row.get('minutes')
+        if minutes is not None and (type(minutes) not in (int, float) or not math.isfinite(minutes) or minutes <= 0):
+            rejected += 1; continue
+        grouped.setdefault((canonical_game(row['date'], home, away), team), []).append(row)
+    samples, conflicts = [], 0
+    for aliases in grouped.values():
+        if len({row['season'] for row in aliases}) != 1:
+            rejected += 1; continue
+        sample = dict(aliases[0])
+        for field in fields:
+            values = {row.get(field) for row in aliases if type(row.get(field)) in (int, float)
+                      and math.isfinite(row[field]) and (row[field] >= 0 or field == 'plus_minus')}
+            sample[field] = next(iter(values)) if len(values) == 1 else None
+            if len(values) > 1:
+                conflicts += 1
+        samples.append(sample)
+    values, counts, totals = {}, {}, {}
+    for metric in requested:
+        if metric.endswith('_pct'):
+            made, attempted = {'fg_pct': ('fgm', 'fga'), 'three_pct': ('tpm', 'tpa'),
+                               'ft_pct': ('ftm', 'fta')}[metric]
+            complete = [r for r in samples if r[made] is not None and r[attempted] is not None
+                        and r[made] <= r[attempted]]
+            denominator = sum(r[attempted] for r in complete)
+            counts[metric] = len(complete)
+            values[metric] = sum(r[made] for r in complete) / denominator if denominator else None
+            continue
+        components = STAT_COMPONENTS.get(metric, (metric,))
+        observed = [sum(r[field] for field in components) for r in samples
+                    if all(r.get(field) is not None for field in components)]
+        counts[metric] = len(observed)
+        totals[metric] = sum(observed) if observed else None
+        values[metric] = sum(observed) / len(observed) if observed else None
+    return {'entity': player, 'player': player, 'opponent': opponent, 'season': 'Available career',
+            'season_type': population['season_type'], 'season_basis': 'available career',
+            'population': 'player_vs_team_whole_games' if opponent else 'career_all_opponents',
+            'n': len(samples), 'games': len(samples), 'aggregation': population.get('aggregation', 'averages'),
+            'observed_counts': counts, 'averages': values, 'totals': totals,
+            **{METRICS[m][0]: v for m, v in values.items()},
+            **{METRICS[m][2]: counts[m] for m in requested if METRICS[m][2]},
+            'actual_teams': sorted({r['team'] for r in samples}),
+            'seasons': sorted({r['season'] for r in samples}),
+            'first_date': min((r['date'] for r in samples), default=None),
+            'data_through_date': max((r['date'] for r in samples), default=None),
+            'cutoff_exclusive': population['cutoff_exclusive'], 'from_date': population.get('from_date'),
+            'source_records': [{key: r.get(key) for key in ('game_id', 'date', 'source')} for r in samples[:2]],
+            'source_records_truncated': len(samples) > 2, 'excluded_rows': rejected,
+            'duplicate_rows': sum(len(group) - 1 for group in grouped.values()),
+            'conflicting_metric_values': conflicts, 'published_at': None,
+            'source_kind': 'stored completed career observations',
+            'coverage_note': ('Available stored career history; full career completeness is not independently verified. '
+                              'Missing statistics and DNPs are not zeroes. Whole-game opponent samples do not establish measured guarding.')}
+
+
 def research_context(store, master, resolved):
     """Retrieve explicitly scoped evidence; dates and populations never substitute."""
     from news_digest import is_promotion
@@ -417,6 +594,12 @@ def research_context(store, master, resolved):
                'player_sheets': [], 'news': [], 'current_player_statistics': [],
                'opponent_player_statistics': [], 'current_tracking': [],
                'freshness_priority': 'Prefer newer evidence only for the same entity, metric, population, season and phase. Broad season totals never replace opponent samples or tentative assignments. Covered game dates, publication dates and assignment dates are distinct.'}
+    career = population['season_basis'] == 'available career'
+    if career:
+        context['requested_metrics'] = _career_metrics(str(resolved.get('original_question') or resolved.get('question') or ''))
+        if population.get('scope_error'):
+            context['population_error'] = population['scope_error']
+            return context
     availability_question = bool(re.search(
         r'\b(?:availab\w*|health\w*|injur\w*|questionable|ruled\s+out)\b',
         str(resolved.get('original_question') or resolved.get('question') or ''), re.I))
@@ -439,6 +622,17 @@ def research_context(store, master, resolved):
                             value[key] = None
                     context['availability_coverage']['feeds'].append(value)
             tracking_exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='refreshed_tracking'").fetchone()
+            if career:
+                for player in resolved['players'][:2]:
+                    names = _career_names(master, player)
+                    if not names:
+                        context['population_error'] = 'The requested player identity is ambiguous; a verified player identity is needed before combining career records.'
+                        continue
+                    context['current_player_statistics'].append(
+                        _career_sample(db, player, population, context['requested_metrics'], names))
+                    if opponent:
+                        context['opponent_player_statistics'].append(
+                            _career_sample(db, player, population, context['requested_metrics'], names, opponent))
             for season in population['seasons']:
                 phase = population['season_type']
                 for player in resolved['players'][:2]:

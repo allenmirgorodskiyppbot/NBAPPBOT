@@ -27,6 +27,8 @@ APP_FILES = [
     'research_discussion.py', 'lineup_selection.py', 'pregame_freshness.py', 'game_schedule_check.py',
     'strategy_info.py', 'master_upgrade.py', 'pregame_archive.py', 'game_phase.py', 'history_backfill.py',
     'history_service.py', 'history_manifest.json',
+    'career_identity.py', 'career_metadata.py', 'matchup_history_targets.json',
+    'career_history_refresh.py',
 ]
 
 

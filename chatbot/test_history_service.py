@@ -166,8 +166,10 @@ class HistoryServiceInstallTests(unittest.TestCase):
             with patch('history_service.import_history_bundle', side_effect=ValueError('fixture')):
                 with self.assertRaises(ValueError):
                     self.install(client)
-            target = next((self.root / 'history').rglob('*.jsonl.gz'))
-            target.write_bytes(b'x' * len(self.blob))
+            # Both independent cache copies must be invalid before another
+            # network transfer is necessary.
+            for target in (self.root / 'history').rglob('*.jsonl.gz'):
+                target.write_bytes(b'x' * len(self.blob))
             result = self.install(client)
         self.assertEqual(len(self.requests), 2)
         self.assertTrue(result['complete'])
@@ -198,6 +200,11 @@ class HistoryUpgradeWorkerTests(unittest.IsolatedAsyncioTestCase):
         self.root = Path(self.directory.name)
         self.store = MasterStore(self.root / 'master.sqlite')
         self.tasks = []
+        self.rolling = Mock(return_value={'complete': True, 'already_imported': True,
+                                         'manifest_sha256': 'b' * 64, 'missing_players': 0})
+        self.rolling_patch = patch('history_service.install_rolling_history', self.rolling)
+        self.rolling_patch.start()
+        self.addCleanup(self.rolling_patch.stop)
 
     async def asyncTearDown(self):
         for task in self.tasks:
@@ -215,6 +222,8 @@ class HistoryUpgradeWorkerTests(unittest.IsolatedAsyncioTestCase):
         sleeps = []
         async def sleep(seconds):
             sleeps.append(seconds)
+            if seconds == history_service.POLL_SECONDS:
+                await asyncio.Event().wait()
             await self.original_sleep(0)
         readiness = Mock(side_effect=[False, True])
         install = Mock(return_value={'complete': True, 'player_games_added': 8})
@@ -224,8 +233,10 @@ class HistoryUpgradeWorkerTests(unittest.IsolatedAsyncioTestCase):
             task = asyncio.create_task(history_upgrade_service(self.store, self.root, ready=readiness, exporter=export))
             self.tasks.append(task)
             await self.until(lambda: export.call_count == 1)
-            self.assertEqual(sleeps, [5])
+            await self.until(lambda: history_service.POLL_SECONDS in sleeps)
+            self.assertEqual(sleeps, [5, history_service.POLL_SECONDS])
             install.assert_called_once_with(self.store, self.root, REF)
+            self.rolling.assert_called_once()
             export.assert_called_once_with(self.store, self.root / 'exports')
             self.assertEqual(self.store.get_checkpoint('history_upgrade_status')['phase'], 'updated')
             task.cancel()

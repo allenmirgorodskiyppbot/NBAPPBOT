@@ -36,7 +36,8 @@ _GENERATED = {'player_metrics', 'calculated_splits', 'correlations', 'pair_summa
               'team_schedule', 'original_evidence', 'original_missing_data',
               'original_sources', 'refresh_coverage', 'export_readme',
               'historical_coverage', 'current_missing_data', 'dataset_coverage',
-              'upgrade_imports', 'workbook_text_chunks', 'history_import'}
+              'upgrade_imports', 'workbook_text_chunks', 'history_import',
+              'matchup_career_coverage', 'matchup_career_refresh'}
 # Populated only from known application tables, never from a workbook-provided SQL name.
 STRUCTURED_EXPORTS = {'research_runs': 'Research_Runs', 'research_candidates': 'Research_Candidates'}
 TEXT_PREFIX = '__NBA_XLSX_TEXT__:'
@@ -550,6 +551,9 @@ def augment_export_tables(master, tables, now=None):
             'history_completeness': 'observed_rows_only_not_independently_verified_complete',
             'note': 'Coverage is separate for each player, season and phase; lifetime completeness requires an independent expected-game inventory.'})
     tables['Historical_Coverage'] = coverage
+    from career_identity import matchup_career_coverage
+    tables['Matchup_Career_Coverage'] = matchup_career_coverage(
+        master, tables.get('player_games', []), tables.get('games', []), now=now)
     observations = tables.get('player_games', [])
     dates = [row['date'] for row in observations if row.get('date')]
     dataset = [{'dataset': 'Saved player-game observations', 'records': len(observations),
@@ -592,6 +596,12 @@ def augment_export_tables(master, tables, now=None):
             tables['History_Import'] = [{'field': key, 'value': value,
                 'scope': 'Historical import report; independent live readiness remains separate.'}
                 for key, value in status.items()]
+        rolling = db.execute("SELECT value_json FROM checkpoints WHERE name='matchup_career_history_status'").fetchone()
+        if rolling:
+            status = _json(rolling[0], 'Saved matchup career status')
+            tables['Matchup_Career_Refresh'] = [{'field': key, 'value': value,
+                'scope': 'Historical source coverage; not current-game readiness.'}
+                for key, value in status.items()]
         for table, sheet in STRUCTURED_EXPORTS.items():
             if table in available:
                 rows = [dict(r) for r in db.execute('SELECT * FROM ' + table)]
@@ -599,6 +609,11 @@ def augment_export_tables(master, tables, now=None):
                 dataset.append({'dataset': sheet, 'records': len(rows),
                                 'status': 'archived_snapshots' if rows else 'empty_archive',
                                 'note': 'Snapshots retain their original as-of/source timestamps; rows are not necessarily fresh or complete.'})
+        if 'career_game_metadata_repairs' in available:
+            # Evidence stays a dated reference on workbook import. Uploaded
+            # audit rows cannot themselves certify that a game was verified.
+            tables['Career_Metadata_Repairs'] = [dict(row) for row in db.execute(
+                'SELECT * FROM career_game_metadata_repairs ORDER BY game_id')]
         if 'master_upgrade_imports' in available:
             tables['Upgrade_Imports'] = [dict(r) for r in db.execute('SELECT * FROM master_upgrade_imports')]
         archive_names = [r[0] for r in db.execute('SELECT sheet_name FROM master_upgrade_sheet_archives')] if 'master_upgrade_sheet_archives' in available else []

@@ -160,6 +160,20 @@ METRICS = {
     'fg_pct': ('fg_pct', 'FG%', None),
     'three_pct': ('three_pct', '3P%', None),
     'ft_pct': ('ft_pct', 'FT%', None),
+    'fga': ('fga_per_game', 'FGA/game', 'fga_observed'),
+    'tpa': ('tpa_per_game', 'three-point attempts/game', 'tpa_observed'),
+    'fgm': ('fgm_per_game', 'field goals made/game', 'fgm_observed'),
+    'ftm': ('ftm_per_game', 'free throws made/game', 'ftm_observed'),
+    'fta': ('fta_per_game', 'free throw attempts/game', 'fta_observed'),
+    'oreb': ('oreb_per_game', 'offensive rebounds/game', 'oreb_observed'),
+    'dreb': ('dreb_per_game', 'defensive rebounds/game', 'dreb_observed'),
+    'fouls': ('fouls_per_game', 'fouls/game', 'fouls_observed'),
+    'plus_minus': ('plus_minus_per_game', 'plus-minus/game', 'plus_minus_observed'),
+    'pra': ('pra_per_game', 'PRA/game', 'pra_observed'),
+    'pr': ('pr_per_game', 'points+rebounds/game', 'pr_observed'),
+    'pa': ('pa_per_game', 'points+assists/game', 'pa_observed'),
+    'ra': ('ra_per_game', 'rebounds+assists/game', 'ra_observed'),
+    'stocks': ('stocks_per_game', 'steals+blocks/game', 'stocks_observed'),
 }
 
 # These imported fields are additive source totals, not ordinary box-score
@@ -215,6 +229,18 @@ def metric_text(row, metrics, opponent_sample=False):
         if metric.endswith('_pct'):
             descriptions.append(number(value*100 if type(value) in (int,float) else None) + ' ' + label + ' (shot ratio)')
             continue
+        if row.get('aggregation') == 'totals':
+            total = row.get('totals', {}).get(metric)
+            observed = row.get('observed_counts', {}).get(metric, 0)
+            total_label = {'pts': 'points', 'reb': 'rebounds', 'ast': 'assists', 'minutes': 'minutes',
+                'tpm': 'made threes', 'stl': 'steals', 'blk': 'blocks', 'tov': 'turnovers',
+                'fga': 'FG attempts', 'tpa': 'three-point attempts', 'fgm': 'field goals made',
+                'ftm': 'free throws made', 'fta': 'free throw attempts', 'oreb': 'offensive rebounds',
+                'dreb': 'defensive rebounds', 'fouls': 'fouls', 'plus_minus': 'plus-minus',
+                'pra': 'PRA', 'pr': 'points+rebounds', 'pa': 'points+assists',
+                'ra': 'rebounds+assists', 'stocks': 'steals+blocks'}[metric]
+            descriptions.append(f'{number(total)} {total_label} total ({observed}/{games} observed)')
+            continue
         observed = row.get('observed_counts', {}).get(metric)
         if observed is None and count_field:
             observed = row.get(count_field)
@@ -246,6 +272,8 @@ def _sample_descriptor(count):
 
 
 def _scope_descriptor(row, context):
+    if row.get('season_basis') == 'available career':
+        return 'available career ' + str(row.get('season_type') or 'Regular Season').casefold() + ' population'
     seasons = sorted(set(context.get('requested_population', {}).get('seasons', [])))
     label = ('earlier requested season' if len(seasons) > 1 and row.get('season') == seasons[0] else
              'later requested season' if len(seasons) > 1 and row.get('season') == seasons[-1] else 'requested season')
@@ -423,7 +451,11 @@ def evidence_cards(context, question=''):
                       'source':source or record.get('source'),
                       'data_through_date':record.get('data_through_date') or record.get('through_date'),
                       'published_at':record.get('published_at')})
-    metrics = requested_metrics(question)
+    metrics = context.get('requested_metrics') or requested_metrics(question)
+    if context.get('population_error'):
+        add('research_scope_error', context['population_error'], {}, 'Requested career date filters')
+        cards[-1]['prompt_descriptor'] = context['population_error'] + ' Ask the user to correct the date before calculating history.'
+        return cards
     snapshots = _published_snapshots(context)
     snapshot_keys = {_baseline_key(row) for row in snapshots}
     descriptor_context = {**context, '_comparison_baselines': [*snapshots,
@@ -470,6 +502,8 @@ def evidence_cards(context, question=''):
         else:
             text+=(f"{metric_text(row,metrics,opponent_sample=True)}; {n} stored {'appearance' if n==1 else 'appearances'}, "
                    f"{date(row.get('first_date'))}–{date(row.get('data_through_date'))}; incomplete sample. Source: master player games.")
+        if row.get('season_basis') == 'available career':
+            text += ' Across available seasons and actual teams; full career completeness is not independently verified. Whole-game opponent appearances are not measured guarding.'
         add('player_opponent_sample',text,row,'master player games')
         cards[-1].update(entity=row.get('player') or row.get('entity'), opponent=row.get('opponent'),
                          matches_resolved_matchup=((row.get('player') or row.get('entity')) in players and row.get('opponent') in teams),
@@ -482,6 +516,9 @@ def evidence_cards(context, question=''):
               ('Published snapshot; covered-game date is unknown, so freshness cannot be established. ' if row.get('coverage_unknown') else '')+
               f"Coverage through {date(row.get('data_through_date') or row.get('through_date'))}; published {date(row.get('published_at'))}. "
               'Source: '+('published NBA Stats extract.' if row.get('published_at') else 'stored player observations.'))
+        if row.get('season_basis') == 'available career':
+            text += (' Across available seasons and actual teams, strictly before '
+                     + str(row.get('cutoff_exclusive')) + '. Full career completeness is not independently verified.')
         add('player_observed_sample' if observed_alongside_snapshot else 'player_all_opponent_averages',text,row)
         cards[-1].update(entity=row.get('player') or row.get('entity'),
                          matches_resolved_player=(row.get('player') or row.get('entity')) in players,

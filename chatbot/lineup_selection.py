@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import Counter
 
 from feeds import TEAM_WORDS, canonical_player, canonical_team
+from career_identity import career_player_key
 
 
 def _subject(item):
@@ -39,7 +40,7 @@ lineup by consumers checking ``lineup_complete``.
     unique, seen = [], set()
     for item in candidates:
         name = str(_subject(item).get('player') or '').strip()
-        key = canonical_player(name)
+        key = career_player_key(name)
         if not name or key in seen:
             continue
         if required and _team(item) not in required:
@@ -57,9 +58,9 @@ lineup by consumers checking ``lineup_complete``.
                            if _team(item) and _team(item) not in selected_teams), None)
             targets = [target] if target else []
         for target in targets:
-            selected_players = {canonical_player(_subject(item)['player']) for item in chosen}
+            selected_players = {career_player_key(_subject(item)['player']) for item in chosen}
             replacement = next((item for item in unique if _team(item) == target and
-                                canonical_player(_subject(item)['player']) not in selected_players), None)
+                                career_player_key(_subject(item)['player']) not in selected_players), None)
             if replacement is None:
                 continue
             if len(chosen) < count:

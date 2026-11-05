@@ -16,6 +16,14 @@ from test_board_shortlist import candidate, report, NOW, DATE
 
 
 class LineupSelectionTests(unittest.TestCase):
+    def test_documented_name_alias_cannot_fill_two_player_slots(self):
+        rows = [{'player': 'Bobby Portis', 'team': 'MIA'},
+                {'player': 'Bobby Portis Jr.', 'team': 'NYK'},
+                {'player': 'Josh Hart', 'team': 'NYK'}]
+        chosen, coverage = select_lineup(rows, 3, required_teams=['MIA', 'NYK'])
+        self.assertEqual([row['player'] for row in chosen], ['Bobby Portis', 'Josh Hart'])
+        self.assertFalse(coverage['lineup_complete'])
+
     def test_best_eligible_opponent_replaces_weakest_same_team_candidate(self):
         rows = [{'player': player, 'team': team} for player, team in
                 [('A', 'NYK'), ('B', 'NYK'), ('C', 'NYK'), ('D', 'NYK'),

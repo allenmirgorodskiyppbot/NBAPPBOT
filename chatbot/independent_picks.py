@@ -16,6 +16,7 @@ from board_shortlist import MARKET_NAMES, player_availability
 from contextual_projection import (projection_for_leg, MIN_COMPARABLE_OBSERVATIONS,
                                    benchmark_margin, baseline_offer_decision)
 from feeds import canonical_player, canonical_team
+from career_identity import career_player_key
 from news_digest import _aware, _clean
 from lineup_selection import select_lineup
 from pregame_freshness import assess_pregame_freshness
@@ -143,7 +144,7 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     candidates = []
     seen = set()
     for player in players[:80]:
-        identity = canonical_player(player['player'])
+        identity = career_player_key(player['player'], store)
         if identity in seen:
             continue
         seen.add(identity)

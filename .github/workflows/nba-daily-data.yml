@@ -7,6 +7,10 @@ on:
       - 'chatbot/nba_daily_export.py'
       - 'chatbot/mirror_sources.py'
       - 'chatbot/advanced_refresh.py'
+      - 'chatbot/career_history_refresh.py'
+      - 'chatbot/history_backfill.py'
+      - 'chatbot/matchup_history_targets.json'
+      - 'chatbot/matchup_refresh_scope.json'
   schedule:
     # Previous-day statistics: morning publication and hourly catches through the evening.
     # UTC hours cover 10/11 AM through 10/11 PM Eastern across daylight saving time.

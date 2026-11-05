@@ -59,6 +59,28 @@ reminders, exports, backups and grading remain available.
 
 ## What refreshes
 
+Opponent career coverage includes every named participant in the matchup records,
+including veterans absent from the current-season publication. The collector
+publishes a validated career-history relay during daily refreshes; the bot checks
+that relay hourly and adds missing records. All 269 named matchup participants
+(eight selected players and 261 opponents) have available published history in
+the checked November 5 build. `Matchup_Career_Coverage` in Excel lists actual
+saved game counts, seasons and dates for each name; this is not a claim that every
+career game or measured defender possession has been recovered.
+
+Explicit “career” and “lifetime” questions now read available observations across
+seasons and teams. An explicit opponent filter, including NYK, is retained.
+For example, “Josh Giddey lifetime assists against the Knicks” requests his saved
+career games against NYK. Current-season questions and the same-team 20-game
+selection benchmark keep their own populations. Documented player aliases are
+resolved before counting games, so name variants cannot create two lineup slots.
+
+Historical source checks can complete compatible unknown game metadata while
+preserving player statistics and recording the source evidence. They do not
+satisfy current-game freshness checks. An unavailable career source retains
+existing history and reports missing participants for retry; no unknown player
+identity or absent game is filled by a guess.
+
 Game observations cover the current published NBA player population across
 **30 teams**, plus previously authorized workbook entities. A validated
 current-season publication can add a newly observed player with an unambiguous

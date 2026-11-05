@@ -1,0 +1,4707 @@
+{
+  "schema_version": 1,
+  "scope": "Current selected players and every named matchup participant",
+  "players": [
+    {
+      "player": "Aaron Gordon",
+      "player_id": "name:aarongordon",
+      "espn_player_id": "3064290",
+      "aliases": [
+        "Aaron Gordon"
+      ],
+      "requested_player": "Aaron Gordon",
+      "nba_player_id": "203932",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Aaron Nesmith",
+      "player_id": "name:aaronnesmith",
+      "espn_player_id": "4396909",
+      "aliases": [
+        "Aaron Nesmith"
+      ],
+      "requested_player": "Aaron Nesmith",
+      "nba_player_id": "1630174",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Aaron Wiggins",
+      "player_id": "name:aaronwiggins",
+      "espn_player_id": "4397183",
+      "aliases": [
+        "Aaron Wiggins"
+      ],
+      "requested_player": "Aaron Wiggins",
+      "nba_player_id": "1630598",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Ace Bailey",
+      "player_id": "name:acebailey",
+      "espn_player_id": "4873138",
+      "aliases": [
+        "Ace Bailey"
+      ],
+      "requested_player": "Ace Bailey",
+      "nba_player_id": "1642846",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Adem Bona",
+      "player_id": "name:adembona",
+      "espn_player_id": "5105637",
+      "aliases": [
+        "Adem Bona"
+      ],
+      "requested_player": "Adem Bona",
+      "nba_player_id": "1641737",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ajay Mitchell",
+      "player_id": "name:ajaymitchell",
+      "espn_player_id": "4900671",
+      "aliases": [
+        "Ajay Mitchell"
+      ],
+      "requested_player": "Ajay Mitchell",
+      "nba_player_id": "1642349",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "AJ Green",
+      "player_id": "name:ajgreen",
+      "espn_player_id": "4397475",
+      "aliases": [
+        "AJ Green"
+      ],
+      "requested_player": "AJ Green",
+      "nba_player_id": "1631260",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Alex Caruso",
+      "player_id": "name:alexcaruso",
+      "espn_player_id": "2991350",
+      "aliases": [
+        "Alex Caruso"
+      ],
+      "requested_player": "Alex Caruso",
+      "nba_player_id": "1627936",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Alex Sarr",
+      "player_id": "name:alexsarr",
+      "espn_player_id": "5160992",
+      "aliases": [
+        "Alex Sarr"
+      ],
+      "requested_player": "Alex Sarr",
+      "nba_player_id": "1642259",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Al Horford",
+      "player_id": "name:alhorford",
+      "espn_player_id": "3213",
+      "aliases": [
+        "Al Horford"
+      ],
+      "requested_player": "Al Horford",
+      "nba_player_id": "201143",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Alperen Sengun",
+      "player_id": "name:alperensengun",
+      "espn_player_id": "4871144",
+      "aliases": [
+        "Alperen Sengun"
+      ],
+      "requested_player": "Alperen Sengun",
+      "nba_player_id": "1630578",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Amen Thompson",
+      "player_id": "name:amenthompson",
+      "espn_player_id": "4684740",
+      "aliases": [
+        "Amen Thompson"
+      ],
+      "requested_player": "Amen Thompson",
+      "nba_player_id": "1641708",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Andre Drummond",
+      "player_id": "name:andredrummond",
+      "espn_player_id": "6585",
+      "aliases": [
+        "Andre Drummond"
+      ],
+      "requested_player": "Andre Drummond",
+      "nba_player_id": "203083",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Andrew Nembhard",
+      "player_id": "name:andrewnembhard",
+      "espn_player_id": "4395712",
+      "aliases": [
+        "Andrew Nembhard"
+      ],
+      "requested_player": "Andrew Nembhard",
+      "nba_player_id": "1629614",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Andrew Wiggins",
+      "player_id": "name:andrewwiggins",
+      "espn_player_id": "3059319",
+      "aliases": [
+        "Andrew Wiggins"
+      ],
+      "requested_player": "Andrew Wiggins",
+      "nba_player_id": "203952",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Anfernee Simons",
+      "player_id": "name:anferneesimons",
+      "espn_player_id": "4351851",
+      "aliases": [
+        "Anfernee Simons"
+      ],
+      "requested_player": "Anfernee Simons",
+      "nba_player_id": "1629014",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Anthony Black",
+      "player_id": "name:anthonyblack",
+      "espn_player_id": "4712849",
+      "aliases": [
+        "Anthony Black"
+      ],
+      "requested_player": "Anthony Black",
+      "nba_player_id": "1641710",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Anthony Davis",
+      "player_id": "name:anthonydavis",
+      "espn_player_id": "6583",
+      "aliases": [
+        "Anthony Davis"
+      ],
+      "requested_player": "Anthony Davis",
+      "nba_player_id": "203076",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Anthony Edwards",
+      "player_id": "name:anthonyedwards",
+      "espn_player_id": "4594268",
+      "aliases": [
+        "Anthony Edwards"
+      ],
+      "requested_player": "Anthony Edwards",
+      "nba_player_id": "1630162",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ausar Thompson",
+      "player_id": "name:ausarthompson",
+      "espn_player_id": "4684742",
+      "aliases": [
+        "Ausar Thompson"
+      ],
+      "requested_player": "Ausar Thompson",
+      "nba_player_id": "1641709",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Austin Reaves",
+      "player_id": "name:austinreaves",
+      "espn_player_id": "4066457",
+      "aliases": [
+        "Austin Reaves"
+      ],
+      "requested_player": "Austin Reaves",
+      "nba_player_id": "1630559",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ayo Dosunmu",
+      "player_id": "name:ayodosunmu",
+      "espn_player_id": "4397002",
+      "aliases": [
+        "Ayo Dosunmu"
+      ],
+      "requested_player": "Ayo Dosunmu",
+      "nba_player_id": "1630245",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Bam Adebayo",
+      "player_id": "name:bamadebayo",
+      "espn_player_id": "4066261",
+      "aliases": [
+        "Bam Adebayo"
+      ],
+      "requested_player": "Bam Adebayo",
+      "nba_player_id": "1628389",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Bennedict Mathurin",
+      "player_id": "name:bennedictmathurin",
+      "espn_player_id": "4683634",
+      "aliases": [
+        "Bennedict Mathurin"
+      ],
+      "requested_player": "Bennedict Mathurin",
+      "nba_player_id": "1631097",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Ben Sheppard",
+      "player_id": "name:bensheppard",
+      "espn_player_id": "4433076",
+      "aliases": [
+        "Ben Sheppard"
+      ],
+      "requested_player": "Ben Sheppard",
+      "nba_player_id": "1641767",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Ben Simmons",
+      "player": "Ben Simmons",
+      "espn_player_id": "3907387",
+      "aliases": [
+        "Ben Simmons"
+      ],
+      "nba_player_id": "1627732",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Bilal Coulibaly",
+      "player_id": "name:bilalcoulibaly",
+      "espn_player_id": "5104155",
+      "aliases": [
+        "Bilal Coulibaly"
+      ],
+      "requested_player": "Bilal Coulibaly",
+      "nba_player_id": "1641731",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Bobby Portis Jr.",
+      "player": "Bobby Portis",
+      "espn_player_id": "3064482",
+      "aliases": [
+        "Bobby Portis",
+        "Bobby Portis Jr."
+      ],
+      "nba_player_id": "1626171",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "Bradley Beal",
+      "player": "Bradley Beal",
+      "espn_player_id": "6580",
+      "aliases": [
+        "Bradley Beal"
+      ],
+      "nba_player_id": "203078",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Brandin Podziemski",
+      "player_id": "name:brandinpodziemski",
+      "espn_player_id": "4709138",
+      "aliases": [
+        "Brandin Podziemski"
+      ],
+      "requested_player": "Brandin Podziemski",
+      "nba_player_id": "1641764",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Brandon Ingram",
+      "player": "Brandon Ingram",
+      "espn_player_id": "3913176",
+      "aliases": [
+        "Brandon Ingram"
+      ],
+      "nba_player_id": "1627742",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Brandon Miller",
+      "player_id": "name:brandonmiller",
+      "espn_player_id": "4433287",
+      "aliases": [
+        "Brandon Miller"
+      ],
+      "requested_player": "Brandon Miller",
+      "nba_player_id": "1641706",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Brook Lopez",
+      "player_id": "name:brooklopez",
+      "espn_player_id": "3448",
+      "aliases": [
+        "Brook Lopez"
+      ],
+      "requested_player": "Brook Lopez",
+      "nba_player_id": "201572",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Bub Carrington",
+      "player_id": "name:bubcarrington",
+      "espn_player_id": "4845374",
+      "aliases": [
+        "Bub Carrington"
+      ],
+      "requested_player": "Bub Carrington",
+      "nba_player_id": "1642267",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Buddy Hield",
+      "player_id": "name:buddyhield",
+      "espn_player_id": "2990984",
+      "aliases": [
+        "Buddy Hield"
+      ],
+      "requested_player": "Buddy Hield",
+      "nba_player_id": "1627741",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Cade Cunningham",
+      "player_id": "name:cadecunningham",
+      "espn_player_id": "4432166",
+      "aliases": [
+        "Cade Cunningham"
+      ],
+      "requested_player": "Cade Cunningham",
+      "nba_player_id": "1630595",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Caleb Martin",
+      "player_id": "name:calebmartin",
+      "espn_player_id": "3138160",
+      "aliases": [
+        "Caleb Martin"
+      ],
+      "requested_player": "Caleb Martin",
+      "nba_player_id": "1628997",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Cameron Johnson",
+      "player_id": "name:cameronjohnson",
+      "espn_player_id": "3138196",
+      "aliases": [
+        "Cameron Johnson"
+      ],
+      "requested_player": "Cameron Johnson",
+      "nba_player_id": "1629661",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Cam Spencer",
+      "player_id": "name:camspencer",
+      "espn_player_id": "4433083",
+      "aliases": [
+        "Cam Spencer"
+      ],
+      "requested_player": "Cam Spencer",
+      "nba_player_id": "1642285",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Caris LeVert",
+      "player_id": "name:carislevert",
+      "espn_player_id": "2991043",
+      "aliases": [
+        "Caris LeVert"
+      ],
+      "requested_player": "Caris LeVert",
+      "nba_player_id": "1627747",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Cason Wallace",
+      "player_id": "name:casonwallace",
+      "espn_player_id": "4683692",
+      "aliases": [
+        "Cason Wallace"
+      ],
+      "requested_player": "Cason Wallace",
+      "nba_player_id": "1641717",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Cedric Coward",
+      "player_id": "name:cedriccoward",
+      "espn_player_id": "4903027",
+      "aliases": [
+        "Cedric Coward"
+      ],
+      "requested_player": "Cedric Coward",
+      "nba_player_id": "1642907",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Chet Holmgren",
+      "player_id": "name:chetholmgren",
+      "espn_player_id": "4433255",
+      "aliases": [
+        "Chet Holmgren"
+      ],
+      "requested_player": "Chet Holmgren",
+      "nba_player_id": "1631096",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Christian Braun",
+      "player_id": "name:christianbraun",
+      "espn_player_id": "4431767",
+      "aliases": [
+        "Christian Braun"
+      ],
+      "requested_player": "Christian Braun",
+      "nba_player_id": "1631128",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "CJ McCollum",
+      "player_id": "name:cjmccollum",
+      "espn_player_id": "2490149",
+      "aliases": [
+        "CJ McCollum"
+      ],
+      "requested_player": "CJ McCollum",
+      "nba_player_id": "203468",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Coby White",
+      "player_id": "name:cobywhite",
+      "espn_player_id": "4395651",
+      "aliases": [
+        "Coby White"
+      ],
+      "requested_player": "Coby White",
+      "nba_player_id": "1629632",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Collin Gillespie",
+      "player_id": "name:collingillespie",
+      "espn_player_id": "4278585",
+      "aliases": [
+        "Collin Gillespie"
+      ],
+      "requested_player": "Collin Gillespie",
+      "nba_player_id": "1631221",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Collin Sexton",
+      "player_id": "name:collinsexton",
+      "espn_player_id": "4277811",
+      "aliases": [
+        "Collin Sexton"
+      ],
+      "requested_player": "Collin Sexton",
+      "nba_player_id": "1629012",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Cooper Flagg",
+      "player_id": "name:cooperflagg",
+      "espn_player_id": "5041939",
+      "aliases": [
+        "Cooper Flagg"
+      ],
+      "requested_player": "Cooper Flagg",
+      "nba_player_id": "1642843",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Daniel Gafford",
+      "player_id": "name:danielgafford",
+      "espn_player_id": "4278049",
+      "aliases": [
+        "Daniel Gafford"
+      ],
+      "requested_player": "Daniel Gafford",
+      "nba_player_id": "1629655",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Daniss Jenkins",
+      "player_id": "name:danissjenkins",
+      "espn_player_id": "5107199",
+      "aliases": [
+        "Daniss Jenkins"
+      ],
+      "requested_player": "Daniss Jenkins",
+      "nba_player_id": "1642450",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Darius Garland",
+      "player_id": "name:dariusgarland",
+      "espn_player_id": "4396907",
+      "aliases": [
+        "Darius Garland"
+      ],
+      "requested_player": "Darius Garland",
+      "nba_player_id": "1629636",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Davion Mitchell",
+      "player_id": "name:davionmitchell",
+      "espn_player_id": "4278053",
+      "aliases": [
+        "Davion Mitchell"
+      ],
+      "requested_player": "Davion Mitchell",
+      "nba_player_id": "1630558",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Day'Ron Sharpe",
+      "player_id": "name:dayronsharpe",
+      "espn_player_id": "4432194",
+      "aliases": [
+        "Day'Ron Sharpe"
+      ],
+      "requested_player": "Day'Ron Sharpe",
+      "nba_player_id": "1630549",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "De'Aaron Fox",
+      "player_id": "name:deaaronfox",
+      "espn_player_id": "4066259",
+      "aliases": [
+        "De'Aaron Fox"
+      ],
+      "requested_player": "De'Aaron Fox",
+      "nba_player_id": "1628368",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Deandre Ayton",
+      "player_id": "name:deandreayton",
+      "espn_player_id": "4278129",
+      "aliases": [
+        "Deandre Ayton"
+      ],
+      "requested_player": "Deandre Ayton",
+      "nba_player_id": "1629028",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "De'Andre Hunter",
+      "player_id": "name:deandrehunter",
+      "espn_player_id": "4065732",
+      "aliases": [
+        "De'Andre Hunter"
+      ],
+      "requested_player": "De'Andre Hunter",
+      "nba_player_id": "1629631",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "De'Anthony Melton",
+      "player_id": "name:deanthonymelton",
+      "espn_player_id": "4066436",
+      "aliases": [
+        "De'Anthony Melton"
+      ],
+      "requested_player": "De'Anthony Melton",
+      "nba_player_id": "1629001",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Dejounte Murray",
+      "player_id": "name:dejountemurray",
+      "espn_player_id": "3907497",
+      "aliases": [
+        "Dejounte Murray"
+      ],
+      "requested_player": "Dejounte Murray",
+      "nba_player_id": "1627749",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "DeMar DeRozan",
+      "player_id": "name:demarderozan",
+      "espn_player_id": "3978",
+      "aliases": [
+        "DeMar DeRozan"
+      ],
+      "requested_player": "DeMar DeRozan",
+      "nba_player_id": "201942",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Deni Avdija",
+      "player_id": "name:deniavdija",
+      "espn_player_id": "4683021",
+      "aliases": [
+        "Deni Avdija"
+      ],
+      "requested_player": "Deni Avdija",
+      "nba_player_id": "1630166",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Dennis Schröder",
+      "player_id": "name:dennisschroder",
+      "espn_player_id": "3032979",
+      "aliases": [
+        "Dennis Schroder",
+        "Dennis Schröder"
+      ],
+      "requested_player": "Dennis Schröder",
+      "nba_player_id": "203471",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "Dereck Lively II",
+      "player": "Dereck Lively II",
+      "espn_player_id": "4683688",
+      "aliases": [
+        "Dereck Lively II"
+      ],
+      "nba_player_id": "1641726",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Derik Queen",
+      "player_id": "name:derikqueen",
+      "espn_player_id": "4869780",
+      "aliases": [
+        "Derik Queen"
+      ],
+      "requested_player": "Derik Queen",
+      "nba_player_id": "1642852",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Derrick Jones Jr.",
+      "player_id": "name:derrickjonesjr",
+      "espn_player_id": "3936099",
+      "aliases": [
+        "Derrick Jones Jr."
+      ],
+      "requested_player": "Derrick Jones Jr.",
+      "nba_player_id": "1627884",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Derrick White",
+      "player_id": "name:derrickwhite",
+      "espn_player_id": "3078576",
+      "aliases": [
+        "Derrick White"
+      ],
+      "requested_player": "Derrick White",
+      "nba_player_id": "1628401",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Desmond Bane",
+      "player_id": "name:desmondbane",
+      "espn_player_id": "4066320",
+      "aliases": [
+        "Desmond Bane"
+      ],
+      "requested_player": "Desmond Bane",
+      "nba_player_id": "1630217",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Devin Booker",
+      "player_id": "name:devinbooker",
+      "espn_player_id": "3136193",
+      "aliases": [
+        "Devin Booker"
+      ],
+      "requested_player": "Devin Booker",
+      "nba_player_id": "1626164",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Devin Vassell",
+      "player_id": "name:devinvassell",
+      "espn_player_id": "4395630",
+      "aliases": [
+        "Devin Vassell"
+      ],
+      "requested_player": "Devin Vassell",
+      "nba_player_id": "1630170",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Dillon Brooks",
+      "player_id": "name:dillonbrooks",
+      "espn_player_id": "3155526",
+      "aliases": [
+        "Dillon Brooks"
+      ],
+      "requested_player": "Dillon Brooks",
+      "nba_player_id": "1628415",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Domantas Sabonis",
+      "player_id": "name:domantassabonis",
+      "espn_player_id": "3155942",
+      "aliases": [
+        "Domantas Sabonis"
+      ],
+      "requested_player": "Domantas Sabonis",
+      "nba_player_id": "1627734",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Donovan Clingan",
+      "player_id": "name:donovanclingan",
+      "espn_player_id": "5105565",
+      "aliases": [
+        "Donovan Clingan"
+      ],
+      "requested_player": "Donovan Clingan",
+      "nba_player_id": "1642270",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Donovan Mitchell",
+      "player_id": "name:donovanmitchell",
+      "espn_player_id": "3908809",
+      "aliases": [
+        "Donovan Mitchell"
+      ],
+      "requested_player": "Donovan Mitchell",
+      "nba_player_id": "1628378",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Donte DiVincenzo",
+      "player": "Donte DiVincenzo",
+      "espn_player_id": "3934673",
+      "aliases": [
+        "Donte DiVincenzo"
+      ],
+      "nba_player_id": "1628978",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Dorian Finney-Smith",
+      "player_id": "name:dorianfinneysmith",
+      "espn_player_id": "2578185",
+      "aliases": [
+        "Dorian Finney-Smith"
+      ],
+      "requested_player": "Dorian Finney-Smith",
+      "nba_player_id": "1627827",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Draymond Green",
+      "player_id": "name:draymondgreen",
+      "espn_player_id": "6589",
+      "aliases": [
+        "Draymond Green"
+      ],
+      "requested_player": "Draymond Green",
+      "nba_player_id": "203110",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Dru Smith",
+      "player_id": "name:drusmith",
+      "espn_player_id": "4066993",
+      "aliases": [
+        "Dru Smith"
+      ],
+      "requested_player": "Dru Smith",
+      "nba_player_id": "1630696",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Duncan Robinson",
+      "player_id": "name:duncanrobinson",
+      "espn_player_id": "3157465",
+      "aliases": [
+        "Duncan Robinson"
+      ],
+      "requested_player": "Duncan Robinson",
+      "nba_player_id": "1629130",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Dylan Harper",
+      "player_id": "name:dylanharper",
+      "espn_player_id": "5037871",
+      "aliases": [
+        "Dylan Harper"
+      ],
+      "requested_player": "Dylan Harper",
+      "nba_player_id": "1642844",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Dyson Daniels",
+      "player_id": "name:dysondaniels",
+      "espn_player_id": "4869342",
+      "aliases": [
+        "Dyson Daniels"
+      ],
+      "requested_player": "Dyson Daniels",
+      "nba_player_id": "1630700",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Egor Dëmin",
+      "player_id": "name:egordemin",
+      "espn_player_id": "5175643",
+      "aliases": [
+        "Egor Demin",
+        "Egor Dëmin"
+      ],
+      "requested_player": "Egor Dëmin",
+      "nba_player_id": "1642856",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Evan Mobley",
+      "player_id": "name:evanmobley",
+      "espn_player_id": "4432158",
+      "aliases": [
+        "Evan Mobley"
+      ],
+      "requested_player": "Evan Mobley",
+      "nba_player_id": "1630596",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Franz Wagner",
+      "player_id": "name:franzwagner",
+      "espn_player_id": "4566434",
+      "aliases": [
+        "Franz Wagner"
+      ],
+      "requested_player": "Franz Wagner",
+      "nba_player_id": "1630532",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Fred VanVleet",
+      "player_id": "name:fredvanvleet",
+      "espn_player_id": "2991230",
+      "aliases": [
+        "Fred VanVleet"
+      ],
+      "requested_player": "Fred VanVleet",
+      "nba_player_id": "1627832",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Gary Payton II",
+      "player_id": "name:garypaytonii",
+      "espn_player_id": "3134903",
+      "aliases": [
+        "Gary Payton II"
+      ],
+      "requested_player": "Gary Payton II",
+      "nba_player_id": "1627780",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Gary Trent Jr.",
+      "player_id": "name:garytrentjr",
+      "espn_player_id": "4277843",
+      "aliases": [
+        "Gary Trent Jr."
+      ],
+      "requested_player": "Gary Trent Jr.",
+      "nba_player_id": "1629018",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "GG Jackson",
+      "player_id": "name:ggjackson",
+      "espn_player_id": "5105550",
+      "aliases": [
+        "GG Jackson"
+      ],
+      "requested_player": "GG Jackson",
+      "nba_player_id": "1641713",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Giannis Antetokounmpo",
+      "player_id": "name:giannisantetokounmpo",
+      "espn_player_id": "3032977",
+      "aliases": [
+        "Giannis Antetokounmpo"
+      ],
+      "requested_player": "Giannis Antetokounmpo",
+      "nba_player_id": "203507",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Goga Bitadze",
+      "player_id": "name:gogabitadze",
+      "espn_player_id": "4348700",
+      "aliases": [
+        "Goga Bitadze"
+      ],
+      "requested_player": "Goga Bitadze",
+      "nba_player_id": "1629048",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "Grant Williams",
+      "player": "Grant Williams",
+      "espn_player_id": "4066218",
+      "aliases": [
+        "Grant Williams"
+      ],
+      "nba_player_id": "1629684",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Grayson Allen",
+      "player_id": "name:graysonallen",
+      "espn_player_id": "3135045",
+      "aliases": [
+        "Grayson Allen"
+      ],
+      "requested_player": "Grayson Allen",
+      "nba_player_id": "1628960",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Harrison Barnes",
+      "player_id": "name:harrisonbarnes",
+      "espn_player_id": "6578",
+      "aliases": [
+        "Harrison Barnes"
+      ],
+      "requested_player": "Harrison Barnes",
+      "nba_player_id": "203084",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Herbert Jones",
+      "player_id": "name:herbertjones",
+      "espn_player_id": "4277813",
+      "aliases": [
+        "Herbert Jones"
+      ],
+      "requested_player": "Herbert Jones",
+      "nba_player_id": "1630529",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Immanuel Quickley",
+      "player_id": "name:immanuelquickley",
+      "espn_player_id": "4395724",
+      "aliases": [
+        "Immanuel Quickley"
+      ],
+      "requested_player": "Immanuel Quickley",
+      "nba_player_id": "1630193",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Isaac Okoro",
+      "player_id": "name:isaacokoro",
+      "espn_player_id": "4432822",
+      "aliases": [
+        "Isaac Okoro"
+      ],
+      "requested_player": "Isaac Okoro",
+      "nba_player_id": "1630171",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Isaiah Collier",
+      "player_id": "name:isaiahcollier",
+      "espn_player_id": "4683766",
+      "aliases": [
+        "Isaiah Collier"
+      ],
+      "requested_player": "Isaiah Collier",
+      "nba_player_id": "1642268",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Isaiah Hartenstein",
+      "player_id": "name:isaiahhartenstein",
+      "espn_player_id": "4222252",
+      "aliases": [
+        "Isaiah Hartenstein"
+      ],
+      "requested_player": "Isaiah Hartenstein",
+      "nba_player_id": "1628392",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Isaiah Jackson",
+      "player_id": "name:isaiahjackson",
+      "espn_player_id": "4432170",
+      "aliases": [
+        "Isaiah Jackson"
+      ],
+      "requested_player": "Isaiah Jackson",
+      "nba_player_id": "1630543",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Isaiah Joe",
+      "player_id": "name:isaiahjoe",
+      "espn_player_id": "4395702",
+      "aliases": [
+        "Isaiah Joe"
+      ],
+      "requested_player": "Isaiah Joe",
+      "nba_player_id": "1630198",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Isaiah Stewart",
+      "player_id": "name:isaiahstewart",
+      "espn_player_id": "4432810",
+      "aliases": [
+        "Isaiah Stewart"
+      ],
+      "requested_player": "Isaiah Stewart",
+      "nba_player_id": "1630191",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Ivica Zubac",
+      "player_id": "name:ivicazubac",
+      "espn_player_id": "4017837",
+      "aliases": [
+        "Ivica Zubac"
+      ],
+      "requested_player": "Ivica Zubac",
+      "nba_player_id": "1627826",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jabari Smith Jr.",
+      "player_id": "name:jabarismithjr",
+      "espn_player_id": "4432639",
+      "aliases": [
+        "Jabari Smith Jr."
+      ],
+      "requested_player": "Jabari Smith Jr.",
+      "nba_player_id": "1631095",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jaden McDaniels",
+      "player_id": "name:jadenmcdaniels",
+      "espn_player_id": "4431671",
+      "aliases": [
+        "Jaden McDaniels"
+      ],
+      "requested_player": "Jaden McDaniels",
+      "nba_player_id": "1630183",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jaime Jaquez Jr.",
+      "player_id": "name:jaimejaquezjr",
+      "espn_player_id": "4432848",
+      "aliases": [
+        "Jaime Jaquez Jr."
+      ],
+      "requested_player": "Jaime Jaquez Jr.",
+      "nba_player_id": "1631170",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jake LaRavia",
+      "player_id": "name:jakelaravia",
+      "espn_player_id": "4592691",
+      "aliases": [
+        "Jake LaRavia"
+      ],
+      "requested_player": "Jake LaRavia",
+      "nba_player_id": "1631222",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ja'Kobe Walter",
+      "player_id": "name:jakobewalter",
+      "espn_player_id": "4684272",
+      "aliases": [
+        "Ja'Kobe Walter"
+      ],
+      "requested_player": "Ja'Kobe Walter",
+      "nba_player_id": "1642266",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jakob Poeltl",
+      "player_id": "name:jakobpoeltl",
+      "espn_player_id": "3134908",
+      "aliases": [
+        "Jakob Poeltl"
+      ],
+      "requested_player": "Jakob Poeltl",
+      "nba_player_id": "1627751",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jalen Brunson",
+      "player_id": "name:jalenbrunson",
+      "espn_player_id": "3934672",
+      "aliases": [
+        "Jalen Brunson"
+      ],
+      "requested_player": "Jalen Brunson",
+      "nba_player_id": "1628973",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jalen Duren",
+      "player_id": "name:jalenduren",
+      "espn_player_id": "4433621",
+      "aliases": [
+        "Jalen Duren"
+      ],
+      "requested_player": "Jalen Duren",
+      "nba_player_id": "1631105",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jalen Green",
+      "player_id": "name:jalengreen",
+      "espn_player_id": "4437244",
+      "aliases": [
+        "Jalen Green"
+      ],
+      "requested_player": "Jalen Green",
+      "nba_player_id": "1630224",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jalen Johnson",
+      "player_id": "name:jalenjohnson",
+      "espn_player_id": "4701230",
+      "aliases": [
+        "Jalen Johnson"
+      ],
+      "requested_player": "Jalen Johnson",
+      "nba_player_id": "1630552",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jalen Smith",
+      "player_id": "name:jalensmith",
+      "espn_player_id": "4397189",
+      "aliases": [
+        "Jalen Smith"
+      ],
+      "requested_player": "Jalen Smith",
+      "nba_player_id": "1630188",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jalen Suggs",
+      "player_id": "name:jalensuggs",
+      "espn_player_id": "4432165",
+      "aliases": [
+        "Jalen Suggs"
+      ],
+      "requested_player": "Jalen Suggs",
+      "nba_player_id": "1630591",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jalen Williams",
+      "player_id": "name:jalenwilliams",
+      "espn_player_id": "4593803",
+      "aliases": [
+        "Jalen Williams"
+      ],
+      "requested_player": "Jalen Williams",
+      "nba_player_id": "1631114",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jamal Murray",
+      "player_id": "name:jamalmurray",
+      "espn_player_id": "3936299",
+      "aliases": [
+        "Jamal Murray"
+      ],
+      "requested_player": "Jamal Murray",
+      "nba_player_id": "1627750",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jamal Shead",
+      "player_id": "name:jamalshead",
+      "espn_player_id": "4432241",
+      "aliases": [
+        "Jamal Shead"
+      ],
+      "requested_player": "Jamal Shead",
+      "nba_player_id": "1642347",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "James Harden",
+      "player_id": "name:jamesharden",
+      "espn_player_id": "3992",
+      "aliases": [
+        "James Harden"
+      ],
+      "requested_player": "James Harden",
+      "nba_player_id": "201935",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ja Morant",
+      "player_id": "name:jamorant",
+      "espn_player_id": "4279888",
+      "aliases": [
+        "Ja Morant"
+      ],
+      "requested_player": "Ja Morant",
+      "nba_player_id": "1629630",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jarace Walker",
+      "player_id": "name:jaracewalker",
+      "espn_player_id": "5106060",
+      "aliases": [
+        "Jarace Walker"
+      ],
+      "requested_player": "Jarace Walker",
+      "nba_player_id": "1641716",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jared McCain",
+      "player_id": "name:jaredmccain",
+      "espn_player_id": "4683778",
+      "aliases": [
+        "Jared McCain"
+      ],
+      "requested_player": "Jared McCain",
+      "nba_player_id": "1642272",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jaren Jackson Jr.",
+      "player_id": "name:jarenjacksonjr",
+      "espn_player_id": "4277961",
+      "aliases": [
+        "Jaren Jackson Jr."
+      ],
+      "requested_player": "Jaren Jackson Jr.",
+      "nba_player_id": "1628991",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jarred Vanderbilt",
+      "player_id": "name:jarredvanderbilt",
+      "espn_player_id": "4278077",
+      "aliases": [
+        "Jarred Vanderbilt"
+      ],
+      "requested_player": "Jarred Vanderbilt",
+      "nba_player_id": "1629020",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jarrett Allen",
+      "player_id": "name:jarrettallen",
+      "espn_player_id": "4066328",
+      "aliases": [
+        "Jarrett Allen"
+      ],
+      "requested_player": "Jarrett Allen",
+      "nba_player_id": "1628386",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jase Richardson",
+      "player_id": "name:jaserichardson",
+      "espn_player_id": "5239561",
+      "aliases": [
+        "Jase Richardson"
+      ],
+      "requested_player": "Jase Richardson",
+      "nba_player_id": "1642859",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jay Huff",
+      "player_id": "name:jayhuff",
+      "espn_player_id": "4065731",
+      "aliases": [
+        "Jay Huff"
+      ],
+      "requested_player": "Jay Huff",
+      "nba_player_id": "1630643",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jaylen Brown",
+      "player_id": "name:jaylenbrown",
+      "espn_player_id": "3917376",
+      "aliases": [
+        "Jaylen Brown"
+      ],
+      "requested_player": "Jaylen Brown",
+      "nba_player_id": "1627759",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jaylen Wells",
+      "player_id": "name:jaylenwells",
+      "espn_player_id": "5112087",
+      "aliases": [
+        "Jaylen Wells"
+      ],
+      "requested_player": "Jaylen Wells",
+      "nba_player_id": "1642377",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jaylin Williams",
+      "player_id": "name:jaylinwilliams",
+      "espn_player_id": "4432823",
+      "aliases": [
+        "Jaylin Williams"
+      ],
+      "requested_player": "Jaylin Williams",
+      "nba_player_id": "1631119",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jaylon Tyson",
+      "player_id": "name:jaylontyson",
+      "espn_player_id": "4683747",
+      "aliases": [
+        "Jaylon Tyson"
+      ],
+      "requested_player": "Jaylon Tyson",
+      "nba_player_id": "1642281",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jayson Tatum",
+      "player_id": "name:jaysontatum",
+      "espn_player_id": "4065648",
+      "aliases": [
+        "Jayson Tatum"
+      ],
+      "requested_player": "Jayson Tatum",
+      "nba_player_id": "1628369",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jerami Grant",
+      "player_id": "name:jeramigrant",
+      "espn_player_id": "2991070",
+      "aliases": [
+        "Jerami Grant"
+      ],
+      "requested_player": "Jerami Grant",
+      "nba_player_id": "203924",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jeremiah Fears",
+      "player_id": "name:jeremiahfears",
+      "espn_player_id": "5144091",
+      "aliases": [
+        "Jeremiah Fears"
+      ],
+      "requested_player": "Jeremiah Fears",
+      "nba_player_id": "1642847",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Jimmy Butler III",
+      "player": "Jimmy Butler III",
+      "espn_player_id": "6430",
+      "aliases": [
+        "Jimmy Butler",
+        "Jimmy Butler III"
+      ],
+      "nba_player_id": "202710",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Joan Beringer",
+      "player_id": "name:joanberinger",
+      "espn_player_id": "5279133",
+      "aliases": [
+        "Joan Beringer"
+      ],
+      "requested_player": "Joan Beringer",
+      "nba_player_id": "1642866",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jock Landale",
+      "player_id": "name:jocklandale",
+      "espn_player_id": "3146557",
+      "aliases": [
+        "Jock Landale"
+      ],
+      "requested_player": "Jock Landale",
+      "nba_player_id": "1629111",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Joel Embiid",
+      "player_id": "name:joelembiid",
+      "espn_player_id": "3059318",
+      "aliases": [
+        "Joel Embiid"
+      ],
+      "requested_player": "Joel Embiid",
+      "nba_player_id": "203954",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "John Collins",
+      "player_id": "name:johncollins",
+      "espn_player_id": "3908845",
+      "aliases": [
+        "John Collins"
+      ],
+      "requested_player": "John Collins",
+      "nba_player_id": "1628381",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Jonathan Isaac",
+      "player": "Jonathan Isaac",
+      "espn_player_id": "4065654",
+      "aliases": [
+        "Jonathan Isaac"
+      ],
+      "nba_player_id": "1628371",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jonathan Kuminga",
+      "player_id": "name:jonathankuminga",
+      "espn_player_id": "4433247",
+      "aliases": [
+        "Jonathan Kuminga"
+      ],
+      "requested_player": "Jonathan Kuminga",
+      "nba_player_id": "1630228",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jordan Goodwin",
+      "player_id": "name:jordangoodwin",
+      "espn_player_id": "4278402",
+      "aliases": [
+        "Jordan Goodwin"
+      ],
+      "requested_player": "Jordan Goodwin",
+      "nba_player_id": "1630692",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jordan Poole",
+      "player_id": "name:jordanpoole",
+      "espn_player_id": "4277956",
+      "aliases": [
+        "Jordan Poole"
+      ],
+      "requested_player": "Jordan Poole",
+      "nba_player_id": "1629673",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Jose Alvarado",
+      "player_id": "name:josealvarado",
+      "espn_player_id": "4277869",
+      "aliases": [
+        "Jose Alvarado"
+      ],
+      "requested_player": "Jose Alvarado",
+      "nba_player_id": "1630631",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Josh Giddey",
+      "player_id": "name:joshgiddey",
+      "espn_player_id": "4871145",
+      "aliases": [
+        "Josh Giddey"
+      ],
+      "requested_player": "Josh Giddey",
+      "nba_player_id": "1630581",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Josh Green",
+      "player_id": "name:joshgreen",
+      "espn_player_id": "4432811",
+      "aliases": [
+        "Josh Green"
+      ],
+      "requested_player": "Josh Green",
+      "nba_player_id": "1630182",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Josh Hart",
+      "player_id": "name:joshhart",
+      "espn_player_id": "3062679",
+      "aliases": [
+        "Josh Hart"
+      ],
+      "requested_player": "Josh Hart",
+      "nba_player_id": "1628404",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Josh Minott",
+      "player_id": "name:joshminott",
+      "espn_player_id": "4687718",
+      "aliases": [
+        "Josh Minott"
+      ],
+      "requested_player": "Josh Minott",
+      "nba_player_id": "1631169",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Josh Okogie",
+      "player_id": "name:joshokogie",
+      "espn_player_id": "4065663",
+      "aliases": [
+        "Josh Okogie"
+      ],
+      "requested_player": "Josh Okogie",
+      "nba_player_id": "1629006",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Jrue Holiday",
+      "player_id": "name:jrueholiday",
+      "espn_player_id": "3995",
+      "aliases": [
+        "Jrue Holiday"
+      ],
+      "requested_player": "Jrue Holiday",
+      "nba_player_id": "201950",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Julian Champagnie",
+      "player_id": "name:julianchampagnie",
+      "espn_player_id": "4592479",
+      "aliases": [
+        "Julian Champagnie"
+      ],
+      "requested_player": "Julian Champagnie",
+      "nba_player_id": "1630577",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Julian Strawther",
+      "player": "Julian Strawther",
+      "espn_player_id": "4432181",
+      "aliases": [
+        "Julian Strawther"
+      ],
+      "nba_player_id": "1631124",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Julius Randle",
+      "player_id": "name:juliusrandle",
+      "espn_player_id": "3064514",
+      "aliases": [
+        "Julius Randle"
+      ],
+      "requested_player": "Julius Randle",
+      "nba_player_id": "203944",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "Jusuf Nurkić",
+      "player": "Jusuf Nurkić",
+      "espn_player_id": "3102530",
+      "aliases": [
+        "Jusuf Nurkic",
+        "Jusuf Nurkić"
+      ],
+      "nba_player_id": "203994",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Karl-Anthony Towns",
+      "player_id": "name:karlanthonytowns",
+      "espn_player_id": "3136195",
+      "aliases": [
+        "Karl-Anthony Towns"
+      ],
+      "requested_player": "Karl-Anthony Towns",
+      "nba_player_id": "1626157",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Kasparas Jakučionis",
+      "player_id": "name:kasparasjakucionis",
+      "espn_player_id": "5214640",
+      "aliases": [
+        "Kasparas Jakucionis",
+        "Kasparas Jakučionis"
+      ],
+      "requested_player": "Kasparas Jakučionis",
+      "nba_player_id": "1642857",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Kawhi Leonard",
+      "player_id": "name:kawhileonard",
+      "espn_player_id": "6450",
+      "aliases": [
+        "Kawhi Leonard"
+      ],
+      "requested_player": "Kawhi Leonard",
+      "nba_player_id": "202695",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Keegan Murray",
+      "player_id": "name:keeganmurray",
+      "espn_player_id": "4594327",
+      "aliases": [
+        "Keegan Murray"
+      ],
+      "requested_player": "Keegan Murray",
+      "nba_player_id": "1631099",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Kel'el Ware",
+      "player_id": "name:kelelware",
+      "espn_player_id": "5105623",
+      "aliases": [
+        "Kel'el Ware"
+      ],
+      "requested_player": "Kel'el Ware",
+      "nba_player_id": "1642276",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Kelly Oubre Jr.",
+      "player_id": "name:kellyoubrejr",
+      "espn_player_id": "3133603",
+      "aliases": [
+        "Kelly Oubre Jr."
+      ],
+      "requested_player": "Kelly Oubre Jr.",
+      "nba_player_id": "1626162",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Kentavious Caldwell-Pope",
+      "player_id": "name:kentaviouscaldwellpope",
+      "espn_player_id": "2581018",
+      "aliases": [
+        "Kentavious Caldwell-Pope"
+      ],
+      "requested_player": "Kentavious Caldwell-Pope",
+      "nba_player_id": "203484",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Keon Ellis",
+      "player_id": "name:keonellis",
+      "espn_player_id": "4702177",
+      "aliases": [
+        "Keon Ellis"
+      ],
+      "requested_player": "Keon Ellis",
+      "nba_player_id": "1631165",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Kevin Durant",
+      "player_id": "name:kevindurant",
+      "espn_player_id": "3202",
+      "aliases": [
+        "Kevin Durant"
+      ],
+      "requested_player": "Kevin Durant",
+      "nba_player_id": "201142",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Kevin Huerter",
+      "player_id": "name:kevinhuerter",
+      "espn_player_id": "4066372",
+      "aliases": [
+        "Kevin Huerter"
+      ],
+      "requested_player": "Kevin Huerter",
+      "nba_player_id": "1628989",
+      "origins": [
+        "assignments:alternate",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Kevon Looney",
+      "player_id": "name:kevonlooney",
+      "espn_player_id": "3155535",
+      "aliases": [
+        "Kevon Looney"
+      ],
+      "requested_player": "Kevon Looney",
+      "nba_player_id": "1626172",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Keyonte George",
+      "player_id": "name:keyontegeorge",
+      "espn_player_id": "4433627",
+      "aliases": [
+        "Keyonte George"
+      ],
+      "requested_player": "Keyonte George",
+      "nba_player_id": "1641718",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Khaman Maluach",
+      "player_id": "name:khamanmaluach",
+      "espn_player_id": "5203685",
+      "aliases": [
+        "Khaman Maluach"
+      ],
+      "requested_player": "Khaman Maluach",
+      "nba_player_id": "1642863",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Klay Thompson",
+      "player_id": "name:klaythompson",
+      "espn_player_id": "6475",
+      "aliases": [
+        "Klay Thompson"
+      ],
+      "requested_player": "Klay Thompson",
+      "nba_player_id": "202691",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "Kon Knueppel",
+      "player": "Kon Knueppel",
+      "espn_player_id": "5061575",
+      "aliases": [
+        "Kon Knueppel"
+      ],
+      "nba_player_id": "1642851",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Kris Dunn",
+      "player_id": "name:krisdunn",
+      "espn_player_id": "2991139",
+      "aliases": [
+        "Kris Dunn"
+      ],
+      "requested_player": "Kris Dunn",
+      "nba_player_id": "1627739",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Kristaps Porziņģis",
+      "player": "Kristaps Porziņģis",
+      "espn_player_id": "3102531",
+      "aliases": [
+        "Kristaps Porzingis",
+        "Kristaps Porziņģis"
+      ],
+      "nba_player_id": "204001",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Kyle Kuzma",
+      "player_id": "name:kylekuzma",
+      "espn_player_id": "3134907",
+      "aliases": [
+        "Kyle Kuzma"
+      ],
+      "requested_player": "Kyle Kuzma",
+      "nba_player_id": "1628398",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Kyrie Irving",
+      "player_id": "name:kyrieirving",
+      "espn_player_id": "6442",
+      "aliases": [
+        "Kyrie Irving"
+      ],
+      "requested_player": "Kyrie Irving",
+      "nba_player_id": "202681",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Kyshawn George",
+      "player_id": "name:kyshawngeorge",
+      "espn_player_id": "5174563",
+      "aliases": [
+        "Kyshawn George"
+      ],
+      "requested_player": "Kyshawn George",
+      "nba_player_id": "1642273",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "LaMelo Ball",
+      "player_id": "name:lameloball",
+      "espn_player_id": "4432816",
+      "aliases": [
+        "LaMelo Ball"
+      ],
+      "requested_player": "LaMelo Ball",
+      "nba_player_id": "1630163",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Lauri Markkanen",
+      "player_id": "name:laurimarkkanen",
+      "espn_player_id": "4066336",
+      "aliases": [
+        "Lauri Markkanen"
+      ],
+      "requested_player": "Lauri Markkanen",
+      "nba_player_id": "1628374",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "LeBron James",
+      "player_id": "name:lebronjames",
+      "espn_player_id": "1966",
+      "aliases": [
+        "LeBron James"
+      ],
+      "requested_player": "LeBron James",
+      "nba_player_id": "2544",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Luguentz Dort",
+      "player_id": "name:luguentzdort",
+      "espn_player_id": "4397020",
+      "aliases": [
+        "Luguentz Dort"
+      ],
+      "requested_player": "Luguentz Dort",
+      "nba_player_id": "1629652",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Luka Dončić",
+      "player_id": "name:lukadoncic",
+      "espn_player_id": "3945274",
+      "aliases": [
+        "Luka Doncic",
+        "Luka Dončić"
+      ],
+      "requested_player": "Luka Dončić",
+      "nba_player_id": "1629029",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Luke Kornet",
+      "player_id": "name:lukekornet",
+      "espn_player_id": "3064560",
+      "aliases": [
+        "Luke Kornet"
+      ],
+      "requested_player": "Luke Kornet",
+      "nba_player_id": "1628436",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Malik Monk",
+      "player_id": "name:malikmonk",
+      "espn_player_id": "4066262",
+      "aliases": [
+        "Malik Monk"
+      ],
+      "requested_player": "Malik Monk",
+      "nba_player_id": "1628370",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Marcus Smart",
+      "player_id": "name:marcussmart",
+      "espn_player_id": "2990992",
+      "aliases": [
+        "Marcus Smart"
+      ],
+      "requested_player": "Marcus Smart",
+      "nba_player_id": "203935",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "Mark Williams",
+      "player": "Mark Williams",
+      "espn_player_id": "4701232",
+      "aliases": [
+        "Mark Williams"
+      ],
+      "nba_player_id": "1631109",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Matas Buzelis",
+      "player_id": "name:matasbuzelis",
+      "espn_player_id": "4711294",
+      "aliases": [
+        "Matas Buzelis"
+      ],
+      "requested_player": "Matas Buzelis",
+      "nba_player_id": "1641824",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Matisse Thybulle",
+      "player_id": "name:matissethybulle",
+      "espn_player_id": "3907498",
+      "aliases": [
+        "Matisse Thybulle"
+      ],
+      "requested_player": "Matisse Thybulle",
+      "nba_player_id": "1629680",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Max Christie",
+      "player_id": "name:maxchristie",
+      "espn_player_id": "4432582",
+      "aliases": [
+        "Max Christie"
+      ],
+      "requested_player": "Max Christie",
+      "nba_player_id": "1631108",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Maxime Raynaud",
+      "player": "Maxime Raynaud",
+      "espn_player_id": "4898371",
+      "aliases": [
+        "Maxime Raynaud"
+      ],
+      "nba_player_id": "1642875",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Max Strus",
+      "player_id": "name:maxstrus",
+      "espn_player_id": "4065778",
+      "aliases": [
+        "Max Strus"
+      ],
+      "requested_player": "Max Strus",
+      "nba_player_id": "1629622",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Michael Porter Jr.",
+      "player_id": "name:michaelporterjr",
+      "espn_player_id": "4278104",
+      "aliases": [
+        "Michael Porter Jr."
+      ],
+      "requested_player": "Michael Porter Jr.",
+      "nba_player_id": "1629008",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Mikal Bridges",
+      "player_id": "name:mikalbridges",
+      "espn_player_id": "3147657",
+      "aliases": [
+        "Mikal Bridges"
+      ],
+      "requested_player": "Mikal Bridges",
+      "nba_player_id": "1628969",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Miles Bridges",
+      "player_id": "name:milesbridges",
+      "espn_player_id": "4066383",
+      "aliases": [
+        "Miles Bridges"
+      ],
+      "requested_player": "Miles Bridges",
+      "nba_player_id": "1628970",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Miles McBride",
+      "player_id": "name:milesmcbride",
+      "espn_player_id": "4431823",
+      "aliases": [
+        "Miles McBride"
+      ],
+      "requested_player": "Miles McBride",
+      "nba_player_id": "1630540",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Mitchell Robinson",
+      "player_id": "name:mitchellrobinson",
+      "espn_player_id": "4351852",
+      "aliases": [
+        "Mitchell Robinson"
+      ],
+      "requested_player": "Mitchell Robinson",
+      "nba_player_id": "1629011",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Moritz Wagner",
+      "player_id": "name:moritzwagner",
+      "espn_player_id": "3150844",
+      "aliases": [
+        "Moritz Wagner"
+      ],
+      "requested_player": "Moritz Wagner",
+      "nba_player_id": "1629021",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "Moses Moody",
+      "player": "Moses Moody",
+      "espn_player_id": "4432171",
+      "aliases": [
+        "Moses Moody"
+      ],
+      "nba_player_id": "1630541",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Myles Turner",
+      "player_id": "name:mylesturner",
+      "espn_player_id": "3133628",
+      "aliases": [
+        "Myles Turner"
+      ],
+      "requested_player": "Myles Turner",
+      "nba_player_id": "1626167",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Naji Marshall",
+      "player_id": "name:najimarshall",
+      "espn_player_id": "4278594",
+      "aliases": [
+        "Naji Marshall"
+      ],
+      "requested_player": "Naji Marshall",
+      "nba_player_id": "1630230",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Naz Reid",
+      "player_id": "name:nazreid",
+      "espn_player_id": "4396971",
+      "aliases": [
+        "Naz Reid"
+      ],
+      "requested_player": "Naz Reid",
+      "nba_player_id": "1629675",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Neemias Queta",
+      "player_id": "name:neemiasqueta",
+      "espn_player_id": "4397424",
+      "aliases": [
+        "Neemias Queta"
+      ],
+      "requested_player": "Neemias Queta",
+      "nba_player_id": "1629674",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Nic Claxton",
+      "player": "Nic Claxton",
+      "espn_player_id": "4278067",
+      "aliases": [
+        "Nic Claxton"
+      ],
+      "nba_player_id": "1629651",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Nickeil Alexander-Walker",
+      "player_id": "name:nickeilalexanderwalker",
+      "espn_player_id": "4278039",
+      "aliases": [
+        "Nickeil Alexander-Walker"
+      ],
+      "requested_player": "Nickeil Alexander-Walker",
+      "nba_player_id": "1629638",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Nikola Jokić",
+      "player_id": "name:nikolajokic",
+      "espn_player_id": "3112335",
+      "aliases": [
+        "Nikola Jokic",
+        "Nikola Jokić"
+      ],
+      "requested_player": "Nikola Jokić",
+      "nba_player_id": "203999",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Nikola Vučević",
+      "player_id": "name:nikolavucevic",
+      "espn_player_id": "6478",
+      "aliases": [
+        "Nikola Vucevic",
+        "Nikola Vučević"
+      ],
+      "requested_player": "Nikola Vučević",
+      "nba_player_id": "202696",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Nique Clifford",
+      "player_id": "name:niqueclifford",
+      "espn_player_id": "4702384",
+      "aliases": [
+        "Nique Clifford"
+      ],
+      "requested_player": "Nique Clifford",
+      "nba_player_id": "1642363",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Noah Clowney",
+      "player_id": "name:noahclowney",
+      "espn_player_id": "4712896",
+      "aliases": [
+        "Noah Clowney"
+      ],
+      "requested_player": "Noah Clowney",
+      "nba_player_id": "1641730",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Norman Powell",
+      "player_id": "name:normanpowell",
+      "espn_player_id": "2595516",
+      "aliases": [
+        "Norman Powell"
+      ],
+      "requested_player": "Norman Powell",
+      "nba_player_id": "1626181",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "OG Anunoby",
+      "player_id": "name:oganunoby",
+      "espn_player_id": "3934719",
+      "aliases": [
+        "O.G. Anunoby",
+        "OG Anunoby"
+      ],
+      "requested_player": "OG Anunoby",
+      "nba_player_id": "1628384",
+      "origins": [
+        "assignments:selected_player",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Onyeka Okongwu",
+      "player_id": "name:onyekaokongwu",
+      "espn_player_id": "4431680",
+      "aliases": [
+        "Onyeka Okongwu"
+      ],
+      "requested_player": "Onyeka Okongwu",
+      "nba_player_id": "1630168",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Oso Ighodaro",
+      "player_id": "name:osoighodaro",
+      "espn_player_id": "4601023",
+      "aliases": [
+        "Oso Ighodaro"
+      ],
+      "requested_player": "Oso Ighodaro",
+      "nba_player_id": "1642345",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Paolo Banchero",
+      "player_id": "name:paolobanchero",
+      "espn_player_id": "4432573",
+      "aliases": [
+        "Paolo Banchero"
+      ],
+      "requested_player": "Paolo Banchero",
+      "nba_player_id": "1631094",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Pascal Siakam",
+      "player_id": "name:pascalsiakam",
+      "espn_player_id": "3149673",
+      "aliases": [
+        "Pascal Siakam"
+      ],
+      "requested_player": "Pascal Siakam",
+      "nba_player_id": "1627783",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Patrick Williams",
+      "player_id": "name:patrickwilliams",
+      "espn_player_id": "4431687",
+      "aliases": [
+        "Patrick Williams"
+      ],
+      "requested_player": "Patrick Williams",
+      "nba_player_id": "1630172",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Paul George",
+      "player_id": "name:paulgeorge",
+      "espn_player_id": "4251",
+      "aliases": [
+        "Paul George"
+      ],
+      "requested_player": "Paul George",
+      "nba_player_id": "202331",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Paul Reed",
+      "player_id": "name:paulreed",
+      "espn_player_id": "4278562",
+      "aliases": [
+        "Paul Reed"
+      ],
+      "requested_player": "Paul Reed",
+      "nba_player_id": "1630194",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Payton Pritchard",
+      "player_id": "name:paytonpritchard",
+      "espn_player_id": "4066354",
+      "aliases": [
+        "Payton Pritchard"
+      ],
+      "requested_player": "Payton Pritchard",
+      "nba_player_id": "1630202",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Pelle Larsson",
+      "player_id": "name:pellelarsson",
+      "espn_player_id": "4601025",
+      "aliases": [
+        "Pelle Larsson"
+      ],
+      "requested_player": "Pelle Larsson",
+      "nba_player_id": "1641796",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Peyton Watson",
+      "player_id": "name:peytonwatson",
+      "espn_player_id": "4576087",
+      "aliases": [
+        "Peyton Watson"
+      ],
+      "requested_player": "Peyton Watson",
+      "nba_player_id": "1631212",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "P.J. Washington",
+      "player_id": "name:pjwashington",
+      "espn_player_id": "4278078",
+      "aliases": [
+        "P.J. Washington"
+      ],
+      "requested_player": "P.J. Washington",
+      "nba_player_id": "1629023",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Quentin Grimes",
+      "player_id": "name:quentingrimes",
+      "espn_player_id": "4397014",
+      "aliases": [
+        "Quentin Grimes"
+      ],
+      "requested_player": "Quentin Grimes",
+      "nba_player_id": "1629656",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Quinten Post",
+      "player_id": "name:quintenpost",
+      "espn_player_id": "4593016",
+      "aliases": [
+        "Quinten Post"
+      ],
+      "requested_player": "Quinten Post",
+      "nba_player_id": "1642366",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Reed Sheppard",
+      "player_id": "name:reedsheppard",
+      "espn_player_id": "4711272",
+      "aliases": [
+        "Reed Sheppard"
+      ],
+      "requested_player": "Reed Sheppard",
+      "nba_player_id": "1642263",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "RJ Barrett",
+      "player_id": "name:rjbarrett",
+      "espn_player_id": "4395625",
+      "aliases": [
+        "RJ Barrett"
+      ],
+      "requested_player": "RJ Barrett",
+      "nba_player_id": "1629628",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Robert Williams III",
+      "player_id": "name:robertwilliamsiii",
+      "espn_player_id": "4066211",
+      "aliases": [
+        "Robert Williams III"
+      ],
+      "requested_player": "Robert Williams III",
+      "nba_player_id": "1629057",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ronald Holland II",
+      "player_id": "name:ronaldhollandii",
+      "espn_player_id": "4683771",
+      "aliases": [
+        "Ronald Holland II"
+      ],
+      "requested_player": "Ronald Holland II",
+      "nba_player_id": "1641842",
+      "origins": [
+        "assignments:alternate",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Royce O'Neale",
+      "player_id": "name:royceoneale",
+      "espn_player_id": "2583632",
+      "aliases": [
+        "Royce O'Neale"
+      ],
+      "requested_player": "Royce O'Neale",
+      "nba_player_id": "1626220",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Rudy Gobert",
+      "player_id": "name:rudygobert",
+      "espn_player_id": "3032976",
+      "aliases": [
+        "Rudy Gobert"
+      ],
+      "requested_player": "Rudy Gobert",
+      "nba_player_id": "203497",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Rui Hachimura",
+      "player_id": "name:ruihachimura",
+      "espn_player_id": "4066648",
+      "aliases": [
+        "Rui Hachimura"
+      ],
+      "requested_player": "Rui Hachimura",
+      "nba_player_id": "1629060",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Ryan Dunn",
+      "player_id": "name:ryandunn",
+      "espn_player_id": "4888725",
+      "aliases": [
+        "Ryan Dunn"
+      ],
+      "requested_player": "Ryan Dunn",
+      "nba_player_id": "1642346",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ryan Kalkbrenner",
+      "player_id": "name:ryankalkbrenner",
+      "espn_player_id": "4576060",
+      "aliases": [
+        "Ryan Kalkbrenner"
+      ],
+      "requested_player": "Ryan Kalkbrenner",
+      "nba_player_id": "1641750",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ryan Rollins",
+      "player_id": "name:ryanrollins",
+      "espn_player_id": "4591725",
+      "aliases": [
+        "Ryan Rollins"
+      ],
+      "requested_player": "Ryan Rollins",
+      "nba_player_id": "1631157",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Saddiq Bey",
+      "player_id": "name:saddiqbey",
+      "espn_player_id": "4397136",
+      "aliases": [
+        "Saddiq Bey"
+      ],
+      "requested_player": "Saddiq Bey",
+      "nba_player_id": "1630180",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Sam Hauser",
+      "player_id": "name:samhauser",
+      "espn_player_id": "4065804",
+      "aliases": [
+        "Sam Hauser"
+      ],
+      "requested_player": "Sam Hauser",
+      "nba_player_id": "1630573",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Sam Merrill",
+      "player_id": "name:sammerrill",
+      "espn_player_id": "4066757",
+      "aliases": [
+        "Sam Merrill"
+      ],
+      "requested_player": "Sam Merrill",
+      "nba_player_id": "1630241",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Scoot Henderson",
+      "player_id": "name:scoothenderson",
+      "espn_player_id": "4683678",
+      "aliases": [
+        "Scoot Henderson"
+      ],
+      "requested_player": "Scoot Henderson",
+      "nba_player_id": "1630703",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Scottie Barnes",
+      "player_id": "name:scottiebarnes",
+      "espn_player_id": "4433134",
+      "aliases": [
+        "Scottie Barnes"
+      ],
+      "requested_player": "Scottie Barnes",
+      "nba_player_id": "1630567",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Scotty Pippen Jr.",
+      "player_id": "name:scottypippenjr",
+      "espn_player_id": "4431785",
+      "aliases": [
+        "Scotty Pippen Jr."
+      ],
+      "requested_player": "Scotty Pippen Jr.",
+      "nba_player_id": "1630590",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Shaedon Sharpe",
+      "player": "Shaedon Sharpe",
+      "espn_player_id": "4914336",
+      "aliases": [
+        "Shaedon Sharpe"
+      ],
+      "nba_player_id": "1631101",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Shai Gilgeous-Alexander",
+      "player_id": "name:shaigilgeousalexander",
+      "espn_player_id": "4278073",
+      "aliases": [
+        "Shai Gilgeous-Alexander"
+      ],
+      "requested_player": "Shai Gilgeous-Alexander",
+      "nba_player_id": "1628983",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Sion James",
+      "player_id": "name:sionjames",
+      "espn_player_id": "4602025",
+      "aliases": [
+        "Sion James"
+      ],
+      "requested_player": "Sion James",
+      "nba_player_id": "1642883",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Stephen Curry",
+      "player_id": "name:stephencurry",
+      "espn_player_id": "3975",
+      "aliases": [
+        "Stephen Curry"
+      ],
+      "requested_player": "Stephen Curry",
+      "nba_player_id": "201939",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Stephon Castle",
+      "player_id": "name:stephoncastle",
+      "espn_player_id": "4845367",
+      "aliases": [
+        "Stephon Castle"
+      ],
+      "requested_player": "Stephon Castle",
+      "nba_player_id": "1642264",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Steven Adams",
+      "player_id": "name:stevenadams",
+      "espn_player_id": "2991235",
+      "aliases": [
+        "Steven Adams"
+      ],
+      "requested_player": "Steven Adams",
+      "nba_player_id": "203500",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Tari Eason",
+      "player_id": "name:tarieason",
+      "espn_player_id": "4433192",
+      "aliases": [
+        "Tari Eason"
+      ],
+      "requested_player": "Tari Eason",
+      "nba_player_id": "1631106",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Taurean Prince",
+      "player_id": "name:taureanprince",
+      "espn_player_id": "2990962",
+      "aliases": [
+        "Taurean Prince"
+      ],
+      "requested_player": "Taurean Prince",
+      "nba_player_id": "1627752",
+      "origins": [
+        "assignments:alternate",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Terance Mann",
+      "player_id": "name:terancemann",
+      "espn_player_id": "3907823",
+      "aliases": [
+        "Terance Mann"
+      ],
+      "requested_player": "Terance Mann",
+      "nba_player_id": "1629611",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Thomas Bryant",
+      "player_id": "name:thomasbryant",
+      "espn_player_id": "3934723",
+      "aliases": [
+        "Thomas Bryant"
+      ],
+      "requested_player": "Thomas Bryant",
+      "nba_player_id": "1628418",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Tim Hardaway Jr.",
+      "player_id": "name:timhardawayjr",
+      "espn_player_id": "2528210",
+      "aliases": [
+        "Tim Hardaway Jr."
+      ],
+      "requested_player": "Tim Hardaway Jr.",
+      "nba_player_id": "203501",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "requested_player": "T.J. McConnell",
+      "player": "T.J. McConnell",
+      "espn_player_id": "2530530",
+      "aliases": [
+        "T.J. McConnell"
+      ],
+      "nba_player_id": "204456",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "requested_player": "Tobias Harris",
+      "player": "Tobias Harris",
+      "espn_player_id": "6440",
+      "aliases": [
+        "Tobias Harris"
+      ],
+      "nba_player_id": "202699",
+      "origins": [
+        "assignments:alternate",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Toumani Camara",
+      "player_id": "name:toumanicamara",
+      "espn_player_id": "4431736",
+      "aliases": [
+        "Toumani Camara"
+      ],
+      "requested_player": "Toumani Camara",
+      "nba_player_id": "1641739",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Trae Young",
+      "player_id": "name:traeyoung",
+      "espn_player_id": "4277905",
+      "aliases": [
+        "Trae Young"
+      ],
+      "requested_player": "Trae Young",
+      "nba_player_id": "1629027",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Trayce Jackson-Davis",
+      "player_id": "name:traycejacksondavis",
+      "espn_player_id": "4431684",
+      "aliases": [
+        "Trayce Jackson-Davis"
+      ],
+      "requested_player": "Trayce Jackson-Davis",
+      "nba_player_id": "1631218",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Tre Johnson",
+      "player_id": "name:trejohnson",
+      "espn_player_id": "5238230",
+      "aliases": [
+        "Tre Johnson"
+      ],
+      "requested_player": "Tre Johnson",
+      "nba_player_id": "1642848",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Tre Jones",
+      "player_id": "name:trejones",
+      "espn_player_id": "4395626",
+      "aliases": [
+        "Tre Jones"
+      ],
+      "requested_player": "Tre Jones",
+      "nba_player_id": "1630200",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Trey Murphy III",
+      "player_id": "name:treymurphyiii",
+      "espn_player_id": "4397688",
+      "aliases": [
+        "Trey Murphy III"
+      ],
+      "requested_player": "Trey Murphy III",
+      "nba_player_id": "1630530",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Ty Jerome",
+      "player_id": "name:tyjerome",
+      "espn_player_id": "4065733",
+      "aliases": [
+        "Ty Jerome"
+      ],
+      "requested_player": "Ty Jerome",
+      "nba_player_id": "1629660",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Tyler Herro",
+      "player_id": "name:tylerherro",
+      "espn_player_id": "4395725",
+      "aliases": [
+        "Tyler Herro"
+      ],
+      "requested_player": "Tyler Herro",
+      "nba_player_id": "1629639",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Tyrese Haliburton",
+      "player_id": "name:tyresehaliburton",
+      "espn_player_id": "4396993",
+      "aliases": [
+        "Tyrese Haliburton"
+      ],
+      "requested_player": "Tyrese Haliburton",
+      "nba_player_id": "1630169",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Tyrese Maxey",
+      "player_id": "name:tyresemaxey",
+      "espn_player_id": "4431678",
+      "aliases": [
+        "Tyrese Maxey"
+      ],
+      "requested_player": "Tyrese Maxey",
+      "nba_player_id": "1630178",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Tyrese Proctor",
+      "player_id": "name:tyreseproctor",
+      "espn_player_id": "5023693",
+      "aliases": [
+        "Tyrese Proctor"
+      ],
+      "requested_player": "Tyrese Proctor",
+      "nba_player_id": "1642878",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Tyus Jones",
+      "player_id": "name:tyusjones",
+      "espn_player_id": "3135046",
+      "aliases": [
+        "Tyus Jones"
+      ],
+      "requested_player": "Tyus Jones",
+      "nba_player_id": "1626145",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Victor Wembanyama",
+      "player_id": "name:victorwembanyama",
+      "espn_player_id": "5104157",
+      "aliases": [
+        "Victor Wembanyama"
+      ],
+      "requested_player": "Victor Wembanyama",
+      "nba_player_id": "1641705",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "VJ Edgecombe",
+      "player_id": "name:vjedgecombe",
+      "espn_player_id": "5124612",
+      "aliases": [
+        "VJ Edgecombe"
+      ],
+      "requested_player": "VJ Edgecombe",
+      "nba_player_id": "1642845",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Walker Kessler",
+      "player_id": "name:walkerkessler",
+      "espn_player_id": "4433136",
+      "aliases": [
+        "Walker Kessler"
+      ],
+      "requested_player": "Walker Kessler",
+      "nba_player_id": "1631117",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player"
+      ]
+    },
+    {
+      "player": "Wendell Carter Jr.",
+      "player_id": "name:wendellcarterjr",
+      "espn_player_id": "4277847",
+      "aliases": [
+        "Wendell Carter Jr."
+      ],
+      "requested_player": "Wendell Carter Jr.",
+      "nba_player_id": "1628976",
+      "origins": [
+        "assignments:primary",
+        "measured_pairs:defense_player",
+        "measured_pairs:offense_player",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Yves Missi",
+      "player_id": "name:yvesmissi",
+      "espn_player_id": "5061589",
+      "aliases": [
+        "Yves Missi"
+      ],
+      "requested_player": "Yves Missi",
+      "nba_player_id": "1642274",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Zach Collins",
+      "player_id": "name:zachcollins",
+      "espn_player_id": "4066650",
+      "aliases": [
+        "Zach Collins"
+      ],
+      "requested_player": "Zach Collins",
+      "nba_player_id": "1628380",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Zach Edey",
+      "player_id": "name:zachedey",
+      "espn_player_id": "4600663",
+      "aliases": [
+        "Zach Edey"
+      ],
+      "requested_player": "Zach Edey",
+      "nba_player_id": "1641744",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Zach LaVine",
+      "player_id": "name:zachlavine",
+      "espn_player_id": "3064440",
+      "aliases": [
+        "Zach LaVine"
+      ],
+      "requested_player": "Zach LaVine",
+      "nba_player_id": "203897",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Zeke Nnaji",
+      "player_id": "name:zekennaji",
+      "espn_player_id": "4431690",
+      "aliases": [
+        "Zeke Nnaji"
+      ],
+      "requested_player": "Zeke Nnaji",
+      "nba_player_id": "1630192",
+      "origins": [
+        "assignments:alternate",
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    },
+    {
+      "player": "Zion Williamson",
+      "player_id": "name:zionwilliamson",
+      "espn_player_id": "4395628",
+      "aliases": [
+        "Zion Williamson"
+      ],
+      "requested_player": "Zion Williamson",
+      "nba_player_id": "1629627",
+      "origins": [
+        "assignments:primary",
+        "measured_refresh_scope:defense_player",
+        "measured_refresh_scope:offense_player",
+        "pair_summaries:named_player",
+        "pair_summaries:player"
+      ]
+    }
+  ],
+  "identity_policy": "Exact normalized source names/provider IDs only. Explicit reviewed aliases retained; no fuzzy suffix inference.",
+  "verified_aliases": [
+    {
+      "player": "Bobby Portis",
+      "aliases": [
+        "Bobby Portis Jr."
+      ],
+      "espn_player_id": "3064482",
+      "nba_player_id": "1626171",
+      "sources": [
+        "https://www.nba.com/player/1626171/bobby-portis",
+        "https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/3064482"
+      ],
+      "evidence": {
+        "nba_name": "Bobby Portis Jr.",
+        "espn_name": "Bobby Portis",
+        "birthdate": "10/2/1995",
+        "matched_profile_attributes": "Arkansas; 2015 first round pick 22; Miami Heat #95. NBA and ESPN use the reviewed Jr. name variant.",
+        "espn_profile_attributes": {
+          "displayDOB": "10/2/1995",
+          "displayHeight": "6' 9\"",
+          "displayWeight": "250 lbs",
+          "age": 31,
+          "displayDraft": "2015: Rd 1, Pk 22 (CHI)",
+          "jersey": "95"
+        }
+      }
+    }
+  ]
+}

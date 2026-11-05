@@ -41,7 +41,7 @@ _PREFERENCE = re.compile(r'\b(?:i (?:like|liked|prefer|want|wanted)\s+'
                          r'(?:a\s+)?(?:brief|short|concise|simple)\b|(?:know|understand|learn)\b)|'
                          r'i(?:[’\']m| am) (?:not )?a fan\b|'
                          r'(?:rather|prefer)\s+(?!(?:a\s+)?(?:brief|short|concise|simple)\b))', re.I)
-_RESEARCH = re.compile(r'\b(?:average\w*|stats?|statistics|last \w+ games|'
+_RESEARCH = re.compile(r'\b(?:average\w*|stats?|statistics|career|lifetime|all[ -]time|all[ -]seasons|last \w+ games|'
                        r'game logs?|who guards?|defensive percentage|injur\w*|'
                        r'news|schedule|score|scores|match(?:es)?\s*ups?|results?|records?|workbooks?|'
                        r'worksheets?|sheets?|rows?|cells?|columns?|tracking|passing|'

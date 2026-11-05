@@ -58,10 +58,13 @@ def _comparable_observations(store, player, player_id, team, cutoff, components)
     """
     quality = {'duplicate_rows': 0, 'conflicting_games': 0, 'incomplete_games': 0,
                'invalid_event_rows': 0, 'invalid_season_rows': 0}
+    from career_identity import resolve_career_identity
+    documented = resolve_career_identity(store, player)
+    approved_names = {normalized_name(name) for name in documented['aliases']}
     with store.connect() as db:
         names = [dict(row) for row in db.execute(
             'SELECT DISTINCT player,player_id FROM player_games WHERE date<?', (cutoff,))
-            if normalized_name(row['player']) == normalized_name(player)]
+            if normalized_name(row['player']) in approved_names]
         if not names:
             return [], quality
         identities = {row['player_id'] for row in names if row['player_id']}
