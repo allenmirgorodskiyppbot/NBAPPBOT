@@ -1322,9 +1322,17 @@ class TelegramBot:
                 return report if isinstance(report, str) else 'Self-test did not return a usable report.'
             except asyncio.CancelledError:
                 raise
+            except TimeoutError:
+                log.warning('Self-test reached the 60-second reply limit; inspect application stage and elapsed-time logs.')
+                return ('The self-test reached the 60-second reply limit. A check may still be running; '
+                        '/selftest will report if it is busy. Check the chatbot logs for its stage and elapsed time. '
+                        'No sample entries were added to your master.')
             except Exception as error:
-                log.warning('Self-test could not finish (%s)', type(error).__name__)
-                return 'Self-test could not finish. Check the chatbot logs; no sample entries were added to your master.'
+                from release_checks import safe_check_category
+                category = safe_check_category(error)
+                log.warning('Self-test could not finish (%s); inspect application stage logs.', category)
+                return ('Self-test could not finish (' + category + '). Check the chatbot logs for its stage; '
+                        'no sample entries were added to your master.')
         if command == '/ai_status':
             if argument:
                 return 'Use /ai_status alone to check local model readiness without making an AI request.'

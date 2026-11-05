@@ -5,12 +5,55 @@ import asyncio
 import datetime as dt
 import logging
 import os
+import re
+import time
 
 from basketball_research import answer_assignment_question, assignment_rows
 from news_digest import _aware
 from self_check import run_self_checks
 
 log = logging.getLogger('knicks.release')
+
+
+def safe_check_category(error):
+    name = type(error).__name__
+    return name if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,63}', name) else 'Error'
+
+
+def check_progress_summary(state):
+    """Only application-authored stage labels and elapsed time, never error text."""
+    current = getattr(state, 'self_test_progress', {}) or {}
+    stage = current.get('stage') or 'Starting checks'
+    started = current.get('started_monotonic')
+    elapsed = max(0, time.monotonic() - started) if type(started) in (int, float) else 0
+    return str(stage)[:140], elapsed
+
+
+def run_checks_with_progress(state, owner, function, *args, **kwargs):
+    """The actual worker owns progress even if its requester stops waiting."""
+    started = time.monotonic()
+
+    def progress(stage):
+        label = str(stage).replace('\n', ' ').replace('\r', ' ')[:140]
+        state.self_test_progress = {'phase': 'running', 'owner': owner, 'stage': label,
+            'started_monotonic': started, 'stage_started_monotonic': time.monotonic()}
+        log.info('Self-check stage: owner=%s stage=%s elapsed=%.1fs', owner, label, time.monotonic()-started)
+
+    progress('Starting checks')
+    try:
+        report = function(*args, progress=progress, **kwargs)
+    except BaseException as error:
+        stage, elapsed = check_progress_summary(state)
+        state.self_test_progress = {**state.self_test_progress, 'phase': 'failed',
+            'elapsed_seconds': elapsed, 'error_type': safe_check_category(error)}
+        log.warning('Self-check worker failed: owner=%s stage=%s elapsed=%.1fs category=%s',
+                    owner, stage, elapsed, safe_check_category(error))
+        raise
+    stage, elapsed = check_progress_summary(state)
+    state.self_test_progress = {**state.self_test_progress, 'phase': 'completed', 'elapsed_seconds': elapsed}
+    log.info('Self-check worker completed: owner=%s elapsed=%.1fs passed=%s failed=%s warnings=%s',
+             owner, elapsed, report.get('passed'), report.get('failed'), report.get('warnings'))
+    return report
 
 
 def model_startup_completed(master):
@@ -27,9 +70,10 @@ def model_startup_completed(master):
     master.set_checkpoint('release_checks', report)
 
 
-def verify_release(master, workbook, data_dir, exporter=None, model_phase=None, telegram=None):
-    report = run_self_checks(master, data_dir, exporter)
+def verify_release(master, workbook, data_dir, exporter=None, model_phase=None, telegram=None, *, progress=None):
+    report = run_self_checks(master, data_dir, exporter, progress=progress)
     checks = report['checks']
+    if progress: progress('Sourced workbook matchup lookup')
     try:
         rows = assignment_rows(workbook)
         if rows:
@@ -45,6 +89,7 @@ def verify_release(master, workbook, data_dir, exporter=None, model_phase=None, 
     except Exception as error:
         checks.append({'name': 'Workbook matchup lookup', 'status': 'FAIL', 'scope': 'read-only live workbook',
                        'error_type': type(error).__name__})
+    if progress: progress('Game-day schedule and connection status')
     digest = master.get_checkpoint('knicks_digest_status', {})
     schedule_ok = digest.get('state') not in {None, 'starting', 'schedule_unavailable', 'disabled'}
     checks.append({'name': 'Current Knicks schedule available for digest timing',
@@ -84,9 +129,10 @@ async def automatic_release_checks(state, data_dir, exporter=None):
             if attempted and digest.get('checked_at') and _aware(digest['checked_at']) >= boot:
                 break
             await asyncio.sleep(1)
-        async with state.self_test_lock:
-            report = await asyncio.to_thread(verify_release, state.master, state.store, data_dir,
-                                              exporter, state.phase, state.telegram.status())
+        from self_check import run_serialized_checks
+        report = await run_serialized_checks(state.self_test_lock, run_checks_with_progress,
+            state, 'automatic', verify_release, state.master, state.store, data_dir,
+            exporter, state.phase, state.telegram.status())
         report['phase'] = 'checked'
         state.master.set_checkpoint('release_checks', report)
         if state.phase == 'ready':
@@ -97,5 +143,5 @@ async def automatic_release_checks(state, data_dir, exporter=None):
         raise
     except Exception as error:
         state.master.set_checkpoint('release_checks', {'phase': 'error',
-            'error_type': type(error).__name__, 'source_ref': os.getenv('SOURCE_REF', 'local-development')})
-        log.warning('Release checks could not finish: %s', type(error).__name__)
+            'error_type': safe_check_category(error), 'source_ref': os.getenv('SOURCE_REF', 'local-development')})
+        log.warning('Release checks could not finish: %s', safe_check_category(error))

@@ -153,16 +153,24 @@ async def ai_status():
 
 
 async def self_test():
-    from self_check import run_self_checks, format_self_check
+    from self_check import run_self_checks, format_self_check, run_serialized_checks
+    from release_checks import run_checks_with_progress, check_progress_summary
     state = app.state
     if state.self_test_lock.locked():
-        return 'A self-test is already running. Please wait for its report.'
-    async with state.self_test_lock:
-        report = await asyncio.to_thread(run_self_checks, state.master, DATA_DIR, export_master)
-        text = format_self_check(report)
-        text += '\nAI startup phase: ' + state.phase + '; model: ' + MODEL
-        text += '\nTelegram: ' + ('connected' if state.telegram.connected else 'not connected')
-        return text
+        stage, elapsed = check_progress_summary(state)
+        return f'A self-test is already running. Stage: {stage}; elapsed {elapsed:.0f}s. Please wait for its report.'
+    try:
+        report = await run_serialized_checks(state.self_test_lock, run_checks_with_progress,
+            state, 'manual', run_self_checks, state.master, DATA_DIR, export_fixture)
+    except asyncio.CancelledError:
+        stage, elapsed = check_progress_summary(state)
+        log.warning('Self-test requester stopped waiting: stage=%s elapsed=%.1fs; an active worker retains its lock.',
+                    stage, elapsed)
+        raise
+    text = format_self_check(report)
+    text += '\nAI startup phase: ' + state.phase + '; model: ' + MODEL
+    text += '\nTelegram: ' + ('connected' if state.telegram.connected else 'not connected')
+    return text
 
 
 def observe_ai_result(result):
@@ -354,6 +362,12 @@ def export_master(master, directory):
         return export_refreshed_master(master, directory)
 
 
+def export_fixture(master, directory):
+    """Tiny isolated check fixtures must not queue behind a full live export."""
+    from refresh_export import export_master as export_refreshed_master
+    return export_refreshed_master(master, directory)
+
+
 async def notify_feed_health(master, notify, current=None):
     from gameday_digest import alert_mode
     # Scheduled news includes source failures in its digest. Keep off days quiet;
@@ -504,7 +518,7 @@ async def initialize(application):
         if state.release_check_task is None:
             from release_checks import automatic_release_checks
             state.release_check_task = asyncio.create_task(
-                automatic_release_checks(state, DATA_DIR, export_master), name='release-checks')
+                automatic_release_checks(state, DATA_DIR, export_fixture), name='release-checks')
         state.phase, state.detail = 'model', 'Waiting for the model server'
         async with httpx.AsyncClient(timeout=15) as client:
             for attempt in range(120):
@@ -630,6 +644,10 @@ async def lifespan(application):
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        # A timed-out requester may leave a protected self-check worker active.
+        # Its workbook reads must finish before the temporary store is removed.
+        async with state.self_test_lock:
+            pass
         state.temporary.cleanup()
 
 
