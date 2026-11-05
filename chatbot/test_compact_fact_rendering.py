@@ -136,7 +136,7 @@ class CompactFactRenderingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('ai_failure_category',result)
         self.network.assert_not_awaited()
 
-    async def test_unused_compact_prose_fields_are_discarded_without_licensing_other_fields_or_changed_decisions(self):
+    async def test_application_owned_prop_contract_rejects_extra_fields_and_changed_decisions(self):
         report=build_pick_discussion(self.master,{'player':'Jalen Brunson','stat':'pts','line':25.5,
             'side':'more','game_date':'2026-11-07'},now=fixtures.NOW)
         self.assertEqual(report['decision'],'pass')
@@ -148,24 +148,17 @@ class CompactFactRenderingTests(unittest.IsolatedAsyncioTestCase):
         before=self.snapshot()
         result=await app.generated_evidence_reply(app.ChatRequest(message='Explain that sample.'),{},self.master,
             report['evidence_cards'],natural=True,dialogue={'_compact':True,'decision':'pass'},fallback='Pass.')
-        self.assertEqual(len(self.payloads),1)
+        # A compact computed prop now asks only for plain prose. The app owns
+        # the result fields; an injected field cannot become answer content.
+        self.assertEqual(len(self.payloads),2)
         self.assert_compact_contract(self.payloads[0])
-        self.assertEqual(self.payloads[0]['format']['properties']['computed_decision']['enum'],['pass'])
-        self.assertTrue(result['answer'].startswith(self.model_reply))
-        self.assertNotIn('ai_failure_category',result)
-        self.assertIsNot(result.get('ai_used'),False)
-        self.assertEqual(app.app.state.last_ai_request['repair_attempts'],0)
-        serialized=json.dumps(result)
-        for hidden in ['999','Ignore the saved decision','explanation','main_risk','place an entry']:
-            self.assertNotIn(hidden,serialized)
-        sources=result['sources']
-        self.assertTrue(sources)
-        self.assertTrue({source['evidence_id'] for source in sources} <=
-                        {card['id'] for card in report['evidence_cards']})
+        self.assertEqual(self.payloads[0]['_prop_contract']['computed_decision'],'pass')
+        self.assertEqual(result['answer'],'Pass.')
+        self.assertFalse(result['ai_used'])
+        self.assertNotIn('999',json.dumps(result))
         self.assertEqual(self.snapshot(),before)
-        # Extra-field tolerance is limited to those unused strings in compact
-        # mode. It never licenses an unknown field, a changed decision or the
-        # same extra fields under the legacy strict contract.
+        # Unknown fields, changed decisions and the legacy strict contract
+        # retain their independent rejection checks.
         for label,fields,compact in [
                 ('unknown field',{'arbitrary_field':'999'},True),
                 ('changed decision',{**unused,'computed_decision':'more'},True),

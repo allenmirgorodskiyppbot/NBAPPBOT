@@ -1235,6 +1235,13 @@ def _unsupported_research_stability(text, cards):
     confidence = re.compile(r'\b(?:high|strong)[- ]confidence\s+(?:pick|bet|over|under|forecast|prediction)\b|'
         r'\b(?:high|strong)\s+confidence\s+(?:of|that|in)\s+[^.;]{0,50}'
         r'\b(?:hit\w*|clear\w*|win\w*|above[- ]line|performance|production)\b', re.I)
+    typicality = re.compile(r'\b(?:normal|typical|usual|routine)\s+(?:'
+        r'for\s+(?:(?:this|that|the|his|her)\s+)*(?:stat(?:istic)?|metric|market|performance)|'
+        r'(?:(?:scoring|statistical|recent|historical)\s+)?'+production+r')\b', re.I)
+    result_validation = re.compile(r'\b(?:validat(?:e[sd]?|ing)|confirm(?:s|ed|ing)?|'
+        r'assur(?:e[sd]?|ing)|prov(?:e[sd]?|ing))\s+'
+        r'(?:(?:the|this|that|a|an|future|current|upcoming|next|game|actual|successful)\s+)*'
+        r'(?:result|outcome|future\s+performance)\b', re.I)
     current = re.compile(r'\b(?:under|in|reflects?|describes?|captures?|represents?|based on)\s+'
                          r'(?:the\s+)?current\s+(?:conditions|role|workload|minutes|lineup)\b', re.I)
     for clause in re.split(r'(?<=[.!?;])\s+|\b(?:whereas|while|and|but)\b', text):
@@ -1245,9 +1252,19 @@ def _unsupported_research_stability(text, cards):
         if not subjects & research:
             continue
         candidates = [fact for fact in facts if fact.get('entity') in subjects & research]
-        for kind, pattern in (('stability', stability), ('confidence', confidence), ('current_conditions', current)):
+        for kind, pattern in (('stability', stability), ('confidence', confidence),
+                              ('typicality', typicality), ('result_validation', result_validation),
+                              ('current_conditions', current)):
             for match in pattern.finditer(clause):
                 prefix, suffix = clause[:match.start()], clause[match.end():]
+                if kind == 'result_validation' and not (
+                        re.search(r'\b(?:live|current|pregame|game.day|real.time)\b', prefix, re.I)
+                        and re.search(r'\b(?:updates?|data|checks?|verif\w*|refresh\w*)\b', prefix, re.I)):
+                    continue
+                if kind == 'result_validation':
+                    # A negated first assertion does not qualify a separate
+                    # positive one after a contrast or dash.
+                    prefix = re.split(r'[—–]|\b(?:yet|however)\b', prefix, flags=re.I)[-1]
                 # Keep uncertainty and mechanisms discussable; a later risk
                 # sentence does not undo an earlier empirical stability claim.
                 if re.search(r'\b(?:if|assuming|could|may|might|would|not|no|never|unknown|unclear|unconfirmed|'
@@ -1262,6 +1279,11 @@ def _unsupported_research_stability(text, cards):
                     supported = any(card.get('kind') == 'calibrated_probability' and
                                     card.get('verified_calibration') is True and
                                     card.get('entity') in subjects for card in cards)
+                elif kind == 'typicality':
+                    supported = any(fact.get('fact_type') == 'typicality' for fact in candidates)
+                elif kind == 'result_validation':
+                    # Checking pregame inputs never establishes the result.
+                    supported = False
                 else:
                     supported = any(fact.get('fact_type') == 'current_conditions' and
                                     fact.get('verified_current') is True for fact in candidates)

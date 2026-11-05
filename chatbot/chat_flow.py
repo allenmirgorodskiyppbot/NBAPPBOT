@@ -6,6 +6,7 @@ references, never invented statistics or permission to create financial records.
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import re
 
 from conversation import resolve_conversation
@@ -192,11 +193,26 @@ def _pick_model_evidence(report):
             record['decision_role'] = 'context_only'
         elif kind == 'prop_assessment':
             record['decision_role'] = 'actual_decision_reason'
+            _add_pick_timing(record, report)
             if report.get('data_readiness', {}).get('ready') is False:
                 record['reason_basis'] = 'game_day_verification'
                 record['text'] += ' Other strategy filters still apply after verification.'
         records.append(record)
     return records
+
+
+def _add_pick_timing(record, report):
+    """Use the readiness check's own Eastern day, never a guessed model date."""
+    readiness = report.get('data_readiness') or {}
+    try:
+        game = dt.date.fromisoformat(str(report.get('date') or readiness.get('game_date')))
+        checked_day = dt.date.fromisoformat(str(readiness.get('required_game_date'))) + dt.timedelta(days=1)
+    except (TypeError, ValueError):
+        return
+    timing = 'future' if game > checked_day else 'past' if game < checked_day else 'today'
+    record['game_timing'] = timing
+    if timing != 'today':
+        record['text'] += ' This is a '+timing+' game, not today.'
 
 
 def _changed_readiness(master, checks):
@@ -295,6 +311,7 @@ async def _explain_picks(master, turn, request, progress, generate, discussion, 
         cards.append(card)
         interpretation = {'id':card['id'],'kind':'prop_interpretation',
                           'text':_pick_interpretation(report), 'sample_decision_role':'context_only'}
+        _add_pick_timing(interpretation, report)
         if report.get('data_readiness', {}).get('ready') is False:
             interpretation['reason_basis'] = 'game_day_verification'
         brief.append(interpretation)

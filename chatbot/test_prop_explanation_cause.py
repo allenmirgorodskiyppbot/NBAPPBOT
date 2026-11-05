@@ -71,12 +71,14 @@ class PropExplanationCauseTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(GOOD, result['answer'])
         self.assertIn('actual hold reason', self.payloads[0]['messages'][0]['content'])
 
-    async def test_short_prop_explanation_uses_the_completion_interface(self):
-        from efficient_ai import efficient_generate
-        with patch('efficient_ai.efficient_generate', wraps=efficient_generate) as completion:
+    async def test_short_prop_explanation_uses_the_plain_text_interface(self):
+        from efficient_ai import efficient_prop_text
+        with patch('efficient_ai.efficient_prop_text', wraps=efficient_prop_text) as completion:
             result = await self.ask([GOOD])
         completion.assert_awaited_once()
-        self.assertEqual(completion.await_args.args[1]['_transport'], 'generate')
+        self.assertEqual(completion.await_args.args[1]['_transport'], 'prop_text')
+        self.assertEqual(completion.await_args.kwargs['decision'], 'pass')
+        self.assertTrue(completion.await_args.kwargs['evidence_ids'])
         self.assertIn(GOOD, result['answer'])
         self.assertNotIn('ai_failure_category', result)
         self.network.assert_not_awaited()
@@ -87,12 +89,70 @@ class PropExplanationCauseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.payloads[0]['format']['properties']['needs_more_data']['enum'], [False])
         self.assertIn('verification hold is already known', self.payloads[0]['messages'][0]['content'])
 
-    async def test_untyped_legacy_context_does_not_close_the_retrieval_contract(self):
+    async def test_untyped_compact_assessment_also_keeps_decision_and_citations_in_the_application(self):
         self.brief = [{key:value for key,value in item.items() if key != 'reason_basis'}
                       for item in self.brief]
         result = await self.ask([GOOD])
         self.assertIn(GOOD, result['answer'])
-        self.assertNotIn('enum', self.payloads[0]['format']['properties']['needs_more_data'])
+        self.assertEqual(self.payloads[0]['_transport'], 'prop_text')
+        self.assertEqual(self.payloads[0]['_prop_contract']['computed_decision'], 'pass')
+
+    async def test_model_sees_plain_explanation_task_and_source_facts_without_internal_citation_ids(self):
+        import json
+        result = await self.ask([GOOD])
+        self.assertIn(GOOD, result['answer'])
+        messages = self.payloads[0]['messages']
+        self.assertIn('only plain English prose', messages[0]['content'])
+        context = json.loads(messages[-2]['content'])
+        self.assertNotIn('required_evidence_ids', context)
+        self.assertTrue(context['evidence'])
+        self.assertTrue(all('id' not in item for item in context['evidence']))
+        self.assertTrue(any(item.get('decision_role') == 'actual_decision_reason'
+                            for item in context['evidence']))
+
+    async def test_unicode_subscript_citations_and_quantities_cannot_escape_validation(self):
+        for text, reason in (('The future game needs verification, per P₃.', 'invalid_evidence'),
+                             ('The player will score ３５ points.', 'numerical_prose')):
+            with self.subTest(text=text):
+                self.payloads.clear()
+                result = await self.ask([text])
+                self.assertFalse(result['ai_used'])
+                self.assertNotIn(text, result['answer'])
+                self.assertEqual(app.app.state.last_ai_request['validation_reason'], reason)
+
+    async def test_future_game_cannot_become_todays_outcome_in_the_explanation(self):
+        self.report['date'] = '2026-11-07'
+        self.report['data_readiness'].update(game_date='2026-11-07', required_game_date='2026-11-04')
+        self.brief = _pick_model_evidence(self.report)
+        for text in ("Historical performance cannot predict today's outcome.",
+                     'The matchup is tonight and needs fresh verification.'):
+            with self.subTest(text=text):
+                self.payloads.clear()
+                result = await self.ask([text])
+                self.assertFalse(result['ai_used'])
+                self.assertNotIn(text, result['answer'])
+                self.assertEqual(app.app.state.last_ai_request['validation_reason'], 'unsupported_scope')
+
+    async def test_timing_uses_readiness_day_and_allows_current_input_checks(self):
+        self.report['date'] = '2026-11-07'
+        self.report['data_readiness'].update(game_date='2026-11-07', required_game_date='2026-11-04')
+        self.brief = _pick_model_evidence(self.report)
+        assessment = next(item for item in self.brief if item['kind'] == 'prop_assessment')
+        self.assertEqual(assessment['game_timing'], 'future')
+        self.assertIn('future game, not today', assessment['text'])
+        text = 'The current inputs can be checked today. The future game still needs game-day verification.'
+        result = await self.ask([text])
+        self.assertIn(text, result['answer'])
+        self.assertNotIn('ai_failure_category', result)
+        self.assertFalse(app._unsupported_prop_timing("This is not today's game.", self.brief))
+        self.assertFalse(app._unsupported_prop_timing('If the game is today, current inputs would be required.', self.brief))
+        self.report['date'] = '2026-11-03'
+        past = next(item for item in _pick_model_evidence(self.report) if item['kind'] == 'prop_assessment')
+        self.assertEqual(past['game_timing'], 'past')
+        self.report['date'] = '2026-11-05'
+        today = next(item for item in _pick_model_evidence(self.report) if item['kind'] == 'prop_assessment')
+        self.assertEqual(today['game_timing'], 'today')
+        self.assertFalse(app._unsupported_prop_timing("This is today's game.", [today]))
 
     async def test_prior_proposal_metadata_also_keeps_recent_counts_out_of_the_hold_cause(self):
         brief = [{'kind':'prop_interpretation', 'sample_decision_role':'context_only'}]

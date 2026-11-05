@@ -76,5 +76,47 @@ class PropReasoningLimitsTests(unittest.TestCase):
               'this future game requires a current game-day data refresh.')
         self.assertIn(text,self.accept(text)['answer'])
 
+    def test_actual_v4_typicality_claim_is_not_established_by_centers(self):
+        self.reject('The historical mean and median are above the line, which is normal for this stat. '
+                    'The decision to hold is due to the need for a current game-day verification, '
+                    'not because of past performance trends.')
+
+    def test_centers_do_not_establish_typical_performance(self):
+        for text in ('The mean and median show typical performance.',
+                     'That is usual for this metric.',
+                     'This is routine statistical performance.'):
+            with self.subTest(text=text):self.reject(text)
+
+    def test_typicality_limits_can_be_discussed_without_asserting_them(self):
+        for text in ('The historical median is above the line, but this does not establish typical performance.',
+                     'It is unknown whether this is normal for this stat.',
+                     'If this became typical performance, the evidence would still need review.'):
+            with self.subTest(text=text):self.accept(text)
+
+    def test_actual_v4_live_update_cannot_validate_an_unplayed_result(self):
+        self.reject('The decision is a pass because a current game-day verification is required. '
+                    'Historical data shows the mean and median are above the line, but this does not '
+                    "confirm today's outcome—only a live update can validate the result.")
+
+    def test_pregame_verification_does_not_establish_results(self):
+        for text in ('A live update confirms the outcome.',
+                     'Current data verification assures a successful result.',
+                     'Pregame data checks prove future performance.',
+                     'A current game-day refresh validates the game result.'):
+            with self.subTest(text=text):self.reject(text)
+
+    def test_negative_and_conditional_result_validation_remain_discussable(self):
+        for text in ('A live update cannot validate the result.',
+                     'Current data verification does not confirm the outcome.',
+                     'If live data could confirm the outcome, that would be a different kind of evidence.',
+                     'A current game-day refresh may confirm the outcome, but that possibility is not established.'):
+            with self.subTest(text=text):self.accept(text)
+
+    def test_live_verification_can_check_inputs_without_validating_the_result(self):
+        for text in ('A live update can confirm the schedule. It cannot establish a future result.',
+                     'Current game-day verification checks the inputs, rather than proving performance.',
+                     'A live data check can validate the stored data.'):
+            with self.subTest(text=text):self.accept(text)
+
 
 if __name__=='__main__':unittest.main()

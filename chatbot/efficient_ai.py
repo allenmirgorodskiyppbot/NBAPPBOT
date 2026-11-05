@@ -7,7 +7,9 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import time
+import unicodedata
 
 _CACHE = OrderedDict()
 MAX_CACHE_ITEMS = 32
@@ -195,3 +197,111 @@ async def efficient_generate(client,payload,store=None,url=None,diagnostics=None
     _completion_payload(payload)  # Reject unsupported requests before any cache or HTTP work.
     tagged={**payload,'_transport':'generate'}
     return await efficient_chat(_CompletionClient(client),tagged,store,url,diagnostics,validator)
+
+
+def prop_text_payload(payload, *, decision, evidence_ids):
+    """Tag a computed assessment for prose-only inference and repair caching.
+
+    The application already owns these three result fields. They are included
+    in the cache identity, never in the model request. An internal ``format``
+    schema may remain in the payload for the application's reply contract, but
+    it is deliberately omitted from the completion API request.
+    """
+    allowed={'model','messages','format','options','think','stream','keep_alive',
+             '_transport','_prop_contract'}
+    if not isinstance(payload,dict) or set(payload)-allowed:
+        raise ValueError('Prop prose accepts only a bounded no-tools payload.')
+    if decision not in {'more','less','pass'}:
+        raise ValueError('Prop prose requires a computed decision.')
+    if (not isinstance(evidence_ids,(list,tuple)) or not evidence_ids
+            or len(evidence_ids)>4
+            or any(not isinstance(item,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,39}',item)
+                   for item in evidence_ids)
+            or len(set(evidence_ids))!=len(evidence_ids)):
+        raise ValueError('Prop prose requires bounded application evidence IDs.')
+    contract={'computed_decision':decision,'evidence_ids':list(evidence_ids),'needs_more_data':False}
+    if payload.get('_transport','prop_text')!='prop_text':
+        raise ValueError('Invalid prop prose transport marker.')
+    if '_prop_contract' in payload and payload['_prop_contract']!=contract:
+        raise ValueError('The prop prose application contract cannot change.')
+    tagged={**payload,'_transport':'prop_text','_prop_contract':contract}
+    _prop_completion_payload(tagged)
+    return tagged
+
+
+def _prop_completion_payload(payload):
+    public={key:value for key,value in payload.items() if key not in {'format','_prop_contract'}}
+    public['_transport']='generate'
+    return _completion_payload(public)
+
+
+class _PropTextResponse(_CompletionResponse):
+    def __init__(self,response,contract):
+        super().__init__(response)
+        self.contract=contract
+
+    def json(self):
+        body=super().json()
+        if isinstance(body,dict):
+            content=body['message']['content']
+            body['message']['content']=json.dumps({**self.contract,'reply':content.strip()},ensure_ascii=False)
+        return body
+
+
+class _PropTextClient:
+    def __init__(self,client):self.client=client
+
+    async def post(self,endpoint,*,json):
+        if not endpoint.endswith('/api/chat'):
+            raise ValueError('Unexpected prop prose adapter endpoint.')
+        response=await self.client.post(endpoint[:-len('/api/chat')]+'/api/generate',
+                                       json=_prop_completion_payload(json))
+        return _PropTextResponse(response,json['_prop_contract'])
+
+
+def _validate_prop_text(body,contract):
+    """Validate the whole prose string; never extract or salvage model JSON."""
+    from grounded_reply import ReplyValidationError
+    try:
+        document=json.loads(body['message']['content'])
+    except (KeyError,TypeError,ValueError):
+        raise ReplyValidationError('invalid_schema') from None
+    if (not isinstance(document,dict) or set(document)!={*contract,'reply'}
+            or any(document.get(key)!=value for key,value in contract.items())):
+        raise ReplyValidationError('invalid_schema')
+    reply=document.get('reply')
+    if not isinstance(reply,str) or not reply.strip():
+        raise ReplyValidationError('empty_reply')
+    if len(reply)>280:
+        raise ReplyValidationError('analysis_too_long')
+    normalized=unicodedata.normalize('NFKC',reply)
+    if (normalized.lstrip().startswith(('{','[','"')) or '`' in normalized
+            or re.search(r'\b(?:computed_decision|evidence_ids|needs_more_data)\b',normalized)):
+        raise ReplyValidationError('invalid_schema')
+    if (any(re.search(r'(?<!\w)'+re.escape(item)+r'(?!\w)',normalized,re.I)
+            for item in contract['evidence_ids'])
+            or re.search(r'\b[A-Z]{1,3}\d+\b',normalized)):
+        raise ReplyValidationError('invalid_evidence')
+
+
+async def efficient_prop_text(client,payload,*,decision,evidence_ids,store=None,url=None,
+                              diagnostics=None,validator=None):
+    """Generate only qualitative prose for an already computed assessment.
+
+    ``prop_text_payload`` returns the tagged original request to retain when
+    caching a repaired normalized body with ``cache_validated_response``.
+    Every cache hit still passes this prose contract and the caller's complete
+    factual/decision validator. Truncation is left for that validator to report
+    before the reply can be cached or delivered.
+    """
+    tagged=prop_text_payload(payload,decision=decision,evidence_ids=evidence_ids)
+    def validate(body):
+        # Preserve the caller's established model-error/output-limit handling.
+        if isinstance(body,dict) and (body.get('error') or body.get('done_reason')=='length'):
+            if validator is not None:
+                return validator(body)
+            raise ValueError('Prop prose inference did not finish.')
+        _validate_prop_text(body,tagged['_prop_contract'])
+        if validator is not None:
+            return validator(body)
+    return await efficient_chat(_PropTextClient(client),tagged,store,url,diagnostics,validate)
