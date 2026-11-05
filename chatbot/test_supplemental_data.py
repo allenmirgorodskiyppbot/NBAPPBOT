@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -118,8 +119,8 @@ class SupplementalTests(unittest.TestCase):
             return httpx.Response(200, content=value) if value is not None else httpx.Response(404)
         return httpx.Client(transport=httpx.MockTransport(handler))
 
-    def refresh(self, client, now=NOW):
-        return sd._refresh(self.store, self.root, client, now)
+    def refresh(self, client, now=NOW, *, force=False):
+        return sd._refresh(self.store, self.root, client, now, force=force)
 
     def protected(self):
         with self.store.connect() as db:
@@ -159,6 +160,52 @@ class SupplementalTests(unittest.TestCase):
             sd.MEASURED_BASE + sd.MEASURED_MANIFEST, sd.AVAILABILITY_URL])
         self.assertEqual(result['availability']['source_generated_at'], self.availability['generated_at'])
         self.assertEqual(result['availability']['phase'], 'unchanged')
+
+    def test_explicit_force_rechecks_sources_within_hour_without_redownloading_or_reimporting(self):
+        protected = self.protected()
+        with self.client() as client:
+            self.refresh(client); count = len(self.requests)
+            normal = self.refresh(client, NOW+dt.timedelta(minutes=5))
+            self.assertTrue(normal['throttled']); self.assertEqual(len(self.requests),count)
+            result = self.refresh(client, NOW+dt.timedelta(minutes=5),force=True)
+        self.assertEqual(result['phase'],'updated'); self.assertFalse(result['changed'])
+        self.assertTrue(result['repairs']['history_import']['already_imported'])
+        self.assertEqual(result['repairs']['stat_completion']['fields_completed'],0)
+        self.assertEqual(self.requests[count:],[sd.REPAIR_BASE+sd.SUPPLEMENTAL_MANIFEST,
+            sd.MEASURED_BASE+sd.MEASURED_MANIFEST,sd.AVAILABILITY_URL])
+        self.assertEqual(protected,self.protected())
+
+    def test_force_preserves_source_failure_and_saved_evidence_instead_of_claiming_refresh(self):
+        with self.client() as client:
+            self.refresh(client)
+            self.routes[sd.AVAILABILITY_URL]=httpx.Response(503,headers={'Retry-After':'3600'})
+            result=self.refresh(client,NOW+dt.timedelta(minutes=5),force=True)
+        self.assertEqual(result['phase'],'partial'); self.assertFalse(result['changed'])
+        self.assertEqual(result['availability']['http_status'],503)
+        self.assertTrue(result['availability']['previous_evidence_retained'])
+        with self.store.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM structured_availability').fetchone()[0],1)
+
+    def test_forced_concurrent_call_returns_busy_without_second_source_requests(self):
+        entered,release=threading.Event(),threading.Event()
+        original=sd._repairs; completed=[]
+        def held(*args):
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError('test release missing')
+            return original(*args)
+        with self.client() as client,patch.object(sd,'_repairs',side_effect=held):
+            worker=threading.Thread(target=lambda:completed.append(self.refresh(client,force=True)))
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(3))
+                result=self.refresh(client,force=True)
+                self.assertEqual(result['phase'],'busy'); self.assertFalse(result['changed'])
+                self.assertEqual(self.requests,[])
+            finally:
+                release.set();worker.join(5)
+            self.assertFalse(worker.is_alive())
+        self.assertEqual(completed[0]['phase'],'updated')
 
     def test_corrupt_repair_checksum_retains_statistics_but_other_steps_succeed(self):
         self.routes[sd.REPAIR_BASE + 'repair-part-001.jsonl.gz'] = b'bad'
@@ -353,7 +400,13 @@ class AsyncSupplementalTests(unittest.IsolatedAsyncioTestCase):
         store = object(); client = object(); now = NOW
         with patch.object(sd, '_refresh', return_value={'changed': False}) as work:
             result = await sd.refresh_supplemental_data(store, '/tmp/test', client, now)
-        self.assertFalse(result['changed']); work.assert_called_once_with(store, '/tmp/test', client, now)
+        self.assertFalse(result['changed']); work.assert_called_once_with(store, '/tmp/test', client, now, force=False)
+
+    async def test_public_force_is_explicitly_forwarded_without_changing_clock(self):
+        with patch.object(sd,'_refresh',return_value={'changed':False}) as work:
+            await sd.refresh_supplemental_data(object(),'/tmp/test',now=NOW,force=True)
+        self.assertEqual(work.call_args.args[-1],NOW)
+        self.assertEqual(work.call_args.kwargs,{'force':True})
 
 
 if __name__ == '__main__':

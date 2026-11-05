@@ -291,6 +291,32 @@ async def telegram_answer(text, history=None, lineup_preferences=None):
             state.ai_started_at = None
 
 
+async def telegram_refresh_dataset():
+    """Data checks are independent of model readiness and never invoke AI."""
+    controller = getattr(app.state, 'dataset_updates', None)
+    if controller is None:
+        return 'The dataset update service is still starting. Try /refresh again shortly.'
+    return await controller.refresh()
+
+
+def configure_dataset_updates(state):
+    from dataset_update import DatasetUpdateController
+    from supplemental_data import refresh_supplemental_data
+
+    async def supplemental():
+        return await refresh_supplemental_data(state.master, DATA_DIR, force=True)
+
+    async def schedule():
+        return await refresh_pregame_schedule(state.master)
+
+    async def export():
+        return await asyncio.to_thread(export_master, state.master, DATA_DIR / 'exports')
+
+    state.dataset_updates = DatasetUpdateController(state.nightly, supplemental_refresh=supplemental,
+                                                    schedule_refresh=schedule, export_refresh=export)
+    state.nightly.notifier = state.telegram.notify_dataset_refresh
+
+
 def save_backup(master, directory):
     directory.mkdir(parents=True, exist_ok=True)
     day = dt.datetime.now(dt.timezone.utc).date().isoformat()
@@ -427,6 +453,7 @@ async def initialize(application):
             start('knicks-gameday-digest', state.digest.run)
             from nightly_data import NightlyNBARefresh
             state.nightly = NightlyNBARefresh(state.master, state.worker,exporter=export_master,data_dir=DATA_DIR)
+            configure_dataset_updates(state)
             start('nightly-nba-refresh', state.nightly.run)
             start('grading-backups', lambda: maintenance(application))
             start('telegram', state.telegram.run)
@@ -522,6 +549,7 @@ async def lifespan(application):
     state.boot_started_at = dt.datetime.now(dt.timezone.utc).isoformat()
     state.release_check_task = None
     state.jobs, state.active, state.store = {}, None, None
+    state.dataset_updates = None
     state.ai_started_at, state.last_ai_failure, state.last_ai_success = None, {}, None
     state.last_ai_request = None
     state.data_ready = True
@@ -558,7 +586,7 @@ async def lifespan(application):
                 await worker.collect_news_sources()
     state.telegram = TelegramBot(state.master, telegram_answer, model_status_callback=ai_status,
                                 self_test_callback=self_test, research_refresh_callback=refresh_board_news,
-                                answer_preferences_callback=telegram_answer)
+                                answer_preferences_callback=telegram_answer, manual_refresh_callback=telegram_refresh_dataset)
     state.temporary = tempfile.TemporaryDirectory(prefix='knicks-')
     state.startup_task = asyncio.create_task(initialize_with_retry(application))
     try:

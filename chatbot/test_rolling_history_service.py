@@ -275,6 +275,37 @@ class RollingCareerWorkerTests(unittest.IsolatedAsyncioTestCase):
         exporter.assert_called_once_with(self.store, self.root / 'exports')
         self.assertTrue(self.store.get_checkpoint('history_upgrade_status')['supplemental']['changed'])
 
+    async def test_successful_rebuild_clears_only_a_previous_history_export_failure(self):
+        self.store.set_checkpoint('history_upgrade_status', {
+            'export_error': 'OSError', 'export_error_at': '2026-11-04T16:30:00+00:00'})
+        self.supplemental.return_value = {'phase': 'updated', 'changed': True}
+        exporter = Mock()
+        async def pause(seconds):
+            raise asyncio.CancelledError
+        with patch('history_service.install_pinned_history', return_value={'complete': True, 'already_imported': True}), \
+             patch('history_service.install_rolling_history', return_value={'already_imported': True}), \
+             patch('history_service.asyncio.sleep', side_effect=pause):
+            with self.assertRaises(asyncio.CancelledError):
+                await history_upgrade_service(self.store, self.root, exporter=exporter)
+        saved = self.store.get_checkpoint('history_upgrade_status')
+        self.assertNotIn('export_error', saved)
+        self.assertNotIn('export_error_at', saved)
+        self.assertIn('export_updated_at', saved)
+        exporter.assert_called_once()
+
+    async def test_failed_export_retries_even_when_all_source_data_is_unchanged(self):
+        self.store.set_checkpoint('history_upgrade_status', {'export_error': 'OSError'})
+        exporter = Mock()
+        async def pause(seconds):
+            raise asyncio.CancelledError
+        with patch('history_service.install_pinned_history', return_value={'complete': True, 'already_imported': True}), \
+             patch('history_service.install_rolling_history', return_value={'already_imported': True}), \
+             patch('history_service.asyncio.sleep', side_effect=pause):
+            with self.assertRaises(asyncio.CancelledError):
+                await history_upgrade_service(self.store, self.root, exporter=exporter)
+        exporter.assert_called_once_with(self.store, self.root / 'exports')
+        self.assertNotIn('export_error', self.store.get_checkpoint('history_upgrade_status'))
+
     async def test_career_outage_does_not_skip_new_availability_or_repaired_stats(self):
         self.supplemental.return_value = {'phase': 'updated', 'changed': True}
         exporter = Mock()

@@ -90,6 +90,54 @@ class ScopeDiscoveryTests(unittest.TestCase):
             self.assertEqual(first,old);self.assertEqual(second,old);self.assertEqual(worker.calls,1)
             self.assertEqual(store.get_checkpoint('dataset_scope_refresh')['phase'],'retained_prior_scope')
 
+    def test_explicit_manual_force_checks_new_scope_inside_poll_hour_without_freshening_source_clock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store=MasterStore(Path(directory)/'master.sqlite');old=scope()
+            store.set_checkpoint('dataset_refresh_scope',old)
+            changed=expand_current_player_scope(old,[observation()])
+            class Worker:
+                calls=0
+                document=manifest(old,old)
+                async def request(inner,url):
+                    inner.calls+=1
+                    return inner.document
+            worker=Worker();later=NOW+dt.timedelta(minutes=20)
+            with patch('dataset_refresh.load_scope',return_value=old):
+                self.assertEqual(asyncio.run(refresh_published_scope(store,worker,NOW)),old)
+                worker.document=manifest(old,changed)
+                self.assertEqual(asyncio.run(refresh_published_scope(store,worker,later)),old)
+                self.assertEqual(worker.calls,1)
+                self.assertEqual(asyncio.run(refresh_published_scope(store,worker,later,force=True)),changed)
+            self.assertEqual(worker.calls,2)
+            status=store.get_checkpoint('dataset_scope_refresh')
+            self.assertEqual(status['last_attempt'],later.isoformat())
+            self.assertEqual(status['source_published_at'],worker.document['source_published_at'])
+            self.assertEqual(status['source_data_through_date'],'2026-11-03')
+
+    def test_manual_force_preserves_worker_host_cooldown_and_identity_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store=MasterStore(Path(directory)/'master.sqlite');old=scope()
+            store.set_checkpoint('dataset_refresh_scope',old)
+            store.set_checkpoint('dataset_scope_refresh',{'phase':'updated','last_attempt':NOW.isoformat()})
+            class Worker:
+                attempts=0;network_calls=0;cooldown=True
+                async def request(inner,url):
+                    inner.attempts+=1
+                    if inner.cooldown:raise RuntimeError('Host cooldown remains active')
+                    inner.network_calls+=1
+                    invalid=copy.deepcopy(old);invalid['players'][0]['espn_player_id']='9999'
+                    invalid['revision']=scope_revision(invalid)
+                    return manifest(old,invalid)
+            worker=Worker();later=NOW+dt.timedelta(minutes=20)
+            with patch('dataset_refresh.load_scope',return_value=old):
+                self.assertEqual(asyncio.run(refresh_published_scope(store,worker,later,force=True)),old)
+                self.assertEqual(worker.network_calls,0)
+                worker.cooldown=False
+                self.assertEqual(asyncio.run(refresh_published_scope(store,worker,later,force=True)),old)
+            self.assertEqual(worker.attempts,2);self.assertEqual(worker.network_calls,1)
+            self.assertEqual(store.get_checkpoint('dataset_refresh_scope'),old)
+            self.assertEqual(store.get_checkpoint('dataset_scope_refresh')['phase'],'retained_prior_scope')
+
     def test_bundled_real_scope_has_unique_identifiers(self):
         old=load_scope();old_before=copy.deepcopy(old)
         self.assertEqual(validate_published_scope(manifest(old,old),old,old,NOW),old_before)

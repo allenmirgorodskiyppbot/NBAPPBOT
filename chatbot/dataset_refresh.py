@@ -259,15 +259,19 @@ def validate_published_scope(document, bundled, previous, now):
     return scope
 
 
-async def refresh_published_scope(store,worker,now):
-    """Refresh the explicitly authorized NBA population once per hour; fail closed."""
+async def refresh_published_scope(store,worker,now,*,force=False):
+    """Refresh authorized identities; explicit force bypasses only the hourly guard.
+
+    Worker source restrictions/cooldowns, publication clocks and the additive
+    identity policy still apply. Failure retains the saved scope unchanged.
+    """
     import datetime as dt
     from news_digest import _aware
     bundled=load_scope();prior=store.get_checkpoint('dataset_refresh_scope',bundled) or bundled
     if bundled.get('population')!='all_current_nba_players':return prior
     status=store.get_checkpoint('dataset_scope_refresh',{}) or {}
     checked=_aware(status.get('last_attempt'))
-    if checked and 0<=(now-checked).total_seconds()<3600:return prior
+    if not force and checked and 0<=(now-checked).total_seconds()<3600:return prior
     source='https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/main/data/live/existing_dataset_scope.json'
     try:
         import asyncio

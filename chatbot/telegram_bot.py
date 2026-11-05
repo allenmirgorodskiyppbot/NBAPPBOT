@@ -36,7 +36,7 @@ MAX_MASTER_UPLOAD = 20 * 1024 * 1024
 TYPING_INTERVAL_SECONDS = 4
 MAX_ACTIVE_COMMANDS = 10
 RESPONSIVE_COMMANDS = {'/start', '/help', '/status', '/ai_status', '/clear', '/newboard',
-                       '/reminder', '/usage', '/freshness', '/strategy'}
+                       '/reminder', '/usage', '/freshness', '/strategy', '/refresh', '/update'}
 
 
 class TelegramAPIError(RuntimeError):
@@ -91,6 +91,7 @@ HELP = '''Knicks Research bot
 /usage — AI work counters and how hosting credits are charged
 /status — feed freshness and bot status
 /freshness — daily import coverage and next game’s data readiness, without AI
+/refresh (or /update) — check for dataset updates now; results arrive when the check finishes
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
@@ -113,6 +114,8 @@ HELP = '''Knicks Research bot
 /settle ENTRY_ID PAYOUT [note] — confirm the actual total return shown by PrizePicks
 
 Ask for picks or use /picks to get the bot's own projections and conditional target lines before checking PrizePicks. You can also send just "Nov 2", "November 2", or "11/2". Dates without a year use the current NBA season (July–June); numeric dates are month/day. With no date, it uses the next unstarted saved Knicks game; "tonight" or an explicit date stays on that day. It can return fewer candidates when evidence is insufficient. These are model targets, not observed PrizePicks offers or placed entries.
+
+The daily dataset refresh runs at 11:30 AM Eastern. The bot sends a result and coverage summary; unavailable sources stay marked unavailable. /refresh checks again on demand.
 
 You can also send a question, a CSV/JSON board file, or screenshots for optional line comparison. Readable full-game cards are combined into a research shortlist; unclear cards stay out. Both visible More/Less choices are compared. The upload's Eastern date is used unless you caption the image YYYY-MM-DD; it must match a saved game. Send images as files for original quality. Check every displayed line. Available lines are separate from entries actually placed.
 
@@ -416,10 +419,13 @@ def parse_board_text(argument: str):
 class TelegramBot:
     def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None,
                  model_status_callback=None, self_test_callback=None, research_refresh_callback=None,
-                 answer_preferences_callback=None):
+                 answer_preferences_callback=None, manual_refresh_callback=None):
         self.store = store
         self.answer_callback = answer_callback
         self.answer_preferences_callback = answer_preferences_callback
+        self.manual_refresh_callback = manual_refresh_callback
+        self._dataset_refresh_tasks = set()
+        self._dataset_refresh_pending_results = {}
         self.model_status_callback = model_status_callback
         self.self_test_callback = self_test_callback
         self.research_refresh_callback = research_refresh_callback
@@ -477,6 +483,12 @@ class TelegramBot:
                     question TEXT NOT NULL,answer TEXT,created_at TEXT NOT NULL,
                     PRIMARY KEY(chat_id,update_id)
                 );
+                CREATE TABLE IF NOT EXISTS telegram_dataset_jobs (
+                    id TEXT PRIMARY KEY,update_id INTEGER UNIQUE NOT NULL,chat_id INTEGER NOT NULL,
+                    status TEXT NOT NULL,created_at TEXT NOT NULL,completed_at TEXT,result_text TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS telegram_dataset_one_active
+                    ON telegram_dataset_jobs((1)) WHERE status='running';
             ''')
             columns = {row['name'] for row in db.execute('PRAGMA table_info(telegram_outbox)')}
             if 'expires_at' not in columns:
@@ -616,14 +628,117 @@ class TelegramBot:
         return (chat.get('type') == 'private' and sender.get('id') in self.allowed_user_ids
                 and chat.get('id') == sender.get('id') and not sender.get('is_bot', False))
 
-    def _queue(self, chat_id, text, event_key, expires_at=None):
+    def _queue_in_db(self, db, chat_id, text, event_key, expires_at=None):
         if int(chat_id) not in self.allowed_user_ids:
             return
+        for number, part in enumerate(chunks(text)):
+            db.execute('INSERT OR IGNORE INTO telegram_outbox '
+                       '(event_key,chat_id,text,created_at,expires_at) VALUES (?,?,?,?,?)',
+                       (f'{event_key}:{chat_id}:{number}', int(chat_id), part, utcnow(), expires_at))
+
+    def _queue(self, chat_id, text, event_key, expires_at=None):
         with self._db() as db:
-            for number, part in enumerate(chunks(text)):
-                db.execute('INSERT OR IGNORE INTO telegram_outbox '
-                           '(event_key,chat_id,text,created_at,expires_at) VALUES (?,?,?,?,?)',
-                           (f'{event_key}:{chat_id}:{number}', int(chat_id), part, utcnow(), expires_at))
+            self._queue_in_db(db, chat_id, text, event_key, expires_at)
+
+    def _start_dataset_refresh(self, chat_id, update_id):
+        if self.manual_refresh_callback is None:
+            return 'Dataset refresh is not configured for this deployment. /status shows the saved update checks.'
+        job_id = uuid.uuid4().hex
+        with self._db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            active = db.execute("SELECT id,chat_id FROM telegram_dataset_jobs WHERE status='running'").fetchone()
+            recovered = None
+            if active:
+                pending = self._dataset_refresh_pending_results.get(active['id'])
+                if pending is None:
+                    return 'A dataset refresh is already in progress. Wait for it to finish before requesting another.'
+                # A completed task whose result write failed cannot strand the
+                # busy marker. Retry that exact result atomically before a new
+                # explicit request starts; never replay its data imports.
+                saved_text, saved_status = pending
+                self._queue_in_db(db, active['chat_id'], saved_text, 'dataset-refresh-result:' + active['id'])
+                db.execute('UPDATE telegram_dataset_jobs SET status=?,completed_at=?,result_text=? WHERE id=?',
+                           (saved_status, utcnow(), saved_text[:10000], active['id']))
+                recovered = active['id']
+            db.execute('INSERT INTO telegram_dataset_jobs VALUES (?,?,?,?,?,?,?)',
+                       (job_id, update_id, chat_id, 'running', utcnow(), None, None))
+            self._queue_in_db(db, chat_id, 'Checking dataset updates… I’ll send the results when the check finishes.',
+                              'dataset-refresh-start:' + job_id)
+        if recovered is not None:
+            self._dataset_refresh_pending_results.pop(recovered, None)
+        task = asyncio.create_task(self._run_dataset_refresh(job_id), name='dataset-refresh:' + job_id)
+        self._dataset_refresh_tasks.add(task)
+        task.add_done_callback(self._dataset_refresh_finished)
+        return None
+
+    def _dataset_refresh_finished(self, task):
+        self._dataset_refresh_tasks.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.warning('Dataset refresh result could not be saved; a later request or startup will recover it.')
+
+    def _finish_dataset_refresh(self, job_id, text, status):
+        with self._db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute("SELECT chat_id FROM telegram_dataset_jobs WHERE id=? AND status='running'", (job_id,)).fetchone()
+            if row is None:
+                return
+            self._queue_in_db(db, row['chat_id'], text, 'dataset-refresh-result:' + job_id)
+            db.execute('UPDATE telegram_dataset_jobs SET status=?,completed_at=?,result_text=? WHERE id=?',
+                       (status, utcnow(), str(text)[:10000], job_id))
+
+    async def _run_dataset_refresh(self, job_id):
+        cancelled = False
+        try:
+            report = await self.manual_refresh_callback()
+            if isinstance(report, str):
+                text = report
+            else:
+                from dataset_update import format_update_report
+                text = format_update_report(report)
+            status = 'completed'
+        except asyncio.CancelledError:
+            cancelled = True
+            status = 'interrupted'
+            text = ('The dataset refresh was interrupted. Existing saved data remains available. '
+                    'Use /refresh to check again.')
+        except Exception:
+            status = 'failed'
+            text = ('The dataset refresh could not finish. Existing saved data remains available. '
+                    'Check /status and try /refresh again.')
+        for attempt in range(3):
+            try:
+                await asyncio.to_thread(self._finish_dataset_refresh, job_id, text, status)
+                break
+            except Exception:
+                if attempt == 2:
+                    self._dataset_refresh_pending_results[job_id] = (text, status)
+                    raise
+                await asyncio.sleep(.1 * (2 ** attempt))
+        if cancelled:
+            raise asyncio.CancelledError
+
+    def _recover_dataset_refreshes(self):
+        with self._db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            rows = db.execute("SELECT id,chat_id,update_id FROM telegram_dataset_jobs WHERE status='running'").fetchall()
+            for row in rows:
+                text = 'A dataset refresh was interrupted by a restart. Existing saved data remains available. Use /refresh to check again.'
+                self._queue_in_db(db, row['chat_id'], text, 'dataset-refresh-result:' + row['id'])
+                db.execute("UPDATE telegram_dataset_jobs SET status='interrupted',completed_at=?,result_text=? WHERE id=?",
+                           (utcnow(), text, row['id']))
+                db.execute("UPDATE telegram_updates SET status='interrupted',completed_at=? "
+                           "WHERE update_id=? AND status='processing'", (utcnow(), row['update_id']))
+
+    async def notify_dataset_refresh(self, text, report):
+        """Queue the daily result once per Eastern run date, using the outbox."""
+        day = str(report.get('notification_day') or '') if isinstance(report, dict) else ''
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+            return False
+        try:
+            datetime.strptime(day, '%Y-%m-%d')
+        except ValueError:
+            return False
+        return await self.notify(text, event_key='dataset-daily:' + day)
 
     async def notify(self, text, event_key=None, expires_at=None):
         """Queue a private alert. Delivery retries are handled by run()."""
@@ -1004,6 +1119,10 @@ class TelegramBot:
                     'The bot backs up its database and merges missing observations while retaining existing records. '
                     'For files over 20 MB, use Import master Excel on the bot website. '
                     'Importing history does not verify today’s schedule or injuries.')
+        if command in {'/refresh', '/update'}:
+            if argument:
+                return 'Use /refresh or /update alone to check for dataset updates.'
+            return self._start_dataset_refresh(message['chat']['id'], update_id)
         if command == '/picks':
             return await self._independent_picks_reply(parse_picks_request(text), message['chat']['id'], text)
         if command == '/clear':
@@ -1250,6 +1369,7 @@ class TelegramBot:
         return authorized
 
     def _recover_interrupted(self):
+        self._recover_dataset_refreshes()
         with self._db() as db:
             rows = db.execute("SELECT update_id,chat_id FROM telegram_updates WHERE status='processing'").fetchall()
         for row in rows:
@@ -1335,7 +1455,11 @@ class TelegramBot:
                 task.cancel()
             for task in list(self._album_tasks):
                 task.cancel()
-            await asyncio.gather(delivery_task, *command_tasks, *self._album_tasks, return_exceptions=True)
+            for task in list(self._dataset_refresh_tasks):
+                task.cancel()
+            await asyncio.gather(delivery_task, *command_tasks, *self._album_tasks,
+                                 *self._dataset_refresh_tasks, return_exceptions=True)
+            self._dataset_refresh_tasks.clear()
             # run() can be restarted on this instance. Do not let a later album
             # fragment attach to a collector cancelled during the previous run.
             self._album_batches.clear()

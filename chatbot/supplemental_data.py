@@ -350,13 +350,13 @@ def _prune(root, kept=2):
             backup.unlink()
 
 
-def _refresh(store, data_dir, client, now):
+def _refresh(store, data_dir, client, now, *, force=False):
     old = store.get_checkpoint(CHECKPOINT, {}) or {}
     try:
         attempted = dt.datetime.fromisoformat(old.get('last_attempt', ''))
     except (TypeError, ValueError):
         attempted = None
-    if attempted and attempted.tzinfo and 0 <= (now - attempted).total_seconds() < POLL_SECONDS:
+    if not force and attempted and attempted.tzinfo and 0 <= (now - attempted).total_seconds() < POLL_SECONDS:
         return {**old, 'changed': False, 'throttled': True}
     if not _LOCK.acquire(blocking=False):
         return {'phase': 'busy', 'changed': False, 'retry_seconds': POLL_SECONDS}
@@ -397,6 +397,11 @@ def _refresh(store, data_dir, client, now):
         _LOCK.release()
 
 
-async def refresh_supplemental_data(store, data_dir, client=None, now=None):
-    """Perform one bounded hourly sync off the event loop; safe to call repeatedly."""
-    return await asyncio.to_thread(_refresh, store, data_dir, client, _now(now))
+async def refresh_supplemental_data(store, data_dir, client=None, now=None, force=False):
+    """Sync off the event loop; explicit force bypasses only the hourly poll guard.
+
+    The nonblocking lock, source/client restrictions, verified caches and all
+    evidence checks still apply. Neither mode changes the application clock or
+    a source timestamp, and an unavailable publication remains unavailable.
+    """
+    return await asyncio.to_thread(_refresh, store, data_dir, client, _now(now), force=force)

@@ -182,7 +182,7 @@ def import_daily_snapshot(store, document, day, now):
 
 
 class NightlyNBARefresh:
-    def __init__(self,store,worker,now=None,exporter=None,data_dir=None):
+    def __init__(self,store,worker,now=None,exporter=None,data_dir=None,notifier=None):
         self.store,self.worker=store,worker
         self.now=now or (lambda:dt.datetime.now(dt.timezone.utc))
         self.base=os.getenv('NBA_DAILY_DATA_URL',DEFAULT_BASE).rstrip('/')
@@ -190,23 +190,37 @@ class NightlyNBARefresh:
             raise ValueError('NBA_DAILY_DATA_URL must be HTTPS.')
         self.enabled=os.getenv('DAILY_NBA_REFRESH','1')=='1'
         self.exporter,self.data_dir=exporter,data_dir
+        self.notifier=notifier
+        self.manual_update_active=False
         self.lock=asyncio.Lock()
 
-    async def tick(self):
+    async def refresh_now(self,*,export=True):
+        """Explicit request bypasses scheduler timers, never worker/source guards."""
+        return await self.tick(force=True,export=export)
+
+    async def tick(self,*,force=False,export=True):
+        if self.manual_update_active and not force:
+            return self.store.get_checkpoint('nightly_nba_refresh',{})
         async with self.lock:
             now=self.now();local=now.astimezone(EASTERN);today=local.date()
             deadline=dt.datetime.combine(today,dt.time(11,30),EASTERN)
-            target_day=today-dt.timedelta(days=1 if local>=deadline else 2)
+            target_day=today-dt.timedelta(days=1 if force or local>=deadline else 2)
             target=target_day.isoformat()
             status=self.store.get_checkpoint('nightly_nba_refresh',{})
             # Event timing is independent of the morning statistics deadline.
             # The helper has its own cache, timeout and source refusal cooldown.
             from game_schedule_check import refresh_game_schedule
             await refresh_game_schedule(self.store,self.worker,now=now)
-            if not self.enabled:
+            if not self.enabled and not force:
                 self.store.set_checkpoint('nightly_nba_refresh',{'enabled':False});return
+            if force:
+                from dataset_refresh import refresh_published_scope
+                await refresh_published_scope(self.store,self.worker,now,force=True)
             if not self.store.get_checkpoint('dataset_refresh_scope'):
-                self.store.set_checkpoint('nightly_nba_refresh',{'enabled':True,'phase':'waiting_for_existing_dataset_scope'});return
+                status={'enabled':self.enabled,'phase':'waiting_for_existing_dataset_scope'}
+                self.store.set_checkpoint('nightly_nba_refresh',status)
+                if not force:await self._notify_daily(status,now)
+                return status
             due=str(status.get('handled_target_date',''))<target
             pending=list(status.get('pending_dates',[]))
             if not status.get('initialized'):
@@ -231,10 +245,11 @@ class NightlyNBARefresh:
             elif local>=deadline and not self.store.get_checkpoint('daily_nba:'+target,{}).get('complete'):
                 pending=[target,*pending]
             last=_aware(status.get('last_attempt'))
+            scheduled_due=bool(not force and local>=deadline and (not last or last<deadline))
             # A completed target can receive scorer corrections or additional
             # published inventory later in the day. Recheck it hourly instead
             # of stopping game imports until tomorrow's new target is due.
-            if local>=deadline and (not last or (now-last).total_seconds()>=3600):
+            if force or scheduled_due or local>=deadline and (not last or (now-last).total_seconds()>=3600):
                 pending=[target,*pending]
             # Repair legacy status that may have borrowed the tracking/source
             # file's newest date even though that game day was never imported.
@@ -268,10 +283,10 @@ class NightlyNBARefresh:
                     if not checked or checked.astimezone(EASTERN).date()!=today:
                         needs_today.append(day)
                 pending=list(dict.fromkeys([target,*needs_today,*pending,*recheck_days]))
-            game_attempt=bool(pending and (due or validation_bootstrap or not last or (now-last).total_seconds()>=3600))
+            game_attempt=bool(pending and (force or scheduled_due or due or validation_bootstrap or not last or (now-last).total_seconds()>=3600))
             tracking_last=_aware(status.get('last_tracking_attempt'))
             tracking_attempt=bool((local>=deadline or game_attempt) and
-                                  (due or not tracking_last or (now-tracking_last).total_seconds()>=3600))
+                                  (force or scheduled_due or due or not tracking_last or (now-tracking_last).total_seconds()>=3600))
             if game_attempt:
                 pending=list(dict.fromkeys(pending))
                 if target in pending:
@@ -352,7 +367,7 @@ class NightlyNBARefresh:
             next_run=deadline if local<deadline else dt.datetime.combine(today+dt.timedelta(days=1),dt.time(11,30),EASTERN)
             target_inventory=self.store.get_checkpoint('daily_nba:'+target,{})
             inventory_verified=target_inventory.get('inventory_verified') is True
-            status.update(enabled=True,phase='waiting_for_publication' if waiting else 'updated',timezone='America/New_York',
+            status.update(enabled=self.enabled,phase='waiting_for_publication' if waiting else 'updated',timezone='America/New_York',
                           daily_time='11:30',target_game_date=target,next_daily_run=next_run.isoformat(),
                           pending_dates=pending,source_data_through_date=through,retry_seconds=3600,
                           older_pending_dates=[day for day in pending if day<target],
@@ -373,7 +388,7 @@ class NightlyNBARefresh:
             export_last=_aware(status.get('last_export_attempt'))
             export_retry=bool(status.get('master_export_error') and
                               (not export_last or (now-export_last).total_seconds()>=3600))
-            if (game_attempt or tracking_attempt or export_retry) and self.exporter and self.data_dir:
+            if export and (game_attempt or tracking_attempt or export_retry) and self.exporter and self.data_dir:
                 from pathlib import Path
                 status['last_export_attempt']=now.isoformat()
                 try:
@@ -387,6 +402,42 @@ class NightlyNBARefresh:
                     status['master_export_error']=type(error).__name__
                     self.store.feed_failure('master_export',type(error).__name__+'; previous Excel export retained.')
                 self.store.set_checkpoint('nightly_nba_refresh',status)
+            if game_attempt or tracking_attempt or export_retry:
+                status['last_finished_at']=self.now().isoformat()
+                self.store.set_checkpoint('nightly_nba_refresh',status)
+            if not force:
+                await self._notify_daily(status,now)
+            return status
+
+    async def _notify_daily(self,status,started):
+        local=started.astimezone(EASTERN)
+        if not self.notifier or local.time()<dt.time(11,30):
+            return
+        day=local.date().isoformat()
+        checkpoint='dataset_daily_notification:'+day
+        previous=self.store.get_checkpoint(checkpoint,{}) or {}
+        if previous.get('phase')=='queued':return
+        attempted=_aware(previous.get('last_attempt'))
+        if attempted and 0<=(started-attempted).total_seconds()<60:return
+        from dataset_update import build_saved_report,format_update_report
+        report=build_saved_report(self.store,nightly=status,now=self.now(),started_at=started)
+        report['finished_at']=status.get('last_finished_at') or report['finished_at']
+        report.update(notification_day=day,notification_event_key='dataset-daily:'+day)
+        attempt={'phase':'queueing','last_attempt':started.isoformat(),
+                 'notification_day':day,'event_key':report['notification_event_key']}
+        self.store.set_checkpoint(checkpoint,attempt)
+        try:
+            queued=await self.notifier(format_update_report(report,daily=True),report)
+            if queued is True:
+                attempt.update(phase='queued',queued_at=self.now().isoformat())
+                self.store.feed_success('daily_refresh_notification','Daily refresh result queued for '+day+'.')
+            else:
+                attempt.update(phase='not_queued',detail='Notifier did not confirm queueing; retry remains enabled.')
+        except asyncio.CancelledError:raise
+        except Exception as error:
+            attempt.update(phase='failed',error_type=type(error).__name__)
+            self.store.feed_failure('daily_refresh_notification',type(error).__name__+'; daily notice will retry.')
+        self.store.set_checkpoint(checkpoint,attempt)
 
     async def run(self):
         while True:

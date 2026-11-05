@@ -328,12 +328,12 @@ async def history_upgrade_service(store, directory, *, ready=lambda: True, expor
             continue
         stamp = dt.datetime.now(dt.timezone.utc)
         old = store.get_checkpoint('history_upgrade_status', {}) or {}
-        export_needed, career_error, rolling = False, None, None
+        export_needed, career_error, rolling = bool(old.get('export_error')), None, None
         try:
             if pinned is None:
                 store.set_checkpoint('history_upgrade_status', {'phase': 'checking', 'last_attempt': stamp.isoformat()})
                 pinned = await asyncio.to_thread(install_pinned_history, store, directory, os.getenv('SOURCE_REF'))
-                export_needed = not pinned.get('already_imported')
+                export_needed = export_needed or not pinned.get('already_imported')
             rolling = await asyncio.to_thread(install_rolling_history, store, directory, now=stamp)
             export_needed = export_needed or not rolling.get('already_imported') or (
                 (rolling.get('metadata_repairs') or {}).get('games_completed', 0) > 0)
@@ -371,8 +371,13 @@ async def history_upgrade_service(store, directory, *, ready=lambda: True, expor
         if exporter and export_needed:
             try:
                 await asyncio.to_thread(exporter, store, Path(directory) / 'exports')
+                status.pop('export_error', None)
+                status.pop('export_error_at', None)
+                status['export_updated_at'] = dt.datetime.now(dt.timezone.utc).isoformat()
+                store.set_checkpoint('history_upgrade_status', status)
             except asyncio.CancelledError:
                 raise
             except Exception as error:
-                store.set_checkpoint('history_upgrade_status', {**status, 'export_error': type(error).__name__})
+                store.set_checkpoint('history_upgrade_status', {**status, 'export_error': type(error).__name__,
+                    'export_error_at': dt.datetime.now(dt.timezone.utc).isoformat()})
         await asyncio.sleep(RETRY_SECONDS if career_error else POLL_SECONDS)

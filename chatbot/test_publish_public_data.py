@@ -213,7 +213,9 @@ class PublicDataCheckoutTests(unittest.TestCase):
             path='data/live/'+name
             self.assertTrue(allowed_path(path,'schedule'))
             self.assertFalse(allowed_path(path,'daily'))
-        source=Path(__file__).parent
+        source=Path(__file__).resolve().parent
+        if not (source/'nba-daily-data.yml').is_file():
+            source=source.parent/'.github'/'workflows'
         daily=(source/'nba-daily-data.yml').read_text()
         schedule=(source/'nba-schedule-data.yml').read_text()
         self.assertIn('group: nba-public-data-daily',daily)
