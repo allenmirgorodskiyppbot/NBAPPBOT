@@ -6,10 +6,10 @@ and can compare those with user-supplied PrizePicks lines. The chat model
 runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
-## November 5 history and strategy upgrade
+## November 5 data and reliability upgrade
 
-Tested application `SOURCE_REF`: `c9ad749f7896140368cd38cd5baf61cdc781a48f`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42039885556)
+Tested application `SOURCE_REF`: `6cde91eea7c97e90c3f20e1233701d1de4ae02b6`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42070042831)
 passed. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 
 The current research benchmark is the **arithmetic mean of the latest 20 usable,
@@ -43,12 +43,12 @@ feed. Reviewed aliases share one provider identity. The earliest
 included career begins with LeBron James in **2003–04**. Historical teams,
 regular seasons, playoffs and play-in games stay separately labeled. ESPN player
 IDs prevent a current player from inheriting a retired namesake's records.
-The initial history extract rejected **105 source games** that failed identity or
-complete box-score validation. Separate ESPN event checks recovered **15 games**
-and 259 player observations; **90 games remain excluded**. Both source versions,
-validation failures and repair provenance are recorded. Published inventory has
-not been independently reconciled against every career game, so this is expanded
-history with documented gaps.
+The latest repair pass recovered **89 of 92 previously unverified source games**.
+Across the recorded source checks, 104 of 107 rejected events now have independently
+validated repairs. Three old participation records remain uncertain: Mike Conley
+on November 24, 2007 and January 26, 2008, and Al Horford on January 16, 2009.
+They remain unknown rather than being silently classified as DNP or Played.
+Published inventory has not been reconciled independently against every career game.
 
 After the deployment loads this release's `SOURCE_REF`, a background worker
 downloads its pinned, checksummed career-history bundle, backs up the master and
@@ -57,6 +57,94 @@ and outbox state remain in the persistent database. The install is idempotent an
 retries failures hourly; `/status` shows its result. Daily collection continues
 afterward. Existing chat, screenshot intake, commands, browser/API routes,
 reminders, exports, backups and grading remain available.
+
+## Verified gap completion and reminder reliability
+
+The November 5 exported master has **171,889 player observations, 21,198 games and
+93 worksheets**. Its 153,677 saved final Played observations contain all 16 basic
+counting/minutes fields. This describes the saved population, not a proof of a
+complete career inventory. The upgrade adds 679 observations and completes 653
+plus/minus values, 2,954 historical starter flags and 7,338 game-score fields from
+verified public source evidence. Known non-null facts, entries, grading, chat and
+current-game readiness checks are preserved; each completion has an immutable audit.
+
+Remaining player blanks are **226 historical starter flags and three LeBron James
+plus/minus values**. Two final-score fields for NYK–ORL on December 13, 2025 remain
+held because source venue headers conflict. Exact names, games, fields and reasons
+are in [the gap report](data/reports/2026-11-05/README.md), and in Excel's
+`Missing_Stats_By_Game`, `Game_Stat_Gaps` and `Tracking_Field_Coverage` sheets.
+No saved 2026–27 Played record has a missing basic counting/minutes field.
+
+The upgrade adds **9,388 actual measured pair-game observations**, dated October
+19, 2017 through November 2, 2026, covering 920 of 928 configured pair definitions.
+Unobserved pairs do not become zeroes. Conflicting overlapping legacy measurements
+remain held, and pre-2017 guarding coverage is not invented. Hustle tracking now
+includes 16 published fields. Overall and under-six-foot closest-defender FG made,
+FG attempted and FG% allowed remain unavailable; eight aggregate tracking categories
+still lack verified covered-game dates.
+
+Structured official injury reports retain exact report clocks when known; date-only
+and Not Yet Submitted records remain uncertain. Fresh game-specific official
+Out/Questionable/Doubtful designations hold recommendations. An absent injury row
+never means healthy, and no starters, expected minutes or restrictions are inferred
+from missing reports. The collector also tries the original official PDF publication;
+a refusal or parsing failure preserves prior evidence and its original timestamps.
+
+The nightly importer still runs at **11:30 AM Eastern**, with hourly retries,
+restart catch-up and explicit pending dates. It now lowers covered-through when a
+publisher retracts complete coverage. Daily and current-event publishers use
+separate concurrency groups and disjoint file scopes, so timing checks cannot
+cancel a pending daily refresh. Git API publication preserves unrelated commits,
+checks for conflicting source changes and honors the same token/branch rules.
+
+A trusted saved game calendar can now produce a single **timing-unverified reminder
+one hour before its scheduled tipoff** when live verification fails. The message
+explains the hold; it contains no unverified picks. Verified current timing retains
+the normal research reminder. Restarts, late catch-up, cancellations, tipoff expiry
+and Eastern daylight-saving changes keep explicit behavior and deduplication.
+
+Natural follow-up questions retain player, market, offered threshold and pending
+clarification. Why/blowout/confidence/motivation questions receive a focused checked
+explanation or a concise computed fallback. Lineup preferences for both teams,
+market and pick count persist privately per Telegram chat beyond recent history;
+`/clear` removes that memory. Old player/line context never becomes a permanent
+preference or a verified offer.
+
+## Manual refresh and daily Telegram receipts
+
+Send **`/refresh`** (or **`/update`**) to start an on-demand dataset check. The bot
+acknowledges immediately and posts the result in the same private chat when the
+background job finishes. One job runs at a time. A restart reports interruption;
+it does not silently replay completed imports. User-requested checks bypass the
+normal service polling timers while respecting source/host refusal cooldowns.
+
+Results distinguish changed values, unchanged verified saved sources, and partial
+or failed verification. Count-stable stat corrections count as updates; check
+and publication timestamps alone do not. An unchanged dataset reuses a known-good
+Excel. Changed data, a missing file or a recorded export failure triggers one final
+rebuild after imports. Failed history exports also retry automatically.
+
+The normal **11:30 AM Eastern** refresh queues a Telegram completion notice with
+the covered game date, tracking coverage, Excel status and remaining blockers.
+Receipts are deduplicated by Eastern calendar day; late startup catches up and
+failed queueing retries. The notification is marked queued only after the durable
+outbox confirms it. Hourly source retries continue without repeating the daily
+receipt. A completed check does not imply every external source is available.
+
+## Activate on the existing Akash deployment
+
+Update the existing deployment's `SOURCE_REF` to the full tested application SHA
+listed above, keeping the persistent volume and private environment settings.
+This single redeploy includes both bot changes and the automatic dataset upgrade;
+**no manual transfer of the 78 MB Excel is required**. The background worker checks
+trusted public source manifests, makes backups, merges missing records and completes
+compatible NULL values, then regenerates the Excel export. Startup and the first
+large export can take several minutes.
+
+Use `/status` for source-specific upgrade phases and `/freshness` for current-game
+readiness. Readiness can still be held by an external schedule refusal, unverified
+game inventory or unavailable current data; an Excel rebuild does not remove those
+holds. The bot's web export provides the rebuilt master after the upgrade.
 
 ## What refreshes
 

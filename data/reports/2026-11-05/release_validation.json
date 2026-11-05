@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "tested_source_ref": "6cde91eea7c97e90c3f20e1233701d1de4ae02b6",
+  "regression": {
+    "tests": 1293,
+    "conclusion": "success",
+    "run_url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42070042831"
+  },
+  "production_publishers": {
+    "daily": {
+      "conclusion": "success",
+      "run_url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42063633785"
+    },
+    "schedule_health": {
+      "conclusion": "success",
+      "run_url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42063633624"
+    }
+  },
+  "automatic_upgrade_real_https": {
+    "player_observations": 171889,
+    "games": 21198,
+    "player_observations_added": 679,
+    "starter_fields_completed": 2954,
+    "plus_minus_fields_completed": 653,
+    "score_fields_completed": 7338,
+    "measured_pair_rows_added": 9388,
+    "availability_rows_imported": 33067,
+    "existing_known_values_preserved": true,
+    "private_entries_chat_settings_preserved": true,
+    "source_and_delivered_databases_unchanged": true
+  },
+  "features": [
+    "/refresh and /update background dataset checks",
+    "11:30 AM Eastern daily completion notices",
+    "conversation corrections and contextual pick explanations",
+    "durable private lineup preferences",
+    "pregame warning reminders when live timing cannot be verified",
+    "automatic backup, import, completion and Excel export"
+  ],
+  "activation": "Update SOURCE_REF on the existing Akash deployment; retain its private settings and persistent volume. No manual Excel transfer is required.",
+  "limits": [
+    "Live ESPN schedule requests currently return HTTP 403 and the NBA CDN check times out; timing remains unverified and affected picks remain held.",
+    "Remaining historical statistic and tracking gaps are listed in data/reports/2026-11-05/README.md.",
+    "Real Telegram delivery starts only after the user activates the release; transport, queueing and restart recovery were tested without sending live messages."
+  ]
+}
