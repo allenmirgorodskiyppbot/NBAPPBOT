@@ -142,6 +142,22 @@ def _brief_pick_facts(report):
     return first + ('\n'+' '.join(facts) if facts else '')
 
 
+def _sample_interpretation(sample):
+    """Preserve observed count direction without inventing balance or odds."""
+    above, below, ties = (sample.get(key, 0) for key in ('more', 'less', 'ties'))
+    if above > below:
+        text = 'More observed results were above the line than below it.'
+    elif below > above:
+        text = 'More observed results were below the line than above it.'
+    elif above:
+        text = 'Observed above-line and below-line counts were equal.'
+    elif ties:
+        text = 'The observed results tied the line.'
+    else:
+        text = 'No above-line or below-line frequency is established.'
+    return text + ' This frequency is descriptive context, not a forecast or the decision reason.'
+
+
 def _pick_interpretation(report):
     """Short, application-derived relationships for the language model."""
     baseline = report.get('baseline') or {}
@@ -151,8 +167,8 @@ def _pick_interpretation(report):
         parts.append('The same-team historical mean is '+relation(baseline['reference_projection'])+
                      ' the offered line; the historical median is '+relation(baseline['baseline_median'])+' it.')
     sample = report.get('sample') or {}
-    if sample.get('more') and sample.get('less'):
-        parts.append('Recent stored outcomes occur on both sides of the line.')
+    if sample:
+        parts.append(_sample_interpretation(sample))
     return ' '.join(parts)
 
 
@@ -168,11 +184,18 @@ def _pick_model_evidence(report):
         elif kind == 'prop_baseline' and baseline.get('available'):
             text = 'Historical mean is '+relation(baseline['reference_projection'])+' the offered line; median is '+relation(baseline['baseline_median'])+' it.'
         elif kind == 'prop_sample':
-            text = ('Recent stored outcomes occur on both sides of the line.' if sample.get('more') and sample.get('less')
-                    else 'Recent outcomes describe the stored sample, not a future probability.')
+            text = _sample_interpretation(sample)
         else:
             text = 'Reduced minutes or changed opportunities can affect this statistic; these are conditional risks.'
-        records.append({'id':card['id'],'kind':kind,'text':text})
+        record = {'id':card['id'],'kind':kind,'text':text}
+        if kind == 'prop_sample':
+            record['decision_role'] = 'context_only'
+        elif kind == 'prop_assessment':
+            record['decision_role'] = 'actual_decision_reason'
+            if report.get('data_readiness', {}).get('ready') is False:
+                record['reason_basis'] = 'game_day_verification'
+                record['text'] += ' Other strategy filters still apply after verification.'
+        records.append(record)
     return records
 
 

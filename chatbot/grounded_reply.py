@@ -1215,8 +1215,9 @@ def _unsupported_probability(text, cards):
 
 
 def _unsupported_research_stability(text, cards):
-    """A reference level and workload mean do not measure player stability."""
-    research = {card.get('entity') for card in cards if card.get('kind') == 'research_projection'}
+    """Historical centers and line counts do not measure player stability."""
+    research = {card.get('entity') for card in cards if card.get('kind') in
+                {'research_projection','prop_baseline','prop_sample'}}
     research.discard(None)
     if not research:
         return False
@@ -1227,7 +1228,13 @@ def _unsupported_research_stability(text, cards):
         r'\b(?:consistent|steady|stable|reliable)\s+(?:(?:scoring|statistical|recent|current|historical)\s+)?' + production + r'\b|'
         r'\b' + production + r'\s+(?:is|has been|looks|appears|remains)\s+(?:consistent|steady|stable|reliable)\b|'
         r'\b(?:shows?|indicates?|reflects?|demonstrates?|establishes?|proves?|confirms?|suggests?|implies)'
-        r'[^.;]{0,50}\b(?:consistency|stability)\b', re.I)
+        r'[^.;]{0,50}\b(?:consistency|stability)\b|'
+        r'\b(?:consistently|reliably|steadily)\s+(?:hit\w*|clear\w*|exceed\w*|beat\w*|finish\w*|scor\w*)\b|'
+        r'\b(?:low|small|limited|tight)\s+(?:variance|variability|dispersion|spread)\b|'
+        r'\b(?:variance|variability|dispersion)\s+(?:is|looks|appears|remains)\s+(?:low|small|limited)\b', re.I)
+    confidence = re.compile(r'\b(?:high|strong)[- ]confidence\s+(?:pick|bet|over|under|forecast|prediction)\b|'
+        r'\b(?:high|strong)\s+confidence\s+(?:of|that|in)\s+[^.;]{0,50}'
+        r'\b(?:hit\w*|clear\w*|win\w*|above[- ]line|performance|production)\b', re.I)
     current = re.compile(r'\b(?:under|in|reflects?|describes?|captures?|represents?|based on)\s+'
                          r'(?:the\s+)?current\s+(?:conditions|role|workload|minutes|lineup)\b', re.I)
     for clause in re.split(r'(?<=[.!?;])\s+|\b(?:whereas|while|and|but)\b', text):
@@ -1238,7 +1245,7 @@ def _unsupported_research_stability(text, cards):
         if not subjects & research:
             continue
         candidates = [fact for fact in facts if fact.get('entity') in subjects & research]
-        for kind, pattern in (('stability', stability), ('current_conditions', current)):
+        for kind, pattern in (('stability', stability), ('confidence', confidence), ('current_conditions', current)):
             for match in pattern.finditer(clause):
                 prefix, suffix = clause[:match.start()], clause[match.end():]
                 # Keep uncertainty and mechanisms discussable; a later risk
@@ -1251,6 +1258,10 @@ def _unsupported_research_stability(text, cards):
                 if kind == 'stability':
                     supported = any(fact.get('fact_type') in {'stability', 'dispersion', 'workload_stability'}
                                     for fact in candidates)
+                elif kind == 'confidence':
+                    supported = any(card.get('kind') == 'calibrated_probability' and
+                                    card.get('verified_calibration') is True and
+                                    card.get('entity') in subjects for card in cards)
                 else:
                     supported = any(fact.get('fact_type') == 'current_conditions' and
                                     fact.get('verified_current') is True for fact in candidates)
