@@ -109,17 +109,20 @@ class ScheduleJobHealthTests(unittest.TestCase):
         repository = Path(__file__).resolve().parent.parent / '.github' / 'workflows' / 'nba-schedule-data.yml'
         workflow = (local if local.exists() else repository).read_text()
         publish = workflow.split('      - name: Publish source timestamp', 1)[1]
-        script = publish.split('        run: |\n', 1)[1].split('          if git diff', 1)[0]
-        script = '\n'.join(line[10:] for line in script.splitlines())
+        self.assertIn('python chatbot/publish_public_data.py --mode schedule', publish)
+        self.assertIn('GITHUB_TOKEN: ${{ github.token }}', publish)
+        from publish_public_data import inspect_changes
         subprocess.run(['git', 'init', '-q', str(self.output)], check=True, capture_output=True)
+        subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                        'commit', '--allow-empty', '-qm', 'Isolated schedule publication fixture'],
+                       cwd=self.output, check=True, capture_output=True)
         status = self.output / 'data' / 'live' / 'schedule_status.json'
         status.parent.mkdir(parents=True)
         status.write_text('{"status":"unavailable"}\n')
-        result = subprocess.run(['bash', '-e', '-c', script], cwd=self.output, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        staged = subprocess.run(['git', 'diff', '--cached', '--name-only'], cwd=self.output,
-                                capture_output=True, text=True, check=True)
-        self.assertEqual(staged.stdout.strip(), 'data/live/schedule_status.json')
+        checkout, changes = inspect_changes(self.output, 'schedule')
+        self.assertEqual(len(checkout), 40)
+        self.assertEqual([change.path for change in changes], ['data/live/schedule_status.json'])
+        self.assertFalse((status.parent / 'schedule_today.json').exists())
 
 
 if __name__ == '__main__':

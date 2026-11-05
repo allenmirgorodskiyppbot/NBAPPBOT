@@ -9,7 +9,7 @@ import asyncio
 import re
 
 from conversation import resolve_conversation
-from pick_discussion import build_pick_discussion
+from pick_discussion import build_pick_discussion, format_pick_discussion
 from master import normalized_name
 from board_shortlist import MARKET_NAMES
 
@@ -21,6 +21,54 @@ def _context(turn):
         context['selected_pick'] = {'position':index+1,
             **{k:v for k,v in turn['recent_picks'][0].items() if k in ('player','stat','line_kind')}}
     return context
+
+
+def _conversational_fallback(turn, question):
+    """General mechanisms need no invented statistics or current-game claims."""
+    query = question.casefold()
+    if turn['intent'] == 'preference':
+        if 'attempt' in query:
+            return ('That preference makes sense: attempts count whether the shot goes in, while points also '
+                    'depend on shooting accuracy and free throws. Both still depend on minutes and shot share, '
+                    'so a blowout can hurt either. I’ll keep the actual attempts offer separate from the points line.')
+        return ('I’ll keep that preference in mind when comparing eligible picks. It doesn’t change what the '
+                'saved evidence supports; I’ll explain any conflict rather than switch sides just to agree.')
+    if re.search(r'\b(?:thanks?|thank you|thank u|ty|thx)\b', query):
+        return 'You’re welcome.'
+    if re.search(r'blowout|bench|minutes|playing time', query):
+        return ('If playing time drops, shot attempts and other counting stats can drop too. That’s a risk to '
+                'check, not a prediction that anyone will be benched.')
+    if re.search(r'revenge|old team|motivat', query):
+        return ('Playing a former team might add motivation, but it doesn’t establish more shot opportunities '
+                'or better shooting accuracy. I’d look for evidence about minutes and role before changing a pick.')
+    if turn['intent'] == 'explanation':
+        return 'Which pick or part of the explanation do you mean? I can explain the evidence, the line, or the main risk.'
+    return 'I can help talk through a pick, compare the actual lines, or explain what could change the assessment.'
+
+
+async def _generate_reply(generate, request, progress, master, cards, *, dialogue, fallback):
+    """A failed explanation must still deliver the checked answer, never model prose."""
+    try:
+        result = await generate(request, progress, master, cards, natural=True,
+                                dialogue=dialogue, fallback=fallback)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        result = None
+    if not isinstance(result, dict) or not str(result.get('answer') or '').strip():
+        return {'answer':fallback, 'sources':list(dict.fromkeys(
+            str(card.get('source')) for card in cards if card.get('source'))), 'ai_used':False}
+    return result
+
+
+def _preference_evidence(store, master, turn, history):
+    from basketball_research import resolve_question, research_context
+    from grounded_reply import evidence_cards
+    resolved = resolve_question(store, master, turn['canonical_question'], history)
+    if turn.get('slots', {}).get('player'):
+        resolved['players'] = [turn['slots']['player']]
+    context = research_context(store, master, resolved)
+    return evidence_cards(context, turn['canonical_question'])
 
 
 def _unavailable_card(pick, reason, index):
@@ -134,8 +182,8 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
     # still get every computed explanation instead of silently dropping legs.
     if len(cards) > 4:
         return fallback_result
-    result = await generate(request, progress, master, cards, natural=True,
-                            dialogue=discussion, fallback=fallback)
+    result = await _generate_reply(generate, request, progress, master, cards,
+                                   dialogue=discussion, fallback=fallback)
     changed = await asyncio.to_thread(_changed_readiness, master, checks)
     if changed:
         return changed
@@ -155,13 +203,14 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
 
 async def answer_conversation(store, master, request, progress, generate, turn=None):
     history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
-    turn = turn or await asyncio.to_thread(resolve_conversation, store, master, request.message, history)
+    turn = turn or await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
+        preferences=getattr(request, 'lineup_preferences', None))
     if turn.get('clarification'):
         return {'answer':turn['clarification'], 'sources':[], 'ai_used':False}
     intent = turn['intent']
     if intent == 'research':
         return None
-    if (intent in {'explanation','preference'} and turn.get('slots', {}).get('player')
+    if (intent == 'explanation' and turn.get('slots', {}).get('player')
             and not turn.get('complete_prop') and not turn.get('recent_picks')):
         # A named-player explanation still needs factual context even when it
         # includes a style request or has no betting threshold. Keep the
@@ -175,7 +224,7 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         discussion['action'] = ('Acknowledge that a complete lineup must include at least one qualified '
             'player from each team. If one side lacks evidence, explain that rather than fill a leg.'
             if both else 'Acknowledge the requested team preference. The game and offer rules still need checking.')
-        return await generate(request, progress, master, [], natural=True, dialogue=discussion,
+        return await _generate_reply(generate, request, progress, master, [], dialogue=discussion,
             fallback=('I’ll include at least one qualified player from each team when building the lineup. '
                       'If I can’t support both sides, I’ll tell you instead of filling a leg.' if both else
                       'I understand the team preference. I’ll still check the available evidence and offer rules.'))
@@ -183,6 +232,7 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         report = await asyncio.to_thread(build_pick_discussion, master, turn['slots'])
         if not report.get('available'):
             return {'answer':report['fallback_answer'], 'sources':report.get('sources',[]), 'ai_used':False}
+        report['fallback_answer'] = format_pick_discussion(report, request.message)
         discussion.update(decision=report['decision'], assessment=report['reason'],
                           date=report['date'], date_assumed=report['date_assumed'])
         risks = report.get('conditional_risks', [])
@@ -193,8 +243,8 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
                    for word in ('blowout','minutes','payout','threes','attempts','motivation'))]
         discussion['relevant_risks'] = (focused or risks[-1:])[:2]
         progress['detail'] = 'Explaining the line and its main risk'
-        result = await generate(request, progress, master, report['evidence_cards'], natural=True,
-                                dialogue=discussion, fallback=report['fallback_answer'])
+        result = await _generate_reply(generate, request, progress, master, report['evidence_cards'],
+                                       dialogue=discussion, fallback=report['fallback_answer'])
         if report.get('data_readiness', {}).get('ready'):
             changed = await asyncio.to_thread(_changed_readiness, master,
                 [{key:report[key] for key in ('player','stat','team','date')}])
@@ -221,4 +271,7 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
     elif intent == 'explanation':
         discussion['action'] = ('Explain the general mechanism using the conversation. If several '
             'picks could be meant, ask which one; do not choose an arbitrary player.')
-    return await generate(request, progress, master, [], natural=True, dialogue=discussion)
+    cards = (await asyncio.to_thread(_preference_evidence, store, master, turn, history)
+             if intent == 'preference' and turn.get('slots', {}).get('player') else [])
+    return await _generate_reply(generate, request, progress, master, cards, dialogue=discussion,
+                                fallback=_conversational_fallback(turn, request.message))

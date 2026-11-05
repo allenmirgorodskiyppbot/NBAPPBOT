@@ -13,7 +13,7 @@ from unittest.mock import patch
 import httpx
 
 from dataset_refresh import initialize_scope
-from feeds import canonical_player
+from feeds import canonical_player,canonical_game
 from master import MasterStore
 from nightly_data import NightlyNBARefresh, import_daily_snapshot
 from test_nightly_data import snapshot
@@ -367,6 +367,114 @@ class RefreshSchedulerTests(unittest.TestCase):
         self.assertEqual(report['inventory_scope'], document['inventory_scope'])
         self.assertEqual(self.store.get_checkpoint('daily_nba:' + TARGET)['inventory_scope'],
                          'Completed games present in the fixture publication only.')
+
+    def test_new_partial_inventory_retracts_previous_complete_coverage_until_recovery(self):
+        earlier='2026-10-29'
+        for day in (earlier,TARGET):
+            import_daily_snapshot(self.store,self.empty_day(day),day,self.now[0])
+        self.store.set_checkpoint('nightly_nba_refresh',{
+            'initialized':True,'pending_dates':[],'handled_target_date':TARGET,
+            'last_attempt':NOW.isoformat(),'last_tracking_attempt':NOW.isoformat()})
+        self.now[0]+=dt.timedelta(hours=1)
+        original=self.worker.request
+        async def revised(url):
+            if url.endswith('/'+TARGET+'.json'):
+                self.calls.append(TARGET+'.json')
+                document=self.empty_day(TARGET)
+                document.update(expected_games=1,complete=False,pending_game_ids=['awaiting-final-box'])
+                return document
+            return await original(url)
+        self.worker.request=revised
+        self.run_tick(self.service())
+        state=self.status()
+        self.assertEqual(state['source_data_through_date'],earlier)
+        self.assertEqual(state['phase'],'waiting_for_publication')
+        self.assertIn(TARGET,state['pending_dates'])
+        self.assertFalse(self.store.get_checkpoint('daily_nba:'+TARGET)['complete'])
+        self.worker.request=original
+        self.now[0]+=dt.timedelta(hours=1)
+        self.run_tick(self.service())
+        self.assertEqual(self.status()['source_data_through_date'],TARGET)
+        self.assertNotIn(TARGET,self.status()['pending_dates'])
+
+    def test_retry_uses_real_elapsed_hour_across_both_dst_clock_changes(self):
+        for before,target,pending,offset in (
+                (dt.datetime(2026,11,1,5,30,tzinfo=UTC),'2026-10-30','2026-10-29','-05:00'),
+                (dt.datetime(2027,3,14,6,30,tzinfo=UTC),'2027-03-12','2027-03-11','-04:00')):
+            with self.subTest(before=before):
+                self.calls.clear()
+                self.now[0]=before
+                import_daily_snapshot(self.store,self.empty_day(target),target,before)
+                self.store.set_checkpoint('nightly_nba_refresh',{
+                    'initialized':True,'pending_dates':[pending],'handled_target_date':target,
+                    'last_attempt':before.isoformat(),'last_tracking_attempt':before.isoformat()})
+                self.now[0]=before+dt.timedelta(seconds=3599)
+                self.run_tick(self.service())
+                self.assertEqual(self.calls,[])
+                self.now[0]+=dt.timedelta(seconds=1)
+                self.run_tick(self.service())
+                self.assertIn(pending+'.json',self.calls)
+                self.assertEqual(self.status()['last_attempt'],self.now[0].isoformat())
+                self.assertTrue(self.status()['next_daily_run'].endswith('11:30:00'+offset))
+
+    def test_cancellation_mid_batch_retains_missed_dates_for_restart(self):
+        self.store.set_checkpoint('nightly_nba_refresh',{
+            'initialized':True,'pending_dates':[],'handled_target_date':'2026-10-20'})
+        original=self.worker.request
+        async def interrupted(url):
+            if url.endswith('/2026-10-29.json'):
+                raise asyncio.CancelledError()
+            return await original(url)
+        self.worker.request=interrupted
+        with self.assertRaises(asyncio.CancelledError):
+            self.run_tick(self.service())
+        self.assertTrue(self.store.get_checkpoint('daily_nba:'+TARGET)['complete'])
+        self.assertEqual(self.status()['handled_target_date'],'2026-10-20')
+        self.worker.request=original
+        self.run_tick(self.service())
+        self.assertEqual(self.status()['handled_target_date'],TARGET)
+        self.assertEqual(self.status()['pending_dates'],[
+            (dt.date(2026,10,27)-dt.timedelta(days=n)).isoformat() for n in range(7)])
+        for day in ('2026-10-30','2026-10-29','2026-10-28'):
+            self.assertTrue(self.store.get_checkpoint('daily_nba:'+day)['complete'])
+
+    def test_export_and_partial_tracking_never_establish_unverified_pregame_inventory(self):
+        from pregame_freshness import assess_pregame_freshness
+        today='2026-10-31'
+        upcoming={'id':canonical_game(today,'NYK','PHI'),'date':today,'home_team':'NYK',
+            'away_team':'PHI','status':'scheduled','start_time':today+'T23:30:00+00:00',
+            'source':'independent current event fixture'}
+        self.store.upsert_game(upcoming)
+        self.store.set_checkpoint('nba_schedule_today',{
+            'date':today,'status':'success','checked_at':NOW.isoformat(),'error':None,
+            'source':'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
+            'expected_game_ids':[upcoming['id']],'games':[upcoming]})
+        document=snapshot()
+        game_id=canonical_game(TARGET,'PHI','CLE')
+        document.update(date=TARGET,published_at=NOW.isoformat())
+        document['games'][0].update(id=game_id,date=TARGET)
+        for row in document['player_games']:
+            row.update(game_id=game_id,date=TARGET)
+        tracking=self.tracking()
+        tracking['records'][0]['data_through_date']=None
+        tracking['coverage'].append({'category':'Overall','status':'unavailable'})
+        original=self.worker.request
+        async def source(url):
+            if url.endswith('/'+TARGET+'.json'):
+                return document
+            if url.endswith('/existing_tracking.json'):
+                return tracking
+            return await original(url)
+        self.worker.request=source
+        self.run_tick(self.service(lambda store,directory:None))
+        state=self.status()
+        self.assertEqual(state['master_export_updated_at'],NOW.isoformat())
+        self.assertEqual(state['tracking_refresh_phase'],'partial')
+        self.assertIsNone(state['tracking_source_data_through_date'])
+        self.assertFalse(state['target_inventory_verified'])
+        readiness=assess_pregame_freshness(self.store,today,'PHI',NOW,player='Tyrese Maxey',stat='points')
+        self.assertFalse(readiness['ready'])
+        self.assertTrue(any('inventory' in reason.lower() for reason in readiness['reasons']))
 
 
 if __name__ == '__main__':

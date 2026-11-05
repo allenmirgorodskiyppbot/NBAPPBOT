@@ -20,7 +20,7 @@ from typing import Literal
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from workbook import WorkbookStore
 from master import MasterStore
@@ -236,10 +236,11 @@ def master_context(master):
     return result
 
 
-async def telegram_answer(text, history=None):
+async def telegram_answer(text, history=None, lineup_preferences=None):
     state = app.state
     from conversation import resolve_conversation
-    discussion = await asyncio.to_thread(resolve_conversation, state.store, state.master, text, history or [])
+    discussion = await asyncio.to_thread(resolve_conversation, state.store, state.master, text, history or [],
+                                         preferences=lineup_preferences)
     if discussion.get('clarification'):
         return discussion['clarification']
     conversational = discussion['intent'] != 'research'
@@ -274,7 +275,8 @@ async def telegram_answer(text, history=None):
         return 'The model is answering another question. Please try again shortly.'
     async with state.chat_lock:
         state.ai_started_at = time.monotonic()
-        request = ChatRequest(message=str(text)[:3000], history=history or [])
+        request = ChatRequest(message=str(text)[:3000], history=history or [],
+                              lineup_preferences=lineup_preferences or {})
         try:
             result = await asyncio.wait_for(answer_question(state.store, request, {}, state.master), 900)
             observe_ai_result(result)
@@ -555,7 +557,8 @@ async def lifespan(application):
             async with worker._cycle_lock:
                 await worker.collect_news_sources()
     state.telegram = TelegramBot(state.master, telegram_answer, model_status_callback=ai_status,
-                                self_test_callback=self_test, research_refresh_callback=refresh_board_news)
+                                self_test_callback=self_test, research_refresh_callback=refresh_board_news,
+                                answer_preferences_callback=telegram_answer)
     state.temporary = tempfile.TemporaryDirectory(prefix='knicks-')
     state.startup_task = asyncio.create_task(initialize_with_retry(application))
     try:
@@ -591,6 +594,13 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=3000)
     history: list[Message] = Field(default_factory=list, max_length=24)
+    lineup_preferences: dict = Field(default_factory=dict)
+
+    @field_validator('lineup_preferences', mode='before')
+    @classmethod
+    def user_lineup_preferences(cls, value):
+        from conversation import validated_lineup_preferences
+        return validated_lineup_preferences(value)
 
 
 def tool(name, description, properties, required):
@@ -1105,7 +1115,8 @@ async def answer_question(store, request, progress, master=None):
     if not source_lookup and not derived_lookup:
         from conversation import resolve_conversation
         from chat_flow import answer_conversation
-        conversation_turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history)
+        conversation_turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
+                                                   preferences=request.lineup_preferences)
         if (not conversation_turn.get('clarification') and
                 (conversation_turn.get('complete_prop') or conversation_turn.get('recent_picks'))):
             await refresh_pregame_schedule(master)
@@ -1125,7 +1136,8 @@ async def answer_question(store, request, progress, master=None):
     if assignment is not None:
         return assignment
     normalized_history = await asyncio.to_thread(canonical_history, store, master, history)
-    request = ChatRequest(message=resolved['question'][:3000], history=normalized_history)
+    request = ChatRequest(message=resolved['question'][:3000], history=normalized_history,
+                          lineup_preferences=request.lineup_preferences)
     from matchup_queries import answer_matchup_question
     matchup = (await asyncio.to_thread(answer_matchup_question, store, request.message,
                                       [message.model_dump() for message in request.history],master)

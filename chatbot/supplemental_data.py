@@ -6,6 +6,7 @@ clocks; this worker never marks today's schedule or game statistics ready.
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 import datetime as dt
 import hashlib
 import json
@@ -125,16 +126,23 @@ def cached_provider_crosswalk(data_dir):
     return None
 
 
-def _game_scores(store, root, static_path, crosswalk, previous, now):
-    from game_stat_completion import complete_verified_game_scores
-
-    sources = [('static', static_path)]
+def _cached_rolling_manifest(store, root):
     rolling = store.get_checkpoint('matchup_career_history_status', {}) or {}
     digest = rolling.get('manifest_sha256')
     if isinstance(digest, str) and re.fullmatch(r'[0-9a-f]{64}', digest):
         path = root.parent / 'history' / 'rolling' / digest / HISTORY_MANIFEST
         if path.is_file():
-            sources.append(('rolling', path))
+            return path, digest
+    return None, None
+
+
+def _game_scores(store, root, static_path, crosswalk, previous, now):
+    from game_stat_completion import complete_verified_game_scores
+
+    sources = [('static', static_path)]
+    path, digest = _cached_rolling_manifest(store, root)
+    if path is not None:
+        sources.append(('rolling', path))
     result, changed = {}, False
     for key, path in sources:
         old = previous.get(key, {})
@@ -158,6 +166,49 @@ def _game_scores(store, root, static_path, crosswalk, previous, now):
                        'partial' if any(p == 'unavailable' for p in phases) else 'updated')
     result['fields_completed'] = sum(result[key].get('fields_completed', 0)
                                      for key, _ in sources if result[key]['phase'] == 'updated')
+    return result, changed
+
+
+def _player_statistics(store, root, static_path, roster, previous, now):
+    """Complete independently from each verified source, without new downloads.
+
+    Existing flat static counters remain available. Completed fields and the
+    statistic totals aggregate both sources; nested reports retain each source's
+    own coverage, audit and backup. Completed row totals count source operations,
+    since one row can receive different missing fields from both sources.
+    """
+    sources = [('static', static_path)]
+    rolling_path, digest = _cached_rolling_manifest(store, root)
+    if rolling_path is not None:
+        sources.append(('rolling', rolling_path))
+    reports, changed = {}, False
+    for key, path in sources:
+        old = previous.get(key, previous if key == 'static' else {})
+        try:
+            if key == 'rolling' and hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                raise ValueError('Cached rolling manifest differs from its verified saved identity.')
+            completed = complete_verified_player_statistics(store, path, now=now,
+                                                            starter_roster_path=roster)
+            reports[key] = _success(old, now, **completed)
+            changed |= completed['fields_completed'] > 0
+        except Exception as error:
+            reports[key] = _failure(old, error, now)
+    static = reports['static']
+    result = {**static, **reports}
+    if 'rolling' not in result:
+        result['rolling'] = {'phase': 'not_saved', 'detail': 'No verified rolling career manifest is cached yet.'}
+    phases = [reports[key]['phase'] for key, _ in sources]
+    result['phase'] = ('unavailable' if all(p == 'unavailable' for p in phases) else
+                       'partial' if any(p == 'unavailable' for p in phases) else 'updated')
+    current = [reports[key] for key, _ in sources if reports[key]['phase'] == 'updated']
+    for name in ('fields_completed', 'rows_completed', 'fields_fillable', 'rows_fillable'):
+        result[name] = sum(item[name] for item in current)
+    for name in ('completed_by_statistic', 'fillable_by_statistic'):
+        totals = Counter()
+        for item in current:
+            totals.update(item[name])
+        result[name] = dict(totals)
+    result['row_count_scope'] = 'Sum of per-source completed rows; one row may be completed by both sources.'
     return result, changed
 
 
@@ -217,10 +268,9 @@ def _repairs(store, root, client, previous, now):
         result['game_score_completion'] = _failure(old_scores, error, now)
     old_completion = previous.get('stat_completion', {})
     try:
-        completed = complete_verified_player_statistics(store, path, now=now,
-                                                        starter_roster_path=roster)
-        result['stat_completion'] = _success(old_completion, now, **completed)
-        changed |= completed['fields_completed'] > 0
+        result['stat_completion'], statistics_changed = _player_statistics(
+            store, root, path, roster, old_completion, now)
+        changed |= statistics_changed
     except Exception as error:
         result['stat_completion'] = _failure(old_completion, error, now)
     if any(result[key]['phase'] in {'unavailable', 'partial'} for key in

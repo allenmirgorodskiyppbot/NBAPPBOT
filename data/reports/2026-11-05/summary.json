@@ -1,0 +1,248 @@
+{
+  "snapshot_date": "2026-11-05",
+  "source_data_through_date": "2026-11-04",
+  "player_observations": 171889,
+  "games": 21198,
+  "eligible_final_played": 153677,
+  "dnp_observations": 17406,
+  "unknown_participation": 806,
+  "master_sheets": 93,
+  "master_sha256": "a4211fba9ef7ab618a0d16f8de6a3783749f7dbe0c9ce23575c5df7dedf1d9a3",
+  "missing_player_fields": [
+    {
+      "field": "plus_minus",
+      "statistic": "Plus/minus",
+      "eligible_observations": 153677,
+      "missing_observations": 3,
+      "affected_players": 1,
+      "first_missing_date": "2003-11-19",
+      "last_missing_date": "2003-12-02",
+      "current_season_missing": 0,
+      "historical_missing": 3,
+      "by_player": {
+        "LeBron James": 3
+      },
+      "by_season": {
+        "2003-04": 3
+      },
+      "by_phase": {
+        "Regular Season": 3
+      }
+    },
+    {
+      "field": "starter",
+      "statistic": "Started flag",
+      "eligible_observations": 153677,
+      "missing_observations": 226,
+      "affected_players": 123,
+      "first_missing_date": "2013-01-29",
+      "last_missing_date": "2026-03-05",
+      "current_season_missing": 0,
+      "historical_missing": 226,
+      "by_player": {
+        "Andre Drummond": 6,
+        "Jalen Brunson": 1,
+        "Jose Alvarado": 2,
+        "Josh Hart": 1,
+        "Karl-Anthony Towns": 3,
+        "Mikal Bridges": 2,
+        "OG Anunoby": 1,
+        "Tobias Harris": 1,
+        "Deandre Ayton": 14,
+        "Devin Booker": 14,
+        "Dorian Finney-Smith": 1,
+        "Luka Dončić": 1,
+        "DeAndre Jordan": 1,
+        "Nikola Jokić": 2,
+        "Jamal Murray": 1,
+        "Trey Lyles": 2,
+        "Kevin Durant": 1,
+        "Draymond Green": 1,
+        "Klay Thompson": 1,
+        "Stephen Curry": 1,
+        "Kevon Looney": 1,
+        "De'Anthony Melton": 3,
+        "LeBron James": 1,
+        "Kyle Kuzma": 2,
+        "Svi Mykhailiuk": 1,
+        "Kentavious Caldwell-Pope": 1,
+        "Ivica Zubac": 1,
+        "Kyle Anderson": 2,
+        "Jaren Jackson Jr.": 2,
+        "Mike Conley": 2,
+        "Dillon Brooks": 2,
+        "Kawhi Leonard": 1,
+        "Pascal Siakam": 2,
+        "Fred VanVleet": 1,
+        "Norman Powell": 1,
+        "Jarrett Allen": 1,
+        "Caris LeVert": 2,
+        "Jayson Tatum": 1,
+        "Al Horford": 1,
+        "Jaylen Brown": 2,
+        "Kyrie Irving": 1,
+        "Marcus Smart": 1,
+        "Anthony Davis": 1,
+        "Julius Randle": 1,
+        "Jrue Holiday": 1,
+        "Kenrich Williams": 1,
+        "Paul George": 2,
+        "Jerami Grant": 2,
+        "Steven Adams": 2,
+        "Dennis Schröder": 2,
+        "DeMar DeRozan": 2,
+        "Derrick White": 3,
+        "Jakob Poeltl": 2,
+        "Wendell Carter Jr.": 1,
+        "Zach LaVine": 1,
+        "Joel Embiid": 2,
+        "Ben Simmons": 3,
+        "Landry Shamet": 3,
+        "T.J. McConnell": 4,
+        "James Harden": 1,
+        "Ben Sheppard": 1,
+        "Jay Huff": 1,
+        "Bennedict Mathurin": 1,
+        "Andrew Nembhard": 1,
+        "Jarace Walker": 1,
+        "Isaiah Jackson": 1,
+        "Kevin Huerter": 3,
+        "Matas Buzelis": 6,
+        "Nikola Vučević": 4,
+        "Ayo Dosunmu": 5,
+        "Josh Giddey": 1,
+        "Patrick Williams": 6,
+        "Jevon Carter": 3,
+        "Tre Jones": 3,
+        "Ausar Thompson": 1,
+        "Paul Reed": 1,
+        "Isaiah Stewart": 1,
+        "Duncan Robinson": 1,
+        "Ronald Holland II": 1,
+        "Daniss Jenkins": 1,
+        "Javonte Green": 1,
+        "Marcus Sasser": 1,
+        "Chaz Lanier": 1,
+        "Tolu Smith": 1,
+        "Isaac Okoro": 5,
+        "Myron Gardner": 2,
+        "Andrew Wiggins": 2,
+        "Bam Adebayo": 2,
+        "Pelle Larsson": 2,
+        "Kasparas Jakučionis": 2,
+        "Jaime Jaquez Jr.": 2,
+        "Kel'el Ware": 2,
+        "Simone Fontecchio": 2,
+        "Dru Smith": 2,
+        "Nikola Jovic": 1,
+        "Davion Mitchell": 1,
+        "Coby White": 2,
+        "Myles Turner": 1,
+        "AJ Green": 1,
+        "Ryan Rollins": 1,
+        "Jericho Sims": 1,
+        "Gary Trent Jr.": 1,
+        "Jalen Smith": 1,
+        "Sam Hauser": 1,
+        "Neemias Queta": 1,
+        "Baylor Scheierman": 1,
+        "Payton Pritchard": 1,
+        "Ron Harper Jr.": 1,
+        "Hugo Gonzalez": 1,
+        "Jordan Walsh": 1,
+        "Luka Garza": 1,
+        "Anfernee Simons": 1,
+        "Collin Sexton": 2,
+        "Nick Richards": 2,
+        "Leonard Miller": 2,
+        "Jalen Green": 1,
+        "Royce O'Neale": 1,
+        "Oso Ighodaro": 1,
+        "Collin Gillespie": 1,
+        "Khaman Maluach": 1,
+        "Grayson Allen": 1,
+        "Ryan Dunn": 1,
+        "Rasheer Fleming": 1
+      },
+      "by_season": {
+        "2012-13": 4,
+        "2013-14": 1,
+        "2014-15": 2,
+        "2025-26": 117,
+        "2016-17": 1,
+        "2024-25": 1,
+        "2018-19": 100
+      },
+      "by_phase": {
+        "Regular Season": 226
+      }
+    }
+  ],
+  "unknown_matchup_pairs": [
+    {
+      "defense_player": "Khaman Maluach",
+      "offense_player": "Andre Drummond"
+    },
+    {
+      "defense_player": "Yves Missi",
+      "offense_player": "Andre Drummond"
+    },
+    {
+      "defense_player": "Karl-Anthony Towns",
+      "offense_player": "Joan Beringer"
+    },
+    {
+      "defense_player": "Joan Beringer",
+      "offense_player": "Karl-Anthony Towns"
+    },
+    {
+      "defense_player": "Khaman Maluach",
+      "offense_player": "Karl-Anthony Towns"
+    },
+    {
+      "defense_player": "Andre Drummond",
+      "offense_player": "Khaman Maluach"
+    },
+    {
+      "defense_player": "Karl-Anthony Towns",
+      "offense_player": "Khaman Maluach"
+    },
+    {
+      "defense_player": "Andre Drummond",
+      "offense_player": "Yves Missi"
+    }
+  ],
+  "unavailable_closest_defender_fields": [
+    {
+      "category": "Overall",
+      "raw_fields": [
+        "D_FGM",
+        "D_FGA"
+      ],
+      "normalized_fields": [
+        "defended_fgm",
+        "defended_fga",
+        "fg_pct_allowed"
+      ],
+      "reason": "Public supported releases do not contain closest-defender populations; direct NBA Stats request timed out."
+    },
+    {
+      "category": "Less Than 6Ft",
+      "raw_fields": [
+        "D_FGM",
+        "D_FGA"
+      ],
+      "normalized_fields": [
+        "rim_defended_fgm",
+        "rim_defended_fga",
+        "fg_pct_allowed"
+      ],
+      "reason": "Direct request held after same-source timeout; not equivalent to aggregate rim or named-pair populations."
+    }
+  ],
+  "measured_source_conflicts_held": 104,
+  "basic_counting_minutes_missing_in_saved_played_games": 0,
+  "current_season_basic_missing": 0,
+  "unknown_aggregate_covered_game_date_categories": 8,
+  "note": "Saved, verified public observations only. Not an independently reconciled complete lifetime inventory; source freshness is separate from export time."
+}

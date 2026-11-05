@@ -18,6 +18,22 @@ class MasterTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
+    def test_status_retains_source_failure_reason_without_full_evidence_inventory(self):
+        self.store.set_checkpoint('supplemental_data_status', {
+            'phase': 'partial', 'last_attempt': '2026-11-05T16:00:00+00:00',
+            'repairs': {'phase': 'partial', 'stat_completion': {
+                'phase': 'unavailable', 'error_type': 'HTTPStatusError', 'http_status': 403,
+                'detail': 'Public source refused the request.'}},
+            'measured_history': {'phase': 'updated', 'observations': 9388,
+                                 'coverage': ['large source payload'] * 10000},
+            'availability': {'phase': 'updated', 'records_added': 29,
+                             'source_generated_at': '2026-11-05T14:45:00+00:00'}})
+        saved = self.store.status()['supplemental_data']
+        self.assertEqual(saved['repairs']['stat_completion']['http_status'], 403)
+        self.assertEqual(saved['measured_history']['observations'], 9388)
+        self.assertEqual(saved['availability']['source_generated_at'], '2026-11-05T14:45:00+00:00')
+        self.assertNotIn('large source payload', json.dumps(saved))
+
     def game(self, **changes):
         row = {'id': 'nba:g1', 'date': '2026-10-27', 'status': 'final',
                'home_team': 'NYK', 'away_team': 'DET', 'home_score': 111,

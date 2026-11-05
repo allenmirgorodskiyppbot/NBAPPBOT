@@ -303,6 +303,50 @@ class SupplementalTests(unittest.TestCase):
         self.assertEqual(result['repairs']['stat_completion']['fields_completed'], 2)
         self.assertIsNone(sd.cached_provider_crosswalk(self.root))
 
+    def test_only_cached_rolling_source_can_complete_an_old_players_missing_fields(self):
+        game = {**self.game, 'id': canonical_game('2025-01-27', 'CHI', 'PHI'),
+                'date': '2025-01-27', 'provider_game_id': '401705206'}
+        row = {**self.row, 'game_id': game['id'], 'date': game['date']}
+        self.store.upsert_game(game)
+        self.store.upsert_player_game({**row, 'starter': None, 'plus_minus': None,
+                                      'source': 'workbook:old rolling-only row'})
+        events = [{'kind':'game','data':game},{'kind':'player_game','data':row}]
+        body = gzip.compress(('\n'.join(json.dumps(r) for r in events)+'\n').encode())
+        manifest = {**self.manifest, 'parts':[{'file':'rolling-only-001.jsonl.gz', 'bytes':len(body),
+            'sha256':hashlib.sha256(body).hexdigest(),'records':len(events)}]}
+        blob = json.dumps(manifest).encode(); digest = hashlib.sha256(blob).hexdigest()
+        folder = self.root/'history'/'rolling'/digest; folder.mkdir(parents=True)
+        (folder/sd.HISTORY_MANIFEST).write_bytes(blob); (folder/'rolling-only-001.jsonl.gz').write_bytes(body)
+        self.store.set_checkpoint('matchup_career_history_status', {'manifest_sha256':digest})
+        with self.client() as client:
+            result = self.refresh(client)
+            again = self.refresh(client, NOW+dt.timedelta(hours=1))
+        completed = result['repairs']['stat_completion']
+        self.assertEqual(completed['static']['fields_completed'], 2)
+        self.assertEqual(completed['rolling']['fields_completed'], 2)
+        self.assertEqual(completed['fields_completed'], 4)
+        self.assertEqual(completed['fields_fillable'], 4)
+        self.assertEqual(completed['completed_by_statistic'], {'plus_minus':2, 'starter':2})
+        self.assertFalse(again['changed'])
+        self.assertFalse(any('/live/career_history/' in url for url in self.requests))
+        with self.store.connect() as db:
+            saved = dict(db.execute('SELECT * FROM player_games WHERE game_id=?',(game['id'],)).fetchone())
+        self.assertEqual((saved['starter'],saved['plus_minus'],saved['minutes'],saved['source']),
+                         (0,-7,34.5,'workbook:old rolling-only row'))
+
+    def test_corrupt_cached_rolling_manifest_cannot_block_safe_static_completion(self):
+        digest = 'd'*64; folder = self.root/'history'/'rolling'/digest; folder.mkdir(parents=True)
+        (folder/sd.HISTORY_MANIFEST).write_text('{}')
+        self.store.set_checkpoint('matchup_career_history_status', {'manifest_sha256':digest})
+        with self.client() as client:
+            result = self.refresh(client)
+        completed = result['repairs']['stat_completion']
+        self.assertEqual(completed['phase'], 'partial')
+        self.assertEqual(completed['static']['fields_completed'], 2)
+        self.assertEqual(completed['rolling']['phase'], 'unavailable')
+        self.assertEqual(completed['fields_completed'], 2)
+        self.assertTrue(result['changed'])
+
 
 class AsyncSupplementalTests(unittest.IsolatedAsyncioTestCase):
     async def test_public_entry_point_runs_synchronous_network_and_database_off_loop(self):

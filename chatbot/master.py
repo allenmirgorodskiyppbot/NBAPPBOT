@@ -26,6 +26,22 @@ def encoded(value):
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str, allow_nan=False)
 
 
+def supplemental_status_summary(document):
+    """Keep source failure reasons visible without dumping entire inventories."""
+    if not isinstance(document, dict):
+        return {}
+    keys = {'phase', 'last_attempt', 'last_checked_at', 'last_success_at',
+            'changed', 'error_type', 'http_status', 'detail', 'next_check_at',
+            'source_data_through_date', 'source_generated_at', 'records_added',
+            'observations', 'added', 'conflicts', 'fields_completed'}
+    result = {key: value for key, value in document.items() if key in keys}
+    for name in ('repairs', 'history_import', 'stat_completion', 'game_score_completion',
+                 'static', 'rolling', 'measured_history', 'availability'):
+        if isinstance(document.get(name), dict):
+            result[name] = supplemental_status_summary(document[name])
+    return result
+
+
 def finite_number(value, label, minimum=None):
     if isinstance(value, bool):
         raise ValueError(f'{label} must be a number.')
@@ -362,9 +378,8 @@ class MasterStore:
                     'release_checks': {key: checks[key] for key in ['phase','passed','failed','warnings','checked_at'] if key in checks},
                     'nightly_nba_refresh': self.get_checkpoint('nightly_nba_refresh', {}),
                     'tracking_refresh': self.get_checkpoint('tracking_refresh_status', {}),
-                    'supplemental_data': {key: value for key, value in
-                        (self.get_checkpoint('supplemental_data_status', {}) or {}).items()
-                        if key in {'phase', 'last_attempt', 'last_checked_at', 'changed', 'error_type', 'next_check_at'}},
+                    'supplemental_data': supplemental_status_summary(
+                        self.get_checkpoint('supplemental_data_status', {})),
                     'history_upgrade': self.get_checkpoint('history_upgrade_status', {}),
                     'matchup_career_history': {key: value for key, value in
                         (self.get_checkpoint('matchup_career_history_status', {}) or {}).items()

@@ -31,7 +31,9 @@ _ASK = re.compile(r'\b(?:choose|picks?|recommend\w*|lean|good|bad|like|take|bet|
                   r'safer|riskier|replace|swap)\b', re.I)
 _EXPLAIN = re.compile(r'\b(?:why|explain|reason\w*|clarif\w*|meaning|mean by|tell me more|elaborate|more detail|'
                       r'how come|what makes|what if|risk\w*|blowout|benched|'
-                      r'bench|minutes limit|revenge|old team)\b', re.I)
+                      r'bench|minutes limit|revenge|old team|concerns?|worr(?:y|ied)|'
+                      r'what could go wrong|how confident|change your mind|would change|'
+                      r'what do you mean|what does that mean)\b', re.I)
 _FOLLOWUP = re.compile(r'^\s*(?:and\b|but\b|why\b|how\b|what about\b|'
                        r'actually\b|no\b|not\b|nah\b|instead\b|i mean\b|'
                        r'up or down\b|more or less\b|over or under\b)|'
@@ -162,7 +164,7 @@ def _market(text):
         ('tpm', r'\b(?:3ptm|3pm|tpm|made (?:threes|three[- ]pointers)|threes|three[- ]pointers?(?: made)?|3[- ]pointers? made|3[- ]pt made)\b'),
         ('oreb', r'\b(?:oreb|offensive rebounds?)\b'),
         ('dreb', r'\b(?:dreb|defensive rebounds?)\b'),
-        ('pra', r'\b(?:pra|p\s*\+\s*r\s*\+\s*a)\b'),
+        ('pra', r'\b(?:pra|p\s*\+\s*r\s*\+\s*a|p\s+r\s+a)\b'),
         ('pr', r'\bpr\b'), ('pa', r'\bpa\b'), ('ra', r'\bra\b'),
         ('stocks', r'\bstocks\b'),
     ]
@@ -250,12 +252,63 @@ def _constraint(text):
 
 
 def _count(text):
+    command = re.match(r'^\s*/picks(?:@\w+)?(?:\s+|$)', text, re.I)
+    if command:
+        argument = text[command.end():]
+        _, error, spans = _date(argument, _now())
+        masked = list(argument)
+        for start, end in spans:
+            masked[start:end] = ' ' * (end - start)
+        remaining = re.sub(r'\bnext\b', ' ', ''.join(masked), flags=re.I).strip()
+        if not error and re.fullmatch(r'[2-6]', remaining):
+            return int(remaining)
+        return None
     words = {'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6}
     match = re.search(r'\b([2-6]|two|three|four|five|six)\s*[- ]?\s*(?:legs?|picks?)\b', text, re.I)
     if not match:
         return None
     token = match.group(1).casefold()
     return words[token] if token in words else int(token)
+
+
+def validated_lineup_preferences(value):
+    """Allow persistent selection preferences, never a player, line or source fact."""
+    result = {}
+    if not isinstance(value, dict):
+        return result
+    if type(value.get('both_teams')) is bool:
+        result['both_teams'] = value['both_teams']
+    if isinstance(value.get('preferred_stat'), str) and value['preferred_stat'] in STAT_COMPONENTS:
+        result['preferred_stat'] = value['preferred_stat']
+    if type(value.get('pick_count')) is int and 2 <= value['pick_count'] <= 6:
+        result['pick_count'] = value['pick_count']
+    return result
+
+
+def lineup_preference_updates(text):
+    """Read explicit user preference changes without replaying old chat facts."""
+    text = str(text or '')[:3000]
+    result = {}
+    both = _constraint(text)
+    if both is not None:
+        result['both_teams'] = both
+    count = _count(text)
+    command_count = re.fullmatch(r'/picks(?:@\w+)?\s+([2-6])\s*', text, re.I)
+    if command_count:
+        count = int(command_count[1])
+    if count is not None and not re.search(r"\b(?:not|don.t|do not)\s+(?:give me\s+)?(?:[2-6]|two|three|four|five|six)\b", text, re.I):
+        result['pick_count'] = count
+    stat, error = _market(text)
+    # A market preference must stand on its own. A named player's offered line
+    # or an instruction to keep that player cannot become a global preference.
+    vocabulary = set(_words('I prefer like liked want wanted rather please the more instead generally '
+        'field goal goals fg fga attempts attempted shot shots three point points threes pointers made '
+        '3ptm 3pm tpm 3pta tpa offensive defensive rebounds rebound rebs reb oreb dreb '
+        'assists assist ast asts pra pr pa ra pts steals blocks stl blk stocks turnovers tov minutes '
+        'p r a and for my picks legs lineups selections targets normally always use betting bets'))
+    if stat and not error and _PREFERENCE.search(text) and set(_words(text)) <= vocabulary:
+        result['preferred_stat'] = stat
+    return validated_lineup_preferences(result)
 
 
 def _selection_preference(text, names):
@@ -282,7 +335,7 @@ def _selection_preference(text, names):
 
 def _empty_state():
     return {'version': 1, 'slots': {}, 'constraints': {}, 'recent_picks': [], 'ambiguous_players': [],
-            'selected_pick_index': None}
+            'selected_pick_index': None, 'pending_clarification': None}
 
 
 def _pick_reference(text, cards):
@@ -369,6 +422,10 @@ def _clean_state(state, names, now):
     index = state.get('selected_pick_index')
     if type(index) is int and 0 <= index < len(result['recent_picks']):
         result['selected_pick_index'] = index
+    pending = state.get('pending_clarification')
+    if (isinstance(pending, dict) and pending.get('kind') == 'attempts'
+            and pending.get('player') == result['slots'].get('player')):
+        result['pending_clarification'] = {'kind': 'attempts', 'player': pending['player']}
     return result
 
 
@@ -383,10 +440,19 @@ def _assistant_cards(text, names, now):
             if date and not error:
                 game_date = date
     for index, line in enumerate(lines):
-        if not re.match(r'^\s*(?:[-•*]|\d+[.)]|\|)', line):
+        listed = bool(re.match(r'^\s*(?:[-•*]|\d+[.)]|\|)', line))
+        heading = re.match(r'^\s*([^—–:\n]{1,100}?)\s*[—–:]\s*'
+                           r'(?:More|Less|Over|Under)\s+' + _NUMBER + r'\b', line, re.I)
+        if not listed and not heading:
             continue
         entities = _scan(line, names)
         if len(entities['players']) != 1:
+            continue
+        if not listed and (_words(heading[1]) != _words(entities['players'][0])
+                           or re.search(r'\b(?:average\w*|scored|recorded|published|stored|sample|'
+                                        r'career|last (?:game|year|season))\b', line, re.I)):
+            # A plain name—side—line heading is an unverified proposal. Prose
+            # about a historical statistic is never promoted to an offer.
             continue
         stat, error = _market(line)
         if not stat or error:
@@ -435,17 +501,30 @@ def _apply_user(text, state, names, now):
     pick_index, reference_error, reference_spans = _pick_reference(text, state['recent_picks'])
     spans += reference_spans
     stat, market_error = _market(text)
+    clarification_answer = False
+    pending = state.get('pending_clarification')
+    # A short answer to our own question has a narrower meaning than the same
+    # words in a new proposal. "Threes" here identifies three-point attempts;
+    # elsewhere it continues to mean made threes.
+    if isinstance(pending, dict) and pending.get('player') == slots.get('player'):
+        reply = re.sub(r'[.!?]+$', '', text.strip()).casefold()
+        if re.fullmatch(r'(?:the )?(?:field goals?|fg|all shots?)(?: attempts?)?', reply):
+            stat, market_error = 'fga', None
+            clarification_answer = True
+        elif re.fullmatch(r'(?:the )?(?:threes|3s|three[- ]point|three[- ]pointers?)(?: attempts?)?', reply):
+            stat, market_error = 'tpa', None
+            clarification_answer = True
     new_game = bool(re.search(r'\b(?:next|different|new)\s+(?:game|matchup)\b', text, re.I))
     followup = bool(_FOLLOWUP.search(text) or (slots.get('player') and
                     (re.fullmatch(r'\s*' + _NUMBER + r'\s*[!?]?\s*', text)
                      or re.search(_NUMBER + r'\s*,?\s*(?:not|instead of|rather than)\s+' + _NUMBER, text, re.I))) or reference_spans
-                    or game_date or date_error or new_game)
+                    or game_date or date_error or new_game or clarification_answer)
     explanation = bool(_EXPLAIN.search(text))
     preference = _selection_preference(text, names)
     social = bool(_SOCIAL.fullmatch(text))
     both_teams = _constraint(text)
     count = _count(text)
-    asks = bool(_ASK.search(text))
+    asks = bool(_ASK.search(text) or clarification_answer)
     research = bool(_RESEARCH.search(text))
     line, line_error = _line(text, spans, bool(asks or stat or market_error or followup or players))
     side, choosing = _side(text)
@@ -479,6 +558,11 @@ def _apply_user(text, state, names, now):
             selected_card = None
         else:
             players = [selected_card['player']]
+    elif (len(state['recent_picks']) == 1 and not players and not ambiguous_names
+          and (followup or explanation) and not new_game
+          and (not stat or stat == state['recent_picks'][0]['stat'])):
+        pick_index, selected_card = 0, state['recent_picks'][0]
+        players = [selected_card['player']]
     elif (len(players) == 1 and (followup or explanation or not research)
           and (players[0] != prior.get('player') or not prior.get('stat') or stat
                or prior_pick_index is not None)):
@@ -552,7 +636,7 @@ def _apply_user(text, state, names, now):
             if selected_card.get('line_kind') == 'research_target' and not same_focus:
                 slots.pop('line', None)
                 slots.pop('side', None)
-    elif not (followup or asks or stat or line is not None or market_error):
+    elif not (followup or asks or stat or line is not None or market_error or explanation):
         # Ordinary discussion does not destroy focus, but it also must not route
         # through an unrelated previous player's statistics.
         return {'intent': 'research' if research else 'chat', 'slots': {}, 'original_question': text,
@@ -647,6 +731,8 @@ def _apply_user(text, state, names, now):
         clarification = 'Which player, statistic, and line should I choose More or Less for?'
     if clarification:
         intent = 'clarification'
+    state['pending_clarification'] = ({'kind': 'attempts', 'player': slots['player']}
+        if clarification and market_error == 'ambiguous_attempts' and slots.get('player') else None)
     canonical = entities['question']
     if slots.get('player') and intent in {'prop', 'explanation', 'preference'}:
         details = [slots['player']]
@@ -666,7 +752,7 @@ def _apply_user(text, state, names, now):
             'inherited': inherited, 'entities': entities}
 
 
-def resolve_conversation(store, master, text, history=None, state=None, now=None):
+def resolve_conversation(store, master, text, history=None, state=None, now=None, preferences=None):
     """Resolve a turn using bounded conversation history or an existing state.
 
     Persist ``state`` per user/chat if desired. When supplied, it is authoritative
@@ -677,6 +763,10 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
     names = _players(store, master)
     current = _clean_state(state, names, now)
     if state is None:
+        saved = validated_lineup_preferences(preferences)
+        current['constraints'].update({key: saved[key] for key in ('both_teams', 'preferred_stat') if key in saved})
+        if 'pick_count' in saved:
+            current['slots']['pick_count'] = saved['pick_count']
         for turn in (history or [])[-HISTORY_TURNS:]:
             item = _turn(turn)
             if not item:

@@ -515,7 +515,7 @@ def discussion_evidence(report):
     return cards
 
 
-def format_pick_discussion(report):
+def format_pick_discussion(report, question=''):
     """Useful non-AI fallback; no raw evidence dump or unverifiable prose."""
     if not report.get('available'):
         return report.get('reason') or 'I need a player, full statistic and line to assess the pick.'
@@ -534,10 +534,40 @@ def format_pick_discussion(report):
         evidence = (f"20-game baseline: average {baseline['reference_projection']:g}, "
                     f"median {baseline['baseline_median']:g}; same team, "
                     f"{', '.join(baseline['seasons'])}.\nCurrent-season context: " + evidence)
+    question = str(question).casefold()
+    if question and baseline.get('available'):
+        evidence = (f"{baseline['n']}-game same-team baseline: average {baseline['reference_projection']:g}, "
+                    f"median {baseline['baseline_median']:g} {metric}, through {baseline['last_date']}.")
+    if question and report['decision'] == 'pass' and not report.get('data_readiness', {}).get('ready', True):
+        reasons = report.get('data_readiness', {}).get('reasons') or []
+        if reasons:
+            first = f"{label} — Pass for now: {reasons[0]}"
+    if re.search(r'\b(?:what (?:is|does)|explain|define)\b.*\bpra\b|\bpra\b.*\bmean\b', question) and report['stat'] == 'pra':
+        return ('PRA means points plus rebounds plus assists. Each contributes to the combined total; '
+                'it is a different market from points alone. Your supplied line remains '
+                f"{report['line']:g} PRA.")
     if report['decision'] != 'pass':
         risk = ('Made threes depend on both attempts and shooting accuracy.' if report['stat'] == 'tpm'
                 else 'Reduced minutes or a role change could overturn this lean.')
     else:
         risk = 'Those results describe the sample, not this game’s win probability.'
+    if re.search(r'blowout|bench|fewer minutes|less minutes|playing time', question):
+        risk = ('If a blowout or rotation change reduces his minutes, both attempts and counting stats can fall. '
+                'I’m not predicting that he will be benched.')
+    elif re.search(r'revenge|old team|motivat', question):
+        risk = ('Facing his old team might matter to him, but motivation alone does not establish more shot '
+                'attempts or better shooting accuracy.')
+    elif re.search(r'change your mind|would change|what changes', question):
+        risk = ('I’d reassess if the actual line changes, his role or minutes change, or current game and '
+                'availability checks fail. None of those changes is assumed here.')
+    elif re.search(r'confiden|chance|probabil|how sure', question):
+        risk = ('Confidence is low. Historical averages and hit counts do not give a calibrated chance '
+                'of this pick winning; minutes and role can change.')
+    elif re.search(r'why|reason|what makes|concern|go wrong', question):
+        if baseline.get('available') and report['decision'] != 'pass':
+            first += ' The historical benchmark supports that side under the same rule used for the shortlist.'
+        risk = ('Made threes depend on both attempts and shooting accuracy; a minutes reduction can hurt either.'
+                if report['stat'] == 'tpm' else
+                'The main risk is a change in minutes or role; a historical average does not lock in this game’s result.')
     return (first + '\n' + evidence + '\n' + risk +
             f" Source: stored player games through {sample['last_date']}; current availability is not fully verified.")

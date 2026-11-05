@@ -1,0 +1,3 @@
+game_id,date,home_team,away_team,provider_game_id,statistic,reason
+nba:2025-12-13:NYK:ORL,2025-12-13,ORL,NYK,0022501229,home_score,Conflicting NBA source home/away headers; no consistent provider crosswalk; no full-game source proof.
+nba:2025-12-13:NYK:ORL,2025-12-13,ORL,NYK,0022501229,away_score,Conflicting NBA source home/away headers; no consistent provider crosswalk; no full-game source proof.

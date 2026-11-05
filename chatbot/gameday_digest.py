@@ -1,8 +1,9 @@
-"""One sourced Knicks injury digest per Eastern game day, independent of AI/stats.
+"""One Knicks pregame notice per Eastern game day, independent of AI/stats.
 
-A fresh, explicit schedule is required. News cannot establish a tipoff, and an
-unreachable schedule is never interpreted as an off day. Schedule-only records
-stay outside the game/result ledger so a calendar cannot settle an entry.
+Fresh verified timing permits the research digest. A trusted saved publication
+can still time a clearly labeled warning when live timing is unavailable; that
+warning never carries picks or certifies freshness. Calendar records stay out
+of the result ledger and cannot settle entries.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ EASTERN = ZoneInfo('America/New_York')
 UTC = dt.timezone.utc
 SCHEDULE_KEY = 'knicks_digest_schedule_v1'
 STATUS_KEY = 'knicks_digest_status'
+FULL_DIGEST_CATCHUP_SECONDS = 15 * 60
 
 
 def alert_mode():
@@ -186,6 +188,29 @@ def render_digest(store, game, now, schedule_checked, refresh_ok):
     return '\n\n'.join(lines)[:3450]
 
 
+def render_timing_notice(game, now, schedule_checked, *, error=None, late=False):
+    """A useful reminder without projections, injury claims or fresh-data labels."""
+    tip = _aware(game['start_time']).astimezone(EASTERN)
+    opponent = game['away_team'] if game['home_team'] == 'NYK' else game['home_team']
+    saved = bool(game.get('using_saved_calendar'))
+    lines = [f"Knicks pregame reminder — {tip.strftime('%b %d')}",
+             f"NYK vs {opponent} · {'saved ' if saved else ''}tipoff {tip.strftime('%I:%M %p').lstrip('0')} Eastern"]
+    if late:
+        lines.append('Catch-up notice: the bot resumed after the scheduled reminder time. The game has not reached its saved tipoff.')
+    if saved:
+        lines.append('Timing unverified: live schedule check failed' + (': ' + _clean(error, 160) if error else '.')
+                     + ' The saved published calendar supplies this reminder time; tipoff changes or cancellations may be missed.')
+    lines.append('Picks held in this notice. No previous picks or stale projections were attached. '
+                 'Use /picks for a new check; research stays on hold until its current-game checks pass.')
+    if saved:
+        lines.append('Calendar publication last checked: ' + str(schedule_checked))
+    else:
+        lines.append('Schedule checked: ' + str(schedule_checked))
+    source = urlsplit(game.get('source') or SCHEDULE_URL)
+    lines.append('Schedule source: ' + source._replace(query='', fragment='').geturl()[:250])
+    return '\n\n'.join(lines)
+
+
 class GamedayDigest:
     def __init__(self, store, worker, notify, now=None):
         self.store, self.worker, self.notify = store, worker, notify
@@ -199,14 +224,25 @@ class GamedayDigest:
         self._using_saved = False
         self._schedule_scope = 'published_season_calendar'
 
+    def _saved_publication(self, current):
+        from season_calendar import saved_schedule, current_season
+        saved = saved_schedule(self.store, current)
+        metadata = saved.get('metadata', {})
+        checked = _aware(metadata.get('source_checked_at'))
+        if (not saved or metadata.get('season') != current_season(current)
+                or metadata.get('source_kind') not in {'saved_publication', 'live_schedule'}
+                or 'NYK' not in metadata.get('covered_teams', [])
+                or not re.fullmatch('[0-9a-f]{64}', str(metadata.get('revision', '')))
+                or not checked or checked > current):
+            return {}
+        return {**saved, 'using_saved_calendar': True}
+
     def _fallback(self, snapshot, current):
         checked = _aware(snapshot.get('checked_at'))
         if snapshot.get('url') == self.url and checked and 0 <= (current-checked).total_seconds() < 1200:
             return snapshot
-        from season_calendar import saved_schedule
-        saved = saved_schedule(self.store, current)
+        saved = self._saved_publication(current)
         if saved:
-            saved['using_saved_calendar'] = True
             self.store.set_checkpoint(SCHEDULE_KEY, saved)
             return saved
         return {}
@@ -268,20 +304,26 @@ class GamedayDigest:
             fresh_full_schedule = bool(not snapshot.get('using_saved_calendar') and checked and
                                        0 <= (current-checked).total_seconds() < 900)
             today_saved = [game for game in snapshot.get('games', []) if game.get('date') == today]
+            schedule_error = None
             if today_saved and not fresh_full_schedule:
                 from game_schedule_check import refresh_game_schedule
                 event_check = await refresh_game_schedule(self.store,self.worker,now=current)
                 observed = {game['id']:game for game in event_check.get('games', [])}
                 if (event_check.get('status') != 'success' or
                         any(game['id'] not in observed for game in today_saved)):
-                    self._using_saved = True
-                    return self._status('schedule_unavailable', detail=
-                        'Current game timing could not be verified; the saved calendar is retained and no reminder was queued.')
-                snapshot = {**snapshot, 'games':[{**game, **observed[game['id']]} if game.get('date') == today else game
+                    trusted = self._saved_publication(current)
+                    if not trusted:
+                        self._using_saved = bool(snapshot.get('using_saved_calendar'))
+                        return self._status('schedule_unavailable', detail=
+                            'Current timing could not be verified and no trusted saved publication supplies a reminder time.')
+                    snapshot = trusted
+                    schedule_error = event_check.get('error') or 'Current event inventory did not verify the saved game.'
+                else:
+                    snapshot = {**snapshot, 'games':[{**game, **observed[game['id']]} if game.get('date') == today else game
                                                  for game in snapshot.get('games', [])],
                             'checked_at':event_check['checked_at'], 'url':event_check['source'],
                             'using_saved_calendar':False, 'schedule_scope':'current_day_events_only'}
-                self._schedule_scope = 'current_day_events_only'
+                    self._schedule_scope = 'current_day_events_only'
             # A cached calendar must not undo a later observed start/end/cancel
             # even if its complete-season fetch was recently successful.
             with self.store.connect() as db:
@@ -321,10 +363,29 @@ class GamedayDigest:
             if current >= tip:
                 return self._status('game_started', **next_info)
             key = 'knicks-gameday:' + today
-            if self.store.get_checkpoint(key):
-                return self._status('already_queued_today', game=game['id'], tipoff=tip.isoformat())
+            queued = self.store.get_checkpoint(key)
+            if queued:
+                return self._status('already_queued_today', game=game['id'], tipoff=tip.isoformat(),
+                    notice_kind=queued.get('notice_kind') if isinstance(queued, dict) else None,
+                    timing_verified=not self._using_saved, schedule_error=schedule_error)
             if current < due:
-                return self._status('waiting', **next_info)
+                return self._status('waiting', timing_verified=not self._using_saved,
+                                    schedule_error=schedule_error, **next_info)
+            catch_up = (current - due).total_seconds() > 60
+            warning_only = self._using_saved or (current - due).total_seconds() > FULL_DIGEST_CATCHUP_SECONDS
+            if warning_only:
+                game = {**game, 'using_saved_calendar': self._using_saved}
+                message = render_timing_notice(game, current, snapshot['checked_at'],
+                    error=schedule_error, late=catch_up)
+                accepted = await self.notify(message, event_key=key, expires_at=tip.timestamp())
+                if accepted:
+                    self.store.set_checkpoint(key, {'queued_at':current.isoformat(), 'game':game['id'],
+                        'tipoff':tip.isoformat(), 'notice_kind':'timing_warning' if self._using_saved else 'late_catchup'})
+                    return self._status('queued', game=game['id'], tipoff=tip.isoformat(),
+                        queued_at=current.isoformat(), notice_kind='timing_warning' if self._using_saved else 'late_catchup',
+                        timing_verified=not self._using_saved, schedule_error=schedule_error,
+                        catch_up=catch_up, **{k:v for k,v in next_info.items() if k not in {'next_game','tipoff'}})
+                return self._status('telegram_disabled', **next_info)
             # Collect again just before composing; the regular polling cycle remains
             # active on off days but is silent. This path never waits for the model.
             refreshed = True
@@ -368,7 +429,7 @@ def reminder_status(store):
     if report.get('schedule_mode') == 'saved_calendar':
         lines.append('Timing uses the saved published season calendar; live schedule changes are not currently verified.')
     if state == 'schedule_unavailable':
-        lines.append('Automatic timing is blocked: the current schedule could not be verified. '
+        lines.append('Automatic timing is blocked: no trusted saved or current schedule is available. '
                      'No off day or tipoff is assumed. /status shows the knicks_schedule error; '
                      '/diagnose tests the public schedule connection.')
     elif state == 'off_day':
@@ -379,7 +440,13 @@ def reminder_status(store):
         lines.append('Schedule coverage is incomplete and missing-game dates are unknown. This date is not confirmed as an off day.')
     elif state in {'queued', 'already_queued_today'}:
         lines.append('Today’s one game-day digest has been queued. Telegram retries delivery until tipoff.')
-    elif state in {'game_started', 'no_upcoming_tipoff_today'}:
+        if report.get('notice_kind') == 'timing_warning' or report.get('schedule_mode') == 'saved_calendar':
+            lines.append('This was a timing warning from the saved calendar; picks were held because live timing was unverified.')
+        elif report.get('notice_kind') == 'late_catchup':
+            lines.append('A late catch-up notice was queued without previous picks or stale projections.')
+    if report.get('schedule_error'):
+        lines.append('Live schedule check: ' + _clean(report['schedule_error'], 160))
+    if state in {'game_started', 'no_upcoming_tipoff_today'}:
         lines.append('No remaining confirmed tipoff today; no late injury digest will be sent.')
     elif state == 'telegram_disabled':
         lines.append('Telegram delivery is not configured; check the private bot settings.')
@@ -391,6 +458,7 @@ def reminder_status(store):
                       'Digest time: ' + due.astimezone(EASTERN).strftime('%b %d, %I:%M %p Eastern')])
     if report.get('mode') == 'knicks_gameday':
         lines.append(f"One digest per Knicks game day, {report.get('minutes_before_tipoff', 60)} minutes before tipoff, "
-                     'with independent projections and collected injury news. Compare target lines with PrizePicks afterward. '
+                     'with independent projections and collected injury news when timing is verified; '
+                     'otherwise a clearly labeled reminder holds picks. Compare target lines with PrizePicks afterward. '
                      'News collection continues quietly; /picks and /summary are available whenever you ask.')
     return '\n\n'.join(lines)

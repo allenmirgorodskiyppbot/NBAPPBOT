@@ -95,7 +95,7 @@ HELP = '''Knicks Research bot
 /selftest — isolated data/backup tests and read-only live health checks
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
 /picks [Nov 2|today|tomorrow] [2-6] — own projections; date/count optional
-/clear — clear this chat's recent conversation context
+/clear — clear this chat's conversation context and lineup preferences
 /diagnose — check the built-in public NBA feed connections
 /importstats — attach CSV/JSON box scores with this caption to import manual stats
 /importmaster — attach an updated master Excel with this caption to merge missing data
@@ -415,9 +415,11 @@ def parse_board_text(argument: str):
 
 class TelegramBot:
     def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None,
-                 model_status_callback=None, self_test_callback=None, research_refresh_callback=None):
+                 model_status_callback=None, self_test_callback=None, research_refresh_callback=None,
+                 answer_preferences_callback=None):
         self.store = store
         self.answer_callback = answer_callback
+        self.answer_preferences_callback = answer_preferences_callback
         self.model_status_callback = model_status_callback
         self.self_test_callback = self_test_callback
         self.research_refresh_callback = research_refresh_callback
@@ -517,8 +519,33 @@ class TelegramBot:
     def _remember(self, chat_id, update_id, question, answer=None):
         with self._db() as db:
             if answer is None:
-                db.execute('INSERT OR IGNORE INTO telegram_conversation VALUES (?,?,?,?,?)',
-                           (chat_id, update_id, question[:3000], None, utcnow()))
+                inserted = db.execute('INSERT OR IGNORE INTO telegram_conversation VALUES (?,?,?,?,?)',
+                           (chat_id, update_id, question[:3000], None, utcnow())).rowcount
+                if inserted:
+                    # Persist user lineup choices in the same transaction as the
+                    # user turn. An answer completion never writes preferences.
+                    from conversation import validated_lineup_preferences
+                    key = f'lineup_preferences:{chat_id}'
+                    saved = db.execute('SELECT value FROM telegram_state WHERE name=?', (key,)).fetchone()
+                    try:
+                        prior = validated_lineup_preferences(json.loads(saved['value'])) if saved else {}
+                    except (ValueError, TypeError):
+                        prior = {}
+                    # Adopt still-recent explicit user choices once when an
+                    # existing deployment gains durable preference storage.
+                    # Answers, player slots and offer values are never migrated.
+                    if saved is None:
+                        cutoff = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+                        recent = db.execute('SELECT question FROM telegram_conversation WHERE chat_id=? '
+                                            'AND created_at>=? ORDER BY update_id LIMIT 13', (chat_id, cutoff))
+                        for row in recent:
+                            prior.update(self._user_preference_changes(row['question'], prior))
+                    changes = self._user_preference_changes(question, prior)
+                    if changes or saved is None and prior:
+                        preferences = validated_lineup_preferences({**prior, **changes})
+                        db.execute('INSERT INTO telegram_state(name,value) VALUES (?,?) '
+                                   'ON CONFLICT(name) DO UPDATE SET value=excluded.value',
+                                   (key, json.dumps(preferences, sort_keys=True)))
             else:
                 # A completed older answer must not resurrect a conversation that
                 # was cleared, or a question already removed by the history limit.
@@ -527,6 +554,27 @@ class TelegramBot:
             db.execute('DELETE FROM telegram_conversation WHERE chat_id=? AND update_id NOT IN '
                        '(SELECT update_id FROM telegram_conversation WHERE chat_id=? '
                        'ORDER BY update_id DESC LIMIT 12)', (chat_id, chat_id))
+
+    @staticmethod
+    def _user_preference_changes(question, prior):
+        from conversation import lineup_preference_updates
+        changes = lineup_preference_updates(question[:3000])
+        if re.match(r'^/picks(?:@\w+)?(?:\s|$)', question, re.I):
+            try:
+                request = parse_picks_request(question, default_count=prior.get('pick_count', 4))
+            except ValueError:
+                return {}
+            if request is not None:
+                changes['pick_count'] = request['count']
+        return changes
+
+    def _lineup_preferences(self, chat_id):
+        """Private durable user choices; never player focus or source evidence."""
+        from conversation import validated_lineup_preferences
+        try:
+            return validated_lineup_preferences(json.loads(self._get_state(f'lineup_preferences:{chat_id}', '{}')))
+        except (ValueError, TypeError):
+            return {}
 
     def _get_state(self, name, default=''):
         with self._db() as db:
@@ -730,10 +778,14 @@ class TelegramBot:
                 log.warning('Tentative matchup recheck incomplete; original source dates retained.')
 
     def _pick_constraints(self, chat_id):
-        if chat_id is None or not callable(getattr(self.store, 'connect', None)):
+        if chat_id is None:
             return {}
+        preferences = self._lineup_preferences(chat_id)
+        if not callable(getattr(self.store, 'connect', None)):
+            return preferences
         from conversation import resolve_conversation
-        turn = resolve_conversation(None, self.store, 'Use my lineup preferences.', self._conversation(chat_id))
+        turn = resolve_conversation(None, self.store, 'Use my lineup preferences.', self._conversation(chat_id),
+                                    preferences=preferences)
         constraints = dict(turn.get('constraints', {}))
         count = turn.get('state', {}).get('slots', {}).get('pick_count')
         if type(count) is int and 1 <= count <= 6:
@@ -956,8 +1008,11 @@ class TelegramBot:
             return await self._independent_picks_reply(parse_picks_request(text), message['chat']['id'], text)
         if command == '/clear':
             with self._db() as db:
+                db.execute('BEGIN IMMEDIATE')
                 db.execute('DELETE FROM telegram_conversation WHERE chat_id=?', (message['chat']['id'],))
-            return 'Recent conversation context cleared. Your dataset and picks remain saved.'
+                db.execute('DELETE FROM telegram_state WHERE name=?',
+                           (f"lineup_preferences:{message['chat']['id']}",))
+            return 'Conversation context and lineup preferences cleared. Your dataset and picks remain saved.'
         if command == '/status':
             return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
         if command == '/freshness':
@@ -1120,8 +1175,8 @@ class TelegramBot:
             return 'Unknown command. Use /help to see available commands.'
         independent_request = parse_picks_request(text)
         if independent_request is not None:
-            response = await self._independent_picks_reply(independent_request, message['chat']['id'], text)
             self._remember(message['chat']['id'], update_id, text)
+            response = await self._independent_picks_reply(independent_request, message['chat']['id'], text)
             self._remember(message['chat']['id'], update_id, text, response)
             return response
         if len(text) > 3000:
@@ -1131,7 +1186,10 @@ class TelegramBot:
         self._remember(chat_id, update_id, text)
         typing = asyncio.create_task(self._typing(chat_id))
         try:
-            response = await self.answer_callback(text, history)
+            if self.answer_preferences_callback is not None:
+                response = await self.answer_preferences_callback(text, history, self._lineup_preferences(chat_id))
+            else:
+                response = await self.answer_callback(text, history)
         finally:
             typing.cancel()
             await asyncio.gather(typing, return_exceptions=True)

@@ -92,7 +92,7 @@ class CalendarFeatureTests(IsolatedMaster):
             import_calendar(self.store, invalid)
         self.assertEqual(len(saved_schedule(self.store, NOW)['games']), 80)
 
-    def test_saved_calendar_retained_but_reminder_held_without_current_event_verification(self):
+    def test_saved_calendar_sends_warning_only_without_current_event_verification(self):
         seed_calendar(self.store)
         now = dt.datetime(2026, 10, 30, 22, 30, tzinfo=UTC)  # 6:30pm ET.
         class BlockedWorker:
@@ -110,19 +110,22 @@ class CalendarFeatureTests(IsolatedMaster):
                 return function(*args, **kwargs)
             # Exercise real rendering/storage inline; executor scheduling has
             # separate coverage in the existing asynchronous Telegram tests.
-            with patch('gameday_digest.asyncio.to_thread', new=inline):
+            with patch('gameday_digest.asyncio.to_thread', new=inline), \
+                    patch('independent_picks.build_independent_picks') as picks:
                 first = await digest.tick()
                 await digest.tick()
+                picks.assert_not_called()
                 return first
         import asyncio
         result = asyncio.run(run())
-        self.assertEqual(result['state'], 'schedule_unavailable')
+        self.assertEqual(result['state'], 'queued')
         self.assertEqual(result['schedule_mode'], 'saved_calendar')
-        notify.assert_not_awaited()
-        self.assertIn('no reminder was queued', result['detail'])
+        notify.assert_awaited_once()
+        self.assertIn('Timing unverified', notify.await_args.args[0])
+        self.assertIn('Picks held', notify.await_args.args[0])
         self.assertEqual(len(saved_schedule(self.store, now)['games']),80)
         self.assertEqual(self.store.get_checkpoint('nba_schedule_today')['status'],'failed')
-        self.assertFalse(self.store.get_checkpoint('knicks-gameday:2026-10-30'))
+        self.assertTrue(self.store.get_checkpoint('knicks-gameday:2026-10-30'))
 
 
 class ProjectionFeatureTests(IsolatedMaster):

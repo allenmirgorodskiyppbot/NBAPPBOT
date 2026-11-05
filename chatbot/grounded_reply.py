@@ -1375,7 +1375,9 @@ def natural_fallback_reply(cards, required=(), failure_message=None):
             break
     message = '\n'.join(facts) or 'I need a clearer player, statistic or line to give a useful assessment.'
     if facts:
-        message += '\nI could not complete the explanation, so these are saved facts rather than a pick recommendation.'
+        message += ('\nThose are historical results; minutes and role can change this game’s outcome.'
+                    if any(str(card.get('kind', '')).startswith('prop_') for card in used) else
+                    '\nThese records provide historical context; they do not establish current game conditions.')
     footer = _natural_footer(used)
     return {'answer':message+('\n\n'+footer if footer else ''), 'sources':_natural_sources(used),
             'ai_used':False, 'ai_failure_category':'grounding_error'}

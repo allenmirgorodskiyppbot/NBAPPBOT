@@ -304,6 +304,14 @@ class NightlyNBARefresh:
                         self.store.feed_failure('nba_daily_refresh',type(error).__name__+(f': HTTP {code}' if code else '')+
                             '; previous-day data not available for '+day+'. Prior verified values retained; hourly retry is automatic.')
                 status['last_attempt']=now.isoformat()
+                # A corrected publication can retract a prior complete day.
+                # Re-read the committed checks instead of retaining the date
+                # computed before this batch's partial/revised inventories.
+                with self.store.connect() as db:
+                    current_days=[json.loads(row[0]) for row in db.execute(
+                        "SELECT value_json FROM checkpoints WHERE name LIKE 'daily_nba:%'")]
+                through=max((r['date'] for r in current_days if r.get('complete') is True
+                             and isinstance(r.get('date'),str) and r['date']<=target),default=None)
             if tracking_attempt:
                 try:
                     tracking=await self.worker.request(self.base+'/existing_tracking.json')
