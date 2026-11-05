@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "previous_tested_source_ref": "ac9fb49434891885fd414cc916bc430527085ea1",
+  "new_tested_source_ref": "d58bf21cadf741615b99ad9eb1e802681eaca49d",
+  "ci": {
+    "run_id": 42113271741,
+    "job_id": 127546138030,
+    "tests_passed": 1528,
+    "seconds": 144.195,
+    "conclusion": "success",
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42113271741"
+  },
+  "live_evidence": {
+    "source": "User-supplied chatbot stage logs; no direct authenticated access.",
+    "automatic": {
+      "seconds": 12.9,
+      "passed": 20,
+      "failed": 0,
+      "warnings": 2
+    },
+    "manual": [
+      {
+        "seconds": 78.8,
+        "passed": 16,
+        "failed": 0,
+        "warnings": 2,
+        "last_stage_when_reply_expired": "Master Excel export contains imported data"
+      },
+      {
+        "seconds": 68.8,
+        "passed": 16,
+        "failed": 0,
+        "warnings": 2,
+        "last_stage_when_reply_expired": "Finishing self-test report"
+      }
+    ],
+    "telegram_fixture_completed_in_seconds": [
+      2.6,
+      3.4
+    ],
+    "diagnosis": "Completed reports were not delivered because the Telegram command awaited only 60 seconds. Wall time increased across database reads and fixture export under server load. The checks themselves did not report failure.",
+    "warning_details": "The stage excerpt reports two warnings without listing their detailed categories."
+  },
+  "managed_environment_probe": {
+    "standalone_nested_loop_stall": "Environment-specific wakeup artifact. Same fixture passed with local networking permission and in a cached network-disabled container. No production heartbeat change is justified by this probe.",
+    "production_telegram_fixture_not_the_stall": true
+  },
+  "live_retest_pending": true,
+  "change": {
+    "owner_command": "/selftest starts a durable background job; /selftest status reads progress and the last report.",
+    "completion": "Finished report and terminal status are queued atomically through the existing private Telegram outbox.",
+    "deduplication": "One manual self-test at a time; duplicate requests and delivery retries do not rerun its checks.",
+    "lifecycle": "Polling restarts retain owned jobs; application shutdown records interruption. A computed result survives finalization cancellation.",
+    "core_checks": "Existing native single-flight worker, fixture isolation, numerical assertions and source warnings are retained.",
+    "status": "In-memory progress avoids model/database work and queued jobs show total request time."
+  },
+  "focused_tests": {
+    "passed": 44,
+    "seconds": 2.795,
+    "new_background_cases": 12,
+    "app_progress_cases": 3
+  },
+  "actual_delayed_delivery_trial": {
+    "method": "Actual wall-clock delayed synthetic callback, isolated temporary DB, private allowlist, no model/network delivery; managed test-loop heartbeat only in validation harness.",
+    "ack_seconds": 0.14,
+    "final_report_seconds": 65.153,
+    "old_60_second_window_crossed": true,
+    "callback_calls": 1,
+    "terminal_rows": 1,
+    "final_outbox_messages": 1,
+    "status_while_running": true,
+    "duplicates_did_not_repeat_check": true,
+    "telegram_source_sha256": "b03f61427a2917376defdfc59a940f111273286f08a7c376214611ff8bfc9093"
+  },
+  "source_sha256": {
+    "chatbot/app.py": "924fed827dda650b6b94753e27ae3723a63ca6ae26a1174f05da7eed99a91203",
+    "chatbot/self_check.py": "2592246555c4baaeb0e9868b947a01215ab8f305265c94f21b99d6f90c0632e2",
+    "chatbot/telegram_bot.py": "b03f61427a2917376defdfc59a940f111273286f08a7c376214611ff8bfc9093",
+    "chatbot/test_app_selftest_status.py": "3ad4ee76d87f30480785b5d54cc11130998200ce96ca77f8754af24fc142f19f",
+    "chatbot/test_selftest_background.py": "6ed9ab9c3db5ee81dcadd02e2d106a2ecd4a8a2f3596615aff487edb7620a599",
+    "chatbot/test_selftest_runtime.py": "b7412a0354050b8832951900ca9d834aca6076a1baf70606f81e99d6fee1f4e5",
+    "chatbot/test_telegram.py": "55df963c11ef756d586e5cf3ae30f336f529ff2da054332cb57d2546313318d8"
+  },
+  "limits": [
+    "Delayed callback test uses an isolated temporary database and durable outbox; it does not send a real Telegram message.",
+    "Measured 0.14-second acknowledgment and 65-second completion are local validation timings, not deployment latency guarantees.",
+    "The deployed stage logs reported no failed checks and two warnings; their categories were not present in the excerpt.",
+    "Current timing and tracking gaps are not bypassed.",
+    "Activation and a new live /selftest result are still required."
+  ]
+}

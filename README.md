@@ -8,9 +8,9 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 data and reliability upgrade
 
-Tested application `SOURCE_REF`: `ac9fb49434891885fd414cc916bc430527085ea1`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42108879787)
-passed all **1,513 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `d58bf21cadf741615b99ad9eb1e802681eaca49d`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42113271741)
+passed all **1,528 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 
@@ -641,7 +641,8 @@ Useful Telegram commands:
 | `/reminder` | Next Knicks game/send time, saved-calendar use or timing uncertainty |
 | `/usage` | AI work counters, cache reuse and the hosting-billing distinction |
 | `/ai_status` | Model readiness, active request and last sanitized failure |
-| `/selftest` | Temporary-fixture business checks and read-only live integrity checks |
+| `/selftest` | Start background fixture/read-only checks and receive the finished report |
+| `/selftest status` | Check stage, elapsed time and the latest saved report |
 | `/summary [injuries\|news\|trades]` | Saved sourced reports without waiting for AI |
 | `/playerlog NAME \| points \| 5` | Stored game observations and averages |
 | `/boards`, `/analyze BOARD_ID` | Saved available lines and their research report |
@@ -654,9 +655,17 @@ Useful Telegram commands:
 | `/clear` | Clear recent chat context without deleting the dataset or entries |
 | `/help` | Upload formats and the remaining commands |
 
+`/selftest` runs as a background owner job: it confirms the start, then sends the
+finished report through the durable Telegram outbox. `/selftest status` shows its
+stage, elapsed time or last report without starting another check. A busy server
+can take longer than one minute; the reply deadline no longer discards a completed
+report. Repeating the command while it is active does not launch another worker.
+See the [background self-test validation](data/reports/2026-11-05/selftest_background_validation.json).
+
 Self-test fixture exports run separately from the full-master Excel queue. Normal
-full-master exports remain serialized. Live integrity checks have an eight-second
-budget each, and the read-only counts/feed snapshot has a three-second budget;
+full-master exports remain serialized. Live integrity checks have an eight-second SQLite execution
+budget each, and the read-only counts/feed snapshot has a three-second budget.
+Wall time also includes storage waits and scheduling under server load;
 unavailable or unfinished reads produce warnings, while confirmed corruption
 produces failure. Replies and logs include safe error categories and check times.
 A requester timing out does not release the worker guard before its native thread
