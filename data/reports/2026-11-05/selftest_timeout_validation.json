@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "tested_source_ref": "ac9fb49434891885fd414cc916bc430527085ea1",
+  "ci": {
+    "run_id": 42108879787,
+    "job_id": 127530860476,
+    "tests_passed": 1513,
+    "seconds": 140.997,
+    "conclusion": "success",
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42108879787"
+  },
+  "problem": {
+    "reported_live_error_type": "TimeoutError",
+    "exact_live_timeout_stage_unknown": true,
+    "reproduced_defect": "A temporary fixture export waited behind the global full-master export lock. Caller timeout released the async guard while its native thread remained alive, permitting duplicate workers."
+  },
+  "changes": [
+    "Temporary fixture Excel exports bypass the full-master export queue; normal full-master builds remain serialized.",
+    "Live integrity reads have an 8-second budget each; the counts/feed snapshot uses one read-only connection with a 3-second budget and short lock waits.",
+    "Unavailable, locked, timed-out or pruned read-only sources report warnings; confirmed corruption reports failure.",
+    "The single-flight guard remains held until native worker completion, including caller or wrapper cancellation.",
+    "Safe stage, elapsed time and exception category appear in diagnostics; Telegram distinguishes its 60-second reply limit.",
+    "Graceful shutdown waits for an active check before removing its workbook."
+  ],
+  "full_size_local_trial": {
+    "source_database_bytes": 546770944,
+    "elapsed_seconds": 1.672,
+    "full_master_export_lock_held": true,
+    "original_database_unchanged": true,
+    "summary": "Self-test: 15 passed, 0 failed, 1 warnings.",
+    "warning": "No RSS collection results were present in the delivered validation database.",
+    "scope": "Local full-size delivered data plus an isolated fixture export; not authenticated Akash validation. Existing managed test-loop heartbeat was used only in the validation harness."
+  },
+  "prior_deployed_version_checks": {
+    "source_ref": "39c4cef17570e28c9c4dbe6a08811504e6fd2fbc",
+    "evidence": "User-supplied live Telegram replies and chatbot logs, not direct authenticated access.",
+    "passed": [
+      "Correct source reference and model ready.",
+      "Game observations through November 4, with no pending import dates.",
+      "Correct saved Knicks away game at Cleveland on November 7 at 8 PM Eastern; current timing and availability explicitly unverified.",
+      "Follow-up retained the selected matchup without repeated team names.",
+      "Direct five-game Brunson points sum 137 and average 27.4, with dates and sources.",
+      "Reminder configured for November 7 at 7 PM Eastern; actual future delivery not tested.",
+      "Manual refresh completed with no changes, Excel ready, and source limitations disclosed.",
+      "Missing-stat clarification retained Brunson and 22.5; points follow-up retained the threshold and returned a source-held Pass."
+    ],
+    "remaining_source_limits": [
+      "Eight tracking categories have unknown covered-game dates.",
+      "Overall and Less Than 6Ft tracking remain unavailable.",
+      "Current game timing remains unverified or expired."
+    ]
+  },
+  "limits": [
+    "The final bundle still requires deployment and new live self-test and date-context replies.",
+    "The exact original live timeout stage was not present in the old log; the export queue defect was independently reproduced.",
+    "These checks do not prove future scheduled-message delivery, live screenshot extraction or pick profitability.",
+    "Model, reserved resources, data population, statistics, ledger and refresh schedule were not changed by this patch."
+  ],
+  "local_full_regression": {
+    "tests_passed": 1499,
+    "seconds": 222.039,
+    "conclusion": "success"
+  },
+  "followup_problem_found": {
+    "previous_deployed_source": "39c4cef17570e28c9c4dbe6a08811504e6fd2fbc",
+    "expected_focused_game_date": "2026-11-07",
+    "reported_prop_date": "2026-11-05",
+    "player_market_line_retained": true,
+    "incorrect_qualitative_text": "Historical data shows the stat above median and mean.",
+    "expected_comparison": "Compare historical mean and median with the offered line."
+  },
+  "intermediate_selftest_patch_ci": {
+    "source_ref": "fa8c14b06438fb02199ae2a30b047064b5546b94",
+    "run_id": 42106878722,
+    "tests_passed": 1499,
+    "seconds": 160.388,
+    "conclusion": "success"
+  },
+  "additional_followup_repairs": {
+    "verified_matchup_context": "The saved discussed game date survives a new related prop, missing-market clarification, and later why follow-ups. Explicit user dates override; source publication dates are excluded. Players outside the matchup need clarification.",
+    "old_context": "A newly source-validated preview clears prior prop slots while retaining preferences and pick count.",
+    "actual_old_history_replay": "The user-reported old November 5 prop response now resolves to the discussed November 7 game without clearing history.",
+    "comparison_checks": "Unsupported self-comparisons and reversed mean/median-to-line statements are rejected or repaired; supported variants and individual-outcome discussion remain valid.",
+    "parsed_text_contract": "Compact digit, newline and comparison validation checks the actual parsed analysis text. A negative test with an otherwise approved numeric median proves the qualitative-only check executes.",
+    "focused_date_tests": {
+      "passed": 118,
+      "seconds": 14.404
+    },
+    "focused_comparison_tests": {
+      "passed": 126,
+      "seconds": 8.869
+    },
+    "combined_final_package": {
+      "passed": 28,
+      "seconds": 5.101
+    }
+  },
+  "final_source_files_sha256": {
+    "chatbot/app.py": "f92b96821e1d32685b359e092b7bfa8a569888e1ff352bdb97f79f2b7dfb5646",
+    "chatbot/conversation.py": "19bc84c1a62626f47c69b751fcca96b52edd36f24ed03b0459e8ea4c378326f3",
+    "chatbot/test_game_prop_date_context.py": "5ffc08e8248431de47c3e5b4fc6125833d0f871cc36823d3af8a096e3c97143f",
+    "chatbot/test_prop_comparison_language.py": "94f5d2a06a055b8b9b11c5d92095b978703aeade9d7287fb0482df3553502cc5",
+    "chatbot/upcoming_game.py": "0630efa730049ec6f3b588ed62da5f17873e723585f5f0cb7926e5425603975a"
+  },
+  "deployment_activation": {
+    "requires_new_source_ref": true,
+    "manual_refresh_completed_before_redeploy": true,
+    "authenticated_akash_access": false,
+    "new_bot_messages_sent_by_assistant": 0
+  }
+}

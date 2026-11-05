@@ -8,10 +8,11 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 data and reliability upgrade
 
-Tested application `SOURCE_REF`: `39c4cef17570e28c9c4dbe6a08811504e6fd2fbc`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42099681375)
-passed all **1,478 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `ac9fb49434891885fd414cc916bc430527085ea1`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42108879787)
+passed all **1,513 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
+The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 
 The current research benchmark is the **arithmetic mean of the latest 20 usable,
 completed regular-season games for the player's current team**, strictly before
@@ -405,7 +406,10 @@ gets a short clarification. The bot also distinguishes preferences and lineup
 instructions from requests for team statistics. `/clear` removes this context.
 Ordinal questions such as “why the second one?” select that player and market.
 Corrections such as “18.5, not 19.5” update the discussion, and switching game dates
-clears the earlier offer. Explanations keep held and unavailable legs visible,
+clears the earlier offer. A saved preview supplies the related prop’s game date after
+the application rechecks its calendar row. Explicit user dates override that context;
+players outside the discussed matchup require clarification. Publication dates never
+become the game date. Explanations keep held and unavailable legs visible,
 including mixed lists of hypothetical targets and user-provided lines. Larger
 lineups receive a complete computed summary when they exceed the AI's bounded
 evidence budget.
@@ -649,6 +653,14 @@ Useful Telegram commands:
 | `/importmaster` | Instructions, or caption an enriched `.xlsx` for an additive merge with backup |
 | `/clear` | Clear recent chat context without deleting the dataset or entries |
 | `/help` | Upload formats and the remaining commands |
+
+Self-test fixture exports run separately from the full-master Excel queue. Normal
+full-master exports remain serialized. Live integrity checks have an eight-second
+budget each, and the read-only counts/feed snapshot has a three-second budget;
+unavailable or unfinished reads produce warnings, while confirmed corruption
+produces failure. Replies and logs include safe error categories and check times.
+A requester timing out does not release the worker guard before its native thread
+finishes. See the [self-test timeout validation](data/reports/2026-11-05/selftest_timeout_validation.json).
 
 Self-tests do not place entries, call a sportsbook, inject sample records into the
 live master, or establish the quality/speed of a generated AI answer. Checks with
