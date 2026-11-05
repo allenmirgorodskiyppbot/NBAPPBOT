@@ -8,9 +8,9 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 data and reliability upgrade
 
-Tested application `SOURCE_REF`: `6cde91eea7c97e90c3f20e1233701d1de4ae02b6`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42070042831)
-passed. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `530e69c294b0adf3e0d47bf2690e699b3f34d72b`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42080813093)
+passed all **1,383 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 
 The current research benchmark is the **arithmetic mean of the latest 20 usable,
 completed regular-season games for the player's current team**, strictly before
@@ -97,6 +97,14 @@ separate concurrency groups and disjoint file scopes, so timing checks cannot
 cancel a pending daily refresh. Git API publication preserves unrelated commits,
 checks for conflicting source changes and honors the same token/branch rules.
 
+If direct historical inventory endpoints refuse requests, a completed nonempty
+regular-season date can be corroborated by an exact match across the published NBA
+calendar, two-sided NBA final team results and independently validated ESPN full
+boxes. All source hashes/publication times remain visible. This fallback does not
+verify live timing, empty off days or unannounced Cup/TBD events. A missing ESPN ID
+can be completed only from an existing unique registered NBA/ESPN identity and
+the same validated current-season source; existing provider IDs cannot be replaced.
+
 A trusted saved game calendar can now produce a single **timing-unverified reminder
 one hour before its scheduled tipoff** when live verification fails. The message
 explains the hold; it contains no unverified picks. Verified current timing retains
@@ -114,8 +122,10 @@ preference or a verified offer.
 
 Send **`/refresh`** (or **`/update`**) to start an on-demand dataset check. The bot
 acknowledges immediately and posts the result in the same private chat when the
-background job finishes. One job runs at a time. A restart reports interruption;
-it does not silently replay completed imports. User-requested checks bypass the
+background job finishes. **`/refresh status`** (or **`/update status`**) shows the
+current stage, elapsed time and last result without starting another job. One job
+runs at a time. A Telegram polling restart preserves an active refresh; application
+shutdown records interruption without silently replaying completed imports. User-requested checks bypass the
 normal service polling timers while respecting source/host refusal cooldowns.
 
 Results distinguish changed values, unchanged verified saved sources, and partial
@@ -390,21 +400,30 @@ constraints and market preferences carry into subsequent Telegram research.
 Hypothetical `/picks` targets remain distinct from uploaded sportsbook lines.
 Conversational answers do not create entries or modify the financial ledger.
 
-When the needed evidence is available, one compact model request supplies the
-explanation. Simple conversation is also model-generated, with a small prompt;
-there are no canned greeting or thank-you responses. Questions needing additional
+Routine prop decisions, reasons, risk questions, definitions, preferences and
+acknowledgments use checked calculations and concise replies without waiting for
+inference. These replies also work while the model is starting or busy. Explicit
+requests for a deeper explanation still use the local model, with a 35-second
+discussion budget and a checked fallback. Questions needing additional
 data retain the retrieval tools and use the same final source contract. Invalid
 explanations get one bounded repair attempt, then return a concise computed
 assessment or labeled saved facts if still invalid. `/ai_status` retains the actual
 failure and timing information. Rejected replies are never reused from the cache.
 Compact prompts carry each selected fact once, with full source metadata
-retained for rendering. Short explanations have a smaller output budget and a
+retained for rendering. Compact research requests have a smaller output budget and a
 180-second total request limit including any repair, with no automatic retry
 after a timeout. Telegram displays a typing indicator while generating a reply.
 Follow-up messages in the same chat wait for the preceding answer so they receive
 completed context; health commands remain available while it works.
 Clearing chat history during a request cannot restore the deleted conversation
 when that request completes.
+
+Ask **“what’s up next?”**, **“who do we play?”**, or **“what should we expect?”**
+after a game preview. The bot looks up the next saved Knicks matchup, gives its
+Eastern date/time and dated recent scoring/results for both teams, and lists
+verified game-specific availability when present. This overrides an older prop
+discussion. Saved calendar timing and incomplete team schedules remain explicitly
+qualified; a quick preview does not certify live timing or authorize a pick.
 `/ai_status` includes active-job elapsed time and timings for the latest compact
 reply phase, including model loading, prompt evaluation and generation when
 provided. Those phase counters do not include earlier retrieval calls; `/usage`

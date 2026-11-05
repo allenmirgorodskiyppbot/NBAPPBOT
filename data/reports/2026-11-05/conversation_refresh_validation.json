@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "application_source_ref": "530e69c294b0adf3e0d47bf2690e699b3f34d72b",
+  "prepared_at": "2026-11-05T18:05:54.100710+00:00",
+  "regression_workflow": {
+    "run_id": 42080813093,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42080813093",
+    "status": "completed",
+    "conclusion": "success",
+    "tests_passed": 1383,
+    "seconds": 147.001,
+    "job_id": 127433037370
+  },
+  "targeted_final_layout": {
+    "passed": 29,
+    "seconds": 20.91,
+    "scope": "Final real repository layout: corrected routing expectations, actual worker contention/cancellation/fatal-error tests, clean bootstrap import."
+  },
+  "focused_checks": {
+    "conversation_routing_grounding": 210,
+    "history_import_concurrency": 104,
+    "schedule_nightly_controller_progress": 85
+  },
+  "routine_reply_benchmark": {
+    "cases": 15,
+    "model_calls": 0,
+    "median_seconds": 0.101091,
+    "max_seconds": 0.151508,
+    "scope": "Controlled historical replay over actual public observations; synthetic clock/readiness fixtures; not live Telegram latency or betting performance."
+  },
+  "next_game_preview": {
+    "seconds": 0.13011,
+    "words": 105,
+    "model_calls": 0,
+    "network_calls": 0,
+    "scope": "Read-only delivered master; saved timing explicitly qualified, dated scored/allowed sample, availability unverified."
+  },
+  "history_writer_profile": {
+    "source_events": 192080,
+    "unchanged_before_seconds": 9.409,
+    "unchanged_after_seconds": 0.169,
+    "insert_679_rows_seconds": 0.228,
+    "competing_writes_over": 1000,
+    "competing_write_failures": 0,
+    "scope": "Isolated copy; complete validation outside writer lock; original master unchanged."
+  },
+  "historical_inventory_recovery": {
+    "publication_status": "published_verified",
+    "validated_dates": {
+      "2026-11-02": {
+        "games": 15,
+        "player_rows": 394
+      },
+      "2026-11-04": {
+        "games": 14,
+        "player_rows": 378
+      }
+    },
+    "scope_players": 490,
+    "requires": "Exact NBA calendar + two-sided final team results + independently validated complete ESPN boxes.",
+    "excludes": [
+      "Live schedule freshness",
+      "Empty off-day certification",
+      "Unannounced Cup/TBD inventory"
+    ],
+    "publication_commit": "7dc86afec30edc83a3ae693a93aa33f22447e35a",
+    "scope_revision": "120b5516f0449fafdfdf8d3f2805c53bb6be9c1dc37d0d23e2737fdee9318d38",
+    "public_sha256": {
+      "2026-11-02.json": "44cc42794852f2dee79f8041c0de37bf6aadf4f6fce5560d5c05f3d47b07b0e7",
+      "2026-11-04.json": "43057d779958f05af74e3ba1b1d7d88f1f684f968fbececf79b7ead2b992bf50",
+      "existing_dataset_scope.json": "55f7768ec78515c46d851c05ac9a9ea870f27bf5f382c3154487de60932d8abf",
+      "historical_matchups_manifest.json": "294baf0050c1075f8d849df4f32fa97d6ec5229d961ec034dd468f81dec85d7c"
+    },
+    "historical_relay": {
+      "measured_observations": 9388,
+      "separate_aggregates": 4403,
+      "observations_through": "2026-11-02",
+      "all_four_parts_verified": true
+    }
+  },
+  "excel_download_transport": {
+    "authenticated_status": 200,
+    "unauthorized_status": 401,
+    "bytes": 77744783,
+    "sheets": 93,
+    "sha256": "a4211fba9ef7ab618a0d16f8de6a3783749f7dbe0c9ce23575c5df7dedf1d9a3",
+    "scope": "Actual prebuilt validated workbook bytes through isolated authenticated ASGI download route; tests transport, not live Akash or rebuilding."
+  },
+  "live_checks": {
+    "akash_authenticated_test": false,
+    "telegram_messages_sent": 0,
+    "activation_required": true
+  },
+  "unchanged_source_limits": [
+    "Overall and Less Than 6Ft closest-defender data unavailable",
+    "Eight aggregate tracking categories have unknown covered-game dates",
+    "Current-game recommendations still require independent current timing and import checks; a saved preview does not certify them."
+  ],
+  "verified_at": "2026-11-05T18:11:41.096326+00:00",
+  "daily_collector_workflow": {
+    "run_id": 42080812725,
+    "conclusion": "success",
+    "publication_commit": "7dc86afec30edc83a3ae693a93aa33f22447e35a"
+  }
+}
