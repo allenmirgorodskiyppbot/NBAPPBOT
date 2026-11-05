@@ -1,0 +1,49 @@
+{
+  "attempted_at": "2026-11-05T16:11:38.328638+00:00",
+  "phase": "checked",
+  "schema_version": 1,
+  "scope": "Collector health only; successful collection does not establish complete current player availability.",
+  "sources": {
+    "official_pdf": {
+      "attempted_at": "2026-11-05T16:11:38.328638+00:00",
+      "error_type": "ReadTimeout",
+      "http_status": null,
+      "index_url": "https://official.nba.com/nba-injury-report-2026-27-season/",
+      "note": "Original publisher was unavailable or could not be parsed reliably; previous evidence and its original report/retrieval times were retained.",
+      "retained_pdf_records": 0,
+      "source_kind": "official_pdf",
+      "status": "unavailable"
+    },
+    "structured_extracts": {
+      "coverage": [
+        {
+          "distinct_records": 30048,
+          "game_dates_represented_through": "2026-11-06",
+          "report_clock_unknown": 1098,
+          "report_data_through_date": "2026-11-05",
+          "source_content_sha256": "76b15fd1a49a082fa809913bfd8b43eed96e1a1b5bf672949f1b5e26000b757a",
+          "source_kind": "official_extract",
+          "source_published_at": "2026-11-05T15:13:29+00:00",
+          "source_rows": 30048,
+          "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_injury_report/injury_report_2027.parquet",
+          "status": "collected"
+        },
+        {
+          "distinct_records": 3019,
+          "game_dates_represented_through": null,
+          "report_clock_unknown": 3019,
+          "report_data_through_date": "2026-11-04",
+          "source_content_sha256": "4910c9e5a918ae265ab1600c64e9bf23dee1c20a2ead2d141185115652f50ae5",
+          "source_kind": "espn_injury_snapshot",
+          "source_published_at": "2026-11-04T20:20:13+00:00",
+          "source_rows": 3019,
+          "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_injuries/injuries_2027.parquet",
+          "status": "collected"
+        }
+      ],
+      "note": "Structured source evidence; collection success does not establish complete current official availability.",
+      "records": 33067,
+      "status": "updated"
+    }
+  }
+}
