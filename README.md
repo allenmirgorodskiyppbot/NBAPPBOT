@@ -8,8 +8,8 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 5 history and strategy upgrade
 
-Tested application `SOURCE_REF`: `f9243b6c946fac219a7a9944ad882ff58f34294c`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/41983132608)
+Tested application `SOURCE_REF`: `b1e1f82c5b6be4dd83781dfd3cd73938aad608c1`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42038368133)
 passed. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 
 The current research benchmark is the **arithmetic mean of the latest 20 usable,
@@ -37,8 +37,9 @@ available sides and payouts were absent, so the simulation is not a sportsbook
 ROI backtest. New pregame archives retain forecasts, supplied offers and passes
 for later evaluation; unavailable payouts remain unknown.
 
-The release also supplies the available careers of **468 current published roster
-identities**, while retaining 20 additional existing scope members. The earliest
+The release supplies available careers for current roster identities and every
+named matchup participant, including veterans absent from the current-season
+feed. Reviewed aliases share one provider identity. The earliest
 included career begins with LeBron James in **2003–04**. Historical teams,
 regular seasons, playoffs and play-in games stay separately labeled. ESPN player
 IDs prevent a current player from inheriting a retired namesake's records.
