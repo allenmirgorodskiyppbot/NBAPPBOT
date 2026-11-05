@@ -149,7 +149,7 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
             continue
         seen.add(identity)
         opponent = game['away_team'] if player['team'] == game['home_team'] else game['home_team']
-        availability = player_availability(news, player['player'], game['date'], now)
+        availability = player_availability(news, player['player'], game['date'], now, store=store)
         freshness = team_freshness[player['team']]
         if freshness['ready'] and not availability['blocked']:
             freshness = assess_pregame_freshness(store, game['date'], player['team'], now,

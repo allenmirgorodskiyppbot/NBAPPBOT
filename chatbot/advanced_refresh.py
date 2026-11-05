@@ -26,10 +26,20 @@ MAPS={
  'Overall':{'D_FGM':'defended_fgm','D_FGA':'defended_fga'},
  'Less Than 6Ft':{'D_FGM':'rim_defended_fgm','D_FGA':'rim_defended_fga'},
  'Rim':{'DEF_RIM_FGM':'rim_defended_fgm','DEF_RIM_FGA':'rim_defended_fga'},
- 'Hustle':{'CONTESTED_SHOTS':'contested_shots','DEFLECTIONS':'deflections'},
+ 'Hustle':{'MIN':'minutes','CONTESTED_SHOTS':'contested_shots',
+           'CONTESTED_SHOTS_2_PT':'contested_two_point_shots','CONTESTED_SHOTS_3_PT':'contested_three_point_shots',
+           'DEFLECTIONS':'deflections','CHARGES_DRAWN':'charges_drawn',
+           'SCREEN_ASSISTS':'screen_assists','SCREEN_AST_PTS':'screen_assist_points',
+           'OFF_LOOSE_BALLS_RECOVERED':'offensive_loose_balls_recovered',
+           'DEF_LOOSE_BALLS_RECOVERED':'defensive_loose_balls_recovered',
+           'LOOSE_BALLS_RECOVERED':'loose_balls_recovered','OFF_BOXOUTS':'offensive_boxouts',
+           'DEF_BOXOUTS':'defensive_boxouts','BOX_OUT_PLAYER_TEAM_REBS':'boxout_team_rebounds',
+           'BOX_OUT_PLAYER_REBS':'boxout_player_rebounds','BOX_OUTS':'boxouts'},
  'Named pair':{'MATCHUP_MIN':'matchup_minutes','PARTIAL_POSS':'partial_possessions','PLAYER_PTS':'player_points',
                'TEAM_PTS':'team_points','MATCHUP_FGM':'fgm','MATCHUP_FGA':'fga','MATCHUP_FG3M':'tpm','MATCHUP_FG3A':'tpa',
-               'MATCHUP_FTM':'ftm','MATCHUP_FTA':'fta','MATCHUP_AST':'ast','MATCHUP_TOV':'tov','SFL':'shooting_fouls'}}
+               'MATCHUP_FTM':'ftm','MATCHUP_FTA':'fta','MATCHUP_AST':'ast','MATCHUP_TOV':'tov','SFL':'shooting_fouls',
+               'MATCHUP_POTENTIAL_AST':'potential_assists','MATCHUP_BLK':'blocks','HELP_BLK':'help_blocks',
+               'HELP_FGM':'help_fgm','HELP_FGA':'help_fga','SWITCHES_ON':'switches_on'}}
 
 
 def result_rows(document):
@@ -227,8 +237,8 @@ async def collect_tracking(collector,output,categories=None):
         if category not in selected:continue
         params=({k:defaults[k] for k in ('LeagueID','Season','SeasonType','PerMode')} if category=='Named pair' else dict(defaults))
         if category=='Hustle':
-            # Published endpoint schema uses G rather than GP. These are the
-            # only original hustle concepts retained; no new screen/boxout fields.
+            # The source uses G rather than GP. Only the explicitly mapped
+            # cumulative fields are retained; percentages are not counted as totals.
             params={k:v for k,v in params.items() if k not in {'GameScope','GameSegment','StarterBench','PlayerID',
                 'LastNGames','Period','PaceAdjust','Rank','PlusMinus'}}
         params.update(extra)
@@ -265,7 +275,7 @@ async def collect_tracking(collector,output,categories=None):
     document={**old,'schema_version':1,'scope_revision':scope['revision'],'season':season,
               'last_attempt':now.isoformat(),'direct_tracking_attempted_at':now.isoformat(),
               'coverage':list(coverage.values()),'records':list(records.values()),
-              'policy':'Existing workbook metrics and named pair definitions only; unsupported fields are never inferred.'}
+              'policy':'Authorized cumulative metric maps and named pair definitions only; unsupported fields are never inferred.'}
     dates=[c.get('source_data_through_date') for c in coverage.values() if c.get('status')=='collected']
     document['source_data_through_date']=min(dates) if dates and all(dates) else None
     document['direct_tracking']=direct_tracking_status(document,now)
@@ -335,7 +345,7 @@ def import_tracking(store,document,now):
                 raise ValueError('Invalid retained tracking source date.')
         if record.get('season')!=document.get('season') or record.get('season_type')!='Regular Season':
             raise ValueError('Tracking season/phase does not match its declared population.')
-        for made,attempts in [('fgm','fga'),('tpm','tpa'),('ftm','fta'),('defended_fgm','defended_fga'),('rim_defended_fgm','rim_defended_fga')]:
+        for made,attempts in [('fgm','fga'),('tpm','tpa'),('ftm','fta'),('help_fgm','help_fga'),('defended_fgm','defended_fga'),('rim_defended_fgm','rim_defended_fga')]:
             if fields.get(made) is not None and fields.get(attempts) is not None and fields[made]>fields[attempts]:
                 raise ValueError('Tracking made shots exceed their attempts.')
         rows.append(record)

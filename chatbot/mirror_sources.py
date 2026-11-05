@@ -219,10 +219,73 @@ class PublishedNBAData:
                                   'coverage_note':'Covered dates are retained only for unchanged source statistics; changed/new values have unknown covered-game dates.'})
             except Exception as error:
                 coverage.append({'category':category,'status':'unavailable','error_type':type(error).__name__})
-        # The current public mirror does not supply these populations. Prior dated
-        # records remain unchanged; neither box production nor rim FG substitutes.
-        coverage.extend({'category':category,'status':'unavailable','reason':'No current-season extract in this publication.'}
-                        for category in ('Overall','Named pair','Less Than 6Ft','Hustle'))
+        # Separate public releases carry actual hustle and player-vs-player
+        # tracking. Do not substitute team defense or ordinary box production.
+        try:
+            from tracking_publications import normalize_hustle
+            content,meta=await self.asset('nba_stats_hustle',
+                f'leaguehustlestatsplayer_regular-season_totals_{self.end_year}.parquet')
+            raw=pq.read_table(io.BytesIO(content)).to_pylist()
+            normalized=normalize_hustle(raw,self.scope,self.season)
+            if not normalized:raise ValueError('No authorized cumulative hustle values returned.')
+            for record in normalized:
+                record.update(source=meta['browser_download_url'],published_at=meta['updated_at'],
+                    source_published_at=meta['updated_at'],publication_time_kind='publisher_modified',
+                    retrieved_at=self.now.isoformat(),publication_source='SportsDataverse published NBA hustle extract',
+                    source_content_sha256=hashlib.sha256(content).hexdigest())
+                tracking_coverage(record,prior.get((record['season'],record['entity'],record['category'])))
+                record.update(preserve_sparse_fields(record,prior.get((record['season'],record['entity'],record['category']))))
+            dates=[r.get('data_through_date') for r in normalized]
+            records.extend(normalized);published.append(meta['updated_at'])
+            coverage.append({'category':'Hustle','status':'collected','records':len(normalized),
+                'source_published_at':meta['updated_at'],
+                'source_data_through_date':min(dates) if dates and all(dates) else None,
+                'source_content_sha256':hashlib.sha256(content).hexdigest(),
+                'fields':sorted(set().union(*(set(r['fields']) for r in normalized))),
+                'coverage_note':'Cumulative hustle fields use source G; covered-game dates are not reported.'})
+        except Exception as error:
+            coverage.append({'category':'Hustle','status':'unavailable','error_type':type(error).__name__})
+        try:
+            from tracking_publications import game_date_inventory,measured_matchups
+            source_content,source_meta=await self.asset('nba_stats_game_matchups',f'game_matchups_{self.end_year}.parquet')
+            schedule_content,schedule_meta=await self.asset('nba_stats_schedules',f'nba_schedule_{self.end_year}.parquet')
+            log_content,log_meta=await self.asset('nba_stats_player_game_logs',f'player_game_logs_{self.end_year}.parquet')
+            mapping=[{'source':meta['browser_download_url'],'source_published_at':meta['updated_at'],
+                      'source_content_sha256':hashlib.sha256(content).hexdigest()}
+                     for content,meta in [(schedule_content,schedule_meta),(log_content,log_meta)]]
+            inventory,excluded=game_date_inventory(pq.read_table(io.BytesIO(schedule_content)).to_pylist(),
+                pq.read_table(io.BytesIO(log_content)).to_pylist(),self.season,mapping_sources=mapping)
+            alias_path=Path(__file__).with_name('matchup_history_targets.json')
+            aliases=json.loads(alias_path.read_text()).get('players',[]) if alias_path.exists() else []
+            normalized,measured,report=measured_matchups(pq.read_table(io.BytesIO(source_content)).to_pylist(),
+                inventory,self.scope,pair_scope,self.season,source=source_meta['browser_download_url'],
+                published_at=source_meta['updated_at'],source_hash=hashlib.sha256(source_content).hexdigest(),
+                now=self.now,alias_rows=aliases)
+            if not normalized:raise ValueError('No authorized measured player-pair observations returned.')
+            for record in normalized:
+                record.update(preserve_sparse_fields(record,prior.get((record['season'],record['entity'],record['category']))))
+            records.extend(normalized);published.append(source_meta['updated_at'])
+            dates=[r['data_through_date'] for r in normalized]
+            coverage.append({'category':'Named pair','status':'collected','records':len(normalized),
+                'source_published_at':source_meta['updated_at'],'source_data_through_date':min(dates),
+                'source_content_sha256':hashlib.sha256(source_content).hexdigest(),
+                'measured_pair_games':len(measured),'first_observed_game_date':report['first_observed_game_date'],
+                'last_observed_game_date':report['last_observed_game_date'],
+                'date_mapping_exclusions':excluded,'held_rows':report['held_rows'],
+                'coverage_note':'Actual named pair observations. Each row date is its last observed measured game; full season/lifetime pair coverage is not asserted.'})
+            # The historical relay builder can reuse this exact current-season
+            # source without downloading it again during the same collection.
+            self.current_measured_tracking={'source_content':source_content,'source_meta':source_meta,
+                'schedule_content':schedule_content,'schedule_meta':schedule_meta,
+                'team_log_content':log_content,'team_log_meta':log_meta,
+                'records':normalized,'measured':measured,'report':report}
+        except Exception as error:
+            coverage.append({'category':'Named pair','status':'unavailable','error_type':type(error).__name__})
+        # These two closest-defender populations are not contained in the
+        # publications above. Measured-matchup FGA is a different population.
+        coverage.extend({'category':category,'status':'unavailable',
+                         'reason':'No current-season closest-defender extract in the supported publications.'}
+                        for category in ('Overall','Less Than 6Ft'))
         imported_keys={(r['season'],r['entity'],r['category']) for r in records}
         records.extend(clear_unverified_tracking_coverage(dict(r)) for r in old.get('records',[])
                        if r.get('season')==self.season and (r.get('season'),r.get('entity'),r.get('category')) not in imported_keys)
@@ -235,4 +298,17 @@ class PublishedNBAData:
             'direct_tracking':direct_tracking_status(old,self.now),
             'source_data_through_date':through,'policy':'Authorized NBA player/team populations and supported metrics; source publication lag is preserved.'}
         target.write_text(json.dumps(document,indent=2,sort_keys=True)+'\n')
+        try:
+            from historical_matchup_refresh import collect_historical_matchups
+            history=await collect_historical_matchups(self,Path(output)/'historical_matchups',now=self.now,
+                current_data=getattr(self,'current_measured_tracking',None),
+                cache_directory=Path(output).parent/'.nba-tracking-cache')
+        except Exception as error:
+            # Existing measured archives and current working categories survive
+            # an unavailable historical source or an unsupported old schema.
+            history={'phase':'unavailable','error_type':type(error).__name__,
+                     'previous_publication_retained':(Path(output)/'historical_matchups'/'historical_matchups_manifest.json').exists()}
+        document['historical_pair_history']=history
+        target.write_text(json.dumps(document,indent=2,sort_keys=True)+'\n')
+        print('Actual measured-pair archive:',json.dumps(history),flush=True)
         return True

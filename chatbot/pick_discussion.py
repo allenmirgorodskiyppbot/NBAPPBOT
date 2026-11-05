@@ -362,7 +362,7 @@ def build_pick_discussion(store, pick, now=None):
     result['sample_age_days'] = age
     availability = {'blocked': False, 'note': None, 'reports': []}
     if day >= today:
-        availability = player_availability(store.recent_news(150), player, day.isoformat(), now)
+        availability = player_availability(store.recent_news(150), player, day.isoformat(), now, store=store)
     result['availability'] = availability
     if availability.get('note'):
         result['cautions'].append(availability['note'])

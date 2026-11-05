@@ -22,6 +22,10 @@ from master import STAT_COMPONENTS
 
 RAW_TABLES = ('games', 'player_games', 'news', 'feed_status', 'boards', 'entries',
               'grade_events', 'season_schedule', 'season_averages', 'refreshed_tracking')
+AUDIT_EXPORTS = {'structured_availability': 'Structured_Availability',
+                 'player_stat_completions': 'Player_Stat_Completions',
+                 'game_score_completions': 'Game_Score_Completions',
+                 'measured_pair_history': 'Measured_Pair_History'}
 BASE_FIELDS = ('pts', 'reb', 'ast', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta',
                'minutes', 'stl', 'blk', 'tov', 'oreb', 'dreb', 'fouls', 'plus_minus')
 METRICS = {**{key: (key,) for key in BASE_FIELDS}, **STAT_COMPONENTS}
@@ -392,12 +396,36 @@ def _profile_view(tables, names, opponent=None, opponent_names=None, current_sea
         output.append({'section':'Dated measured matchup','player':row['offense_player'],'defender':row['defense_player'],
                        'season':row['season'],'season_type':row['season_type'],'metric':row['metric'],'value':row['value'],
                        'n':row.get('covered_games'),'first_game':row['first_game'],'last_game':row['last_game'],
-                       'source':row.get('source_ids'),'status':'dated_measured_observations','notes':row['population']})
+                       'source':row.get('source_urls') or row.get('source_ids'),
+                       'status':row.get('status') or 'dated_measured_observations','notes':row['population']})
     for label in ('Shot locations and distance bands','Rotation stints and entry/exit times',
                   'On/off possessions and ratings','Play types; contests and deflections'):
         output.append({'section':'Profile coverage','metric':label,'status':'requires_own_source',
                        'notes':'Only current rows explicitly present in Tracking_Metrics establish a refresh. Original profile-only values remain in the dated reference workbook; no replacement is inferred from totals.'})
     return output
+
+
+def _unique_measured(rows):
+    """Legacy exact game identities supplement stable NBA observation IDs."""
+    from measured_history import observation_key, COUNTS
+    unique = {}
+    for raw in rows:
+        row = dict(raw)
+        key = observation_key(row) or (str(row.get('game_id')), _day(row.get('date')),
+            str(row.get('offense_player')), str(row.get('defense_player')),
+            row.get('season'), row.get('season_type'))
+        if key not in unique:
+            unique[key] = row
+            continue
+        old = unique[key]
+        fields = ('date', 'season', 'season_type', 'matchup_seconds', 'partial_possessions', *COUNTS)
+        conflict = (old.get('_measured_conflict') or row.get('_measured_conflict') or
+                    any(old.get(field) is not None and row.get(field) is not None
+                        and old[field] != row[field] for field in fields))
+        unique[key] = {**old, **{field: value for field, value in row.items() if value is not None}}
+        if conflict:
+            unique[key]['_measured_conflict'] = True
+    return list(unique.values())
 
 
 def measured_pair_metrics(rows):
@@ -414,17 +442,26 @@ def measured_pair_metrics(rows):
                 'covered_games':len({r['game_id'] for r in group}),
                 'first_game':min(_day(r['date']) for r in group),'last_game':max(_day(r['date']) for r in group),
                 'population':'Dated measured pair observations only; not whole-game coappearance',
-                'source_ids':','.join(sorted({str(r.get('source_id') or '') for r in group}))}
+                'source_ids':','.join(sorted({str(r.get('source_id') or '') for r in group})),
+                'source_urls':'; '.join(sorted({str(r['source']) for r in group if r.get('source')})),
+                'source_content_sha256s':','.join(sorted({str(r['source_content_sha256']) for r in group if r.get('source_content_sha256')})),
+                'source_published_at':max((str(r.get('published_at') or '') for r in group),default='') or None,
+                'conflicting_records':sum(bool(r.get('_measured_conflict')) for r in group),
+                'coverage_note':'Last game is the latest observed actual pair game; complete season or lifetime guarding coverage is not asserted.'}
+        conflict = common['conflicting_records'] > 0
+        common['status'] = 'held_conflicting_measurements' if conflict else 'dated_measured_observations'
         for metric in ('matchup_seconds','partial_possessions','player_points','team_points','fgm','fga','tpm','tpa','ftm','fta',
-                       'matchup_assists','matchup_turnovers','shooting_fouls'):
-            values=[r[metric] for r in group if _number(r.get(metric))]
+                       'matchup_assists','matchup_turnovers','shooting_fouls','potential_assists','blocks',
+                       'help_blocks','help_fgm','help_fga','switches_on'):
+            values=[] if conflict else [r[metric] for r in group if _number(r.get(metric)) and r[metric]>=0]
             output.append({**common,'metric':metric,'value':sum(values) if values else None,
                            'observed_records':len(values),'missing_records':len(group)-len(values)})
         for label,made,attempts in (('fg_pct','fgm','fga'),('three_pct','tpm','tpa'),('ft_pct','ftm','fta')):
-            matched=[r for r in group if _number(r.get(made)) and _number(r.get(attempts))]
+            matched=[] if conflict else [r for r in group if _number(r.get(made)) and _number(r.get(attempts))
+                                         and 0<=r[made]<=r[attempts]]
             numerator=sum(r[made] for r in matched);denominator=sum(r[attempts] for r in matched)
             output.append({**common,'metric':label,'value':numerator/denominator if denominator>0 else None,
-                           'numerator':numerator,'denominator':denominator,'observed_records':len(matched),
+                           'numerator':None if conflict else numerator,'denominator':None if conflict else denominator,'observed_records':len(matched),
                            'missing_records':len(group)-len(matched)})
     return output
 
@@ -442,6 +479,10 @@ def build_export_tables(master, now=None):
     with master.connect() as db:
         db.execute('BEGIN')
         raw={name:[dict(r) for r in db.execute('SELECT * FROM '+name)] for name in RAW_TABLES}
+        available = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        audits = {sheet: [{**dict(row), 'export_policy': 'Saved source/audit evidence only; uploading this sheet does not independently verify current game readiness.'}
+                          for row in db.execute('SELECT * FROM '+table)]
+                  for table, sheet in AUDIT_EXPORTS.items() if table in available}
         exists=db.execute("SELECT 1 FROM sqlite_master WHERE name='workbook_evidence'").fetchone()
         evidence=[dict(r) for r in db.execute('SELECT * FROM workbook_evidence')] if exists else []
         inventory=_checkpoint(db,'workbook_sheet_inventory',[])
@@ -450,6 +491,9 @@ def build_export_tables(master, now=None):
     evidence_groups=defaultdict(list)
     for row in evidence:
         evidence_groups[row['kind']].append(json.loads(row['payload_json']))
+    from measured_history import measured_records
+    measured = _unique_measured(measured_records(master, extra_rows=evidence_groups['measured_pairs']))
+    measured = [row for row in measured if _day(row.get('date')) and _day(row['date'])<=today.isoformat()]
     games={r['id']:r for r in raw['games']}
     players=defaultdict(list)
     for row in raw['player_games']:
@@ -476,13 +520,13 @@ def build_export_tables(master, now=None):
     else:
         assignments=assignment_rows_for(master,fallback_rows=assignments,now=now)
     records=[json.loads(r['payload_json']) for r in raw['refreshed_tracking']]
-    tables={**raw,
+    tables={**raw, **audits,
             'Player_Metrics':player_metrics(players),
             'Calculated_Splits':calculated_splits(evidence_groups['splits'],players,rest),
             'Correlations':correlations(evidence_groups['correlations'],players),
             'Pair_Summaries':pair_summaries(evidence_groups['pair_summaries'],players,evidence_groups['assignments']),
-            'Measured_Pair_Metrics':measured_pair_metrics([r for r in evidence_groups['measured_pairs']
-                if _day(r.get('date')) and _day(r['date'])<=today.isoformat()]),
+            'Measured_Pair_Metrics':measured_pair_metrics(measured),
+            'Measured_Pair_Evidence':measured,
             'Tracking_Metrics':tracking_metrics(records),
             'Matchup_Assignments':assignments,
             'Team_Schedule':list(rest.values()),
@@ -548,7 +592,9 @@ def build_export_tables(master, now=None):
         {'topic':'Populations','value':'Historical seasons and phases stay separate except explicitly named Available career/Recent windows. Coappearance does not establish guarding.'},
         {'topic':'Freshness','value':'Export generation time is not data coverage. Read each source/last-game date and Refresh_Coverage.'}]
     from master_upgrade import augment_export_tables
-    return augment_export_tables(master, tables, now=now)
+    tables = augment_export_tables(master, tables, now=now)
+    from data_gaps import augment_gap_tables
+    return augment_gap_tables(master, tables)
 
 
 def _cell(value):
@@ -583,7 +629,7 @@ def export_master(master, directory, now=None):
                         columns=[r[0] for r in db.execute('SELECT * FROM '+name+' LIMIT 0').description]
                 else:
                     from master_upgrade import STRUCTURED_EXPORTS
-                    table=next((table for table,sheet_name in STRUCTURED_EXPORTS.items() if sheet_name==name),None)
+                    table=next((table for table,sheet_name in {**STRUCTURED_EXPORTS, **AUDIT_EXPORTS}.items() if sheet_name==name),None)
                     if table:
                         with master.connect() as db:
                             columns=[r[0] for r in db.execute('SELECT * FROM '+table+' LIMIT 0').description]

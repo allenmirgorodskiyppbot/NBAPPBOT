@@ -196,6 +196,9 @@ class HistoryServiceInstallTests(unittest.TestCase):
 
 class HistoryUpgradeWorkerTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        self.supplemental_patch = patch('history_service._supplemental_cycle', return_value={'phase': 'updated', 'changed': False})
+        self.supplemental = self.supplemental_patch.start()
+        self.addCleanup(self.supplemental_patch.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.root = Path(self.directory.name)
         self.store = MasterStore(self.root / 'master.sqlite')

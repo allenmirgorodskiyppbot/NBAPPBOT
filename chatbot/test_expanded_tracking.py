@@ -50,12 +50,13 @@ class ExpandedTrackingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             import_tracking(self.store, self.document(self.record(per_mode='PerGame')), NOW)
 
-    def test_hustle_uses_source_g_and_only_existing_contest_deflection_metrics(self):
+    def test_hustle_uses_source_g_and_explicit_cumulative_hustle_metrics(self):
         row = {'PLAYER_ID': self.player['nba_player_id'], 'G': 5, 'CONTESTED_SHOTS': 32,
                'DEFLECTIONS': 8, 'SCREEN_ASSISTS': 90, 'CHARGES_DRAWN': 20}
         rec = normalize_records([row], 'Hustle', self.scope, '2026-27')[0]
         self.assertEqual(rec['gp'], 5)
-        self.assertEqual(rec['fields'], {'contested_shots': 32, 'deflections': 8})
+        self.assertEqual(rec['fields'], {'contested_shots': 32, 'deflections': 8,
+                                         'screen_assists': 90, 'charges_drawn': 20})
         self.assertEqual(rec['field_units']['contested_shots'], 'cumulative_total')
 
     def test_team_population_uses_known_id_and_retains_its_own_denominator(self):
@@ -65,6 +66,14 @@ class ExpandedTrackingTests(unittest.TestCase):
         self.assertEqual(rec['fields']['stl'], 40)
         self.assertEqual(rec['fields']['oreb'], 60)
         self.assertEqual(normalize_records([row], 'Team totals', self.scope, '2026-27', team_ids={}), [])
+
+    def test_named_pair_help_shot_makes_cannot_exceed_attempts_on_import(self):
+        pairs=json.loads(Path(__file__).with_name('matchup_refresh_scope.json').read_text())['pairs']
+        pair=pairs[0]
+        row=self.record({'help_fgm':2,'help_fga':1},category='Named pair',
+                        entity=pair['offense_player']+' | '+pair['defense_player'])
+        with self.assertRaisesRegex(ValueError,'made shots exceed'):
+            import_tracking(self.store,self.document(row),NOW)
 
     def test_missing_fields_are_archived_without_inheriting_new_gp_or_timestamp(self):
         old = self.record()

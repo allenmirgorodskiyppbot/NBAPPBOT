@@ -254,10 +254,42 @@ class RollingCareerInstallTests(unittest.TestCase):
 
 class RollingCareerWorkerTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        self.supplemental_patch = patch('history_service._supplemental_cycle', return_value={'phase': 'updated', 'changed': False})
+        self.supplemental = self.supplemental_patch.start()
+        self.addCleanup(self.supplemental_patch.stop)
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.root = Path(self.folder.name)
         self.store = MasterStore(self.root / 'master.sqlite')
+
+    async def test_supplemental_changes_reexport_even_when_career_is_unchanged(self):
+        self.supplemental.return_value = {'phase': 'updated', 'changed': True}
+        exporter = Mock()
+        async def pause(seconds):
+            raise asyncio.CancelledError
+        with patch('history_service.install_pinned_history', return_value={'complete': True, 'already_imported': True}), \
+             patch('history_service.install_rolling_history', return_value={'already_imported': True}), \
+             patch('history_service.asyncio.sleep', side_effect=pause):
+            with self.assertRaises(asyncio.CancelledError):
+                await history_upgrade_service(self.store, self.root, exporter=exporter)
+        exporter.assert_called_once_with(self.store, self.root / 'exports')
+        self.assertTrue(self.store.get_checkpoint('history_upgrade_status')['supplemental']['changed'])
+
+    async def test_career_outage_does_not_skip_new_availability_or_repaired_stats(self):
+        self.supplemental.return_value = {'phase': 'updated', 'changed': True}
+        exporter = Mock()
+        async def pause(seconds):
+            raise asyncio.CancelledError
+        with patch('history_service.install_pinned_history', side_effect=httpx.ReadTimeout('private source detail')), \
+             patch('history_service.asyncio.sleep', side_effect=pause):
+            with self.assertRaises(asyncio.CancelledError):
+                await history_upgrade_service(self.store, self.root, exporter=exporter)
+        self.supplemental.assert_awaited_once()
+        exporter.assert_called_once_with(self.store, self.root / 'exports')
+        status = self.store.get_checkpoint('history_upgrade_status')
+        self.assertEqual(status['phase'], 'retrying')
+        self.assertEqual(status['error_type'], 'ReadTimeout')
+        self.assertNotIn('private source detail', json.dumps(status))
 
     async def test_worker_checks_again_hourly_without_restarting_or_reinstalling_pinned_bundle(self):
         pinned = Mock(return_value={'complete': True, 'already_imported': True})

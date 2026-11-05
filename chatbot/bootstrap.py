@@ -29,6 +29,10 @@ APP_FILES = [
     'history_service.py', 'history_manifest.json',
     'career_identity.py', 'career_metadata.py', 'matchup_history_targets.json',
     'career_history_refresh.py',
+    'data_gaps.py', 'stat_completion.py', 'structured_availability.py',
+    'tracking_publications.py', 'historical_matchup_refresh.py', 'measured_history.py',
+    'official_injury_pdf.py', 'supplemental_data.py',
+    'game_stat_completion.py',
 ]
 
 

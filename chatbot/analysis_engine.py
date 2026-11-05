@@ -237,7 +237,7 @@ def analyze_board(store, board_id, as_of=None):
         freshness = (assess_pregame_freshness(store, event_date, leg.get('team'), now,
                      player=leg.get('player'), stat=leg.get('stat')) if event_date else
                      {'ready': False, 'reasons': ['Game date is unresolved.']})
-        availability = (player_availability(news, leg.get('player', ''), event_date, now)
+        availability = (player_availability(news, leg.get('player', ''), event_date, now, store=store)
                         if event_date else {'blocked': False, 'note': None, 'reports': []})
         current_checks.append({'context': context, 'event_issue': event_issue,
                                'freshness': freshness, 'availability': availability})

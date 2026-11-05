@@ -362,6 +362,9 @@ class MasterStore:
                     'release_checks': {key: checks[key] for key in ['phase','passed','failed','warnings','checked_at'] if key in checks},
                     'nightly_nba_refresh': self.get_checkpoint('nightly_nba_refresh', {}),
                     'tracking_refresh': self.get_checkpoint('tracking_refresh_status', {}),
+                    'supplemental_data': {key: value for key, value in
+                        (self.get_checkpoint('supplemental_data_status', {}) or {}).items()
+                        if key in {'phase', 'last_attempt', 'last_checked_at', 'changed', 'error_type', 'next_check_at'}},
                     'history_upgrade': self.get_checkpoint('history_upgrade_status', {}),
                     'matchup_career_history': {key: value for key, value in
                         (self.get_checkpoint('matchup_career_history_status', {}) or {}).items()

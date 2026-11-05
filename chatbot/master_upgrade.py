@@ -37,7 +37,11 @@ _GENERATED = {'player_metrics', 'calculated_splits', 'correlations', 'pair_summa
               'original_sources', 'refresh_coverage', 'export_readme',
               'historical_coverage', 'current_missing_data', 'dataset_coverage',
               'upgrade_imports', 'workbook_text_chunks', 'history_import',
-              'matchup_career_coverage', 'matchup_career_refresh'}
+              'matchup_career_coverage', 'matchup_career_refresh', 'missing_stats_summary',
+              'missing_stats_by_game', 'tracking_field_coverage', 'unknown_participation',
+              'missing_stats_readme', 'structured_availability', 'player_stat_completions',
+              'measured_pair_history', 'measured_pair_evidence', 'career_metadata_repairs',
+              'game_stat_coverage', 'game_stat_gaps', 'game_score_completions'}
 # Populated only from known application tables, never from a workbook-provided SQL name.
 STRUCTURED_EXPORTS = {'research_runs': 'Research_Runs', 'research_candidates': 'Research_Candidates'}
 TEXT_PREFIX = '__NBA_XLSX_TEXT__:'

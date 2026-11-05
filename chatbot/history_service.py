@@ -312,8 +312,15 @@ def install_rolling_history(store, directory, *, now=None, client=None, matchup_
             **({'cleanup_error': cleanup_error} if cleanup_error else {})}
 
 
+async def _supplemental_cycle(store, directory, stamp):
+    # Imported lazily because supplemental validation reuses the bounded history
+    # download helpers in this module.
+    from supplemental_data import refresh_supplemental_data
+    return await refresh_supplemental_data(store, directory, now=stamp)
+
+
 async def history_upgrade_service(store, directory, *, ready=lambda: True, exporter=None):
-    """Install pinned history once, then check opponent career additions hourly."""
+    """Refresh independent verified sources hourly and export one merged result."""
     pinned = None
     while True:
         if not ready():
@@ -321,39 +328,51 @@ async def history_upgrade_service(store, directory, *, ready=lambda: True, expor
             continue
         stamp = dt.datetime.now(dt.timezone.utc)
         old = store.get_checkpoint('history_upgrade_status', {}) or {}
+        export_needed, career_error, rolling = False, None, None
         try:
             if pinned is None:
                 store.set_checkpoint('history_upgrade_status', {'phase': 'checking', 'last_attempt': stamp.isoformat()})
                 pinned = await asyncio.to_thread(install_pinned_history, store, directory, os.getenv('SOURCE_REF'))
-                status = {'phase': 'updated', 'last_attempt': stamp.isoformat(), **pinned,
-                          'note': 'Pinned history merged; rolling matchup-career checks run hourly.'}
-                store.set_checkpoint('history_upgrade_status', status)
-                if exporter and not pinned.get('already_imported'):
-                    try:
-                        await asyncio.to_thread(exporter, store, Path(directory) / 'exports')
-                    except Exception as error:
-                        store.set_checkpoint('history_upgrade_status', {**status, 'export_error': type(error).__name__})
+                export_needed = not pinned.get('already_imported')
             rolling = await asyncio.to_thread(install_rolling_history, store, directory, now=stamp)
-            status = {**store.get_checkpoint('history_upgrade_status', {}), 'last_attempt': stamp.isoformat(),
-                      'phase': 'partial' if rolling.get('missing_players') else 'updated',
-                      'pinned_complete': True, 'rolling_history': rolling,
-                      'next_check_at': (stamp + dt.timedelta(seconds=POLL_SECONDS)).isoformat(),
-                      'note': 'Available matchup career history checked; current game readiness remains a separate check.'}
-            store.set_checkpoint('history_upgrade_status', status)
-            if exporter and (not rolling.get('already_imported') or
-                             (rolling.get('metadata_repairs') or {}).get('games_completed', 0) > 0):
-                try:
-                    await asyncio.to_thread(exporter, store, Path(directory) / 'exports')
-                except Exception as error:
-                    store.set_checkpoint('history_upgrade_status', {**status, 'export_error': type(error).__name__})
-            await asyncio.sleep(POLL_SECONDS)
+            export_needed = export_needed or not rolling.get('already_imported') or (
+                (rolling.get('metadata_repairs') or {}).get('games_completed', 0) > 0)
         except asyncio.CancelledError:
             raise
         except Exception as error:
-            status = {**store.get_checkpoint('history_upgrade_status', old), 'phase': 'retrying',
-                      'last_attempt': stamp.isoformat(), 'error_type': type(error).__name__,
-                      'pinned_complete': bool(pinned),
-                      'next_retry_at': (dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=RETRY_SECONDS)).isoformat(),
-                      'note': 'Existing history retained; an unavailable source or unverified identity will be retried hourly.'}
-            store.set_checkpoint('history_upgrade_status', status)
-            await asyncio.sleep(RETRY_SECONDS)
+            career_error = type(error).__name__
+        # Availability, measured matchups and validated repairs remain useful
+        # even if the separate career publication cannot be reached this hour.
+        try:
+            supplemental = await _supplemental_cycle(store, directory, stamp)
+            export_needed = export_needed or bool(supplemental.get('changed'))
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            supplemental = {'phase': 'retrying', 'error_type': type(error).__name__, 'changed': False}
+            store.set_checkpoint('supplemental_data_status', {**supplemental, 'last_attempt': stamp.isoformat()})
+        phase = ('retrying' if career_error else 'partial' if
+                 (rolling or {}).get('missing_players') or supplemental.get('phase') in {'partial', 'retrying', 'unavailable', 'busy'}
+                 else 'updated')
+        status = {**old, **(pinned or {}), 'phase': phase, 'last_attempt': stamp.isoformat(),
+                  'pinned_complete': bool(pinned),
+                  'supplemental': {key: supplemental[key] for key in ('phase', 'changed', 'error_type') if key in supplemental},
+                  'note': 'Verified career, matchup and availability sources checked independently; current game readiness remains a separate check.'}
+        if rolling is not None:
+            status['rolling_history'] = rolling
+        status.pop('error_type', None)
+        status.pop('next_retry_at', None)
+        if career_error:
+            status.update(error_type=career_error,
+                          next_retry_at=(stamp + dt.timedelta(seconds=RETRY_SECONDS)).isoformat())
+        else:
+            status['next_check_at'] = (stamp + dt.timedelta(seconds=POLL_SECONDS)).isoformat()
+        store.set_checkpoint('history_upgrade_status', status)
+        if exporter and export_needed:
+            try:
+                await asyncio.to_thread(exporter, store, Path(directory) / 'exports')
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                store.set_checkpoint('history_upgrade_status', {**status, 'export_error': type(error).__name__})
+        await asyncio.sleep(RETRY_SECONDS if career_error else POLL_SECONDS)

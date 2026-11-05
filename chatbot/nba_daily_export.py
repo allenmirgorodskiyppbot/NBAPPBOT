@@ -375,12 +375,40 @@ async def main_async(args):
         direct_ok=await supplement_tracking(collector,output)
         advanced_ok=bool(advanced_ok or direct_ok)
         print('Existing-statistics source collected:',advanced_ok,flush=True)
+        availability_report=await collect_availability_inputs(mirror,client,output,now=collector.now)
+        print('Availability collection:',json.dumps(availability_report,sort_keys=True),flush=True)
         from career_history_refresh import refresh_career_history
         career_report = await refresh_career_history(client, output, mirror.scope, now=collector.now)
         print('Matchup career history:', json.dumps(career_report, sort_keys=True), flush=True)
     if failures:
         print('Some daily dates could not be collected; no success was fabricated.',flush=True)
     return 1 if failures==args.days and not advanced_ok else 0
+
+
+async def collect_availability_inputs(mirror, client, output, *, now):
+    """Collect both availability sources without replacing failed evidence clocks."""
+    from structured_availability import collect_availability
+    from official_injury_pdf import collect_official_pdf
+    reports={}
+    for source,collect,args in (
+            ('structured_extracts',collect_availability,(mirror,output)),
+            ('official_pdf',collect_official_pdf,(client,output))):
+        try:
+            reports[source]=await collect(*args,now=now)
+        except Exception as error:
+            # The source helpers publish atomically. Their unexpected failure
+            # must neither delete a prior relay nor block the other source.
+            reports[source]={'status':'unavailable','attempted_at':now.isoformat(),
+                'error_type':type(error).__name__,
+                'http_status':getattr(getattr(error,'response',None),'status_code',None),
+                'note':'Source collection failed; existing evidence was not removed or relabeled.'}
+    report={'schema_version':1,'phase':'checked','attempted_at':now.isoformat(),'sources':reports,
+        'scope':'Collector health only; successful collection does not establish complete current player availability.'}
+    target=Path(output)/'availability_collection_status.json'
+    temporary=target.with_suffix('.json.tmp')
+    temporary.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+    temporary.replace(target)
+    return report
 
 
 if __name__=='__main__':

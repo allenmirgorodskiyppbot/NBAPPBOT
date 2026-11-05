@@ -90,7 +90,7 @@ def _subject_text(item, player):
     return None
 
 
-def player_availability(news, player, date, now):
+def _news_player_availability(news, player, date, now):
     """Return publisher-reported cautions; never turn collection time into proof."""
     target = dt.date.fromisoformat(date)
     relevant = []
@@ -181,6 +181,60 @@ def player_availability(news, player, date, now):
         clock = '' if caution['timing_confirmed'] else '; timezone unconfirmed'
         return {'blocked': False, 'note': f"Availability caution: {caution['title']} ({caution['source']}{clock}).", 'reports': reports}
     return {'blocked': False, 'note': None, 'reports': reports}
+
+
+def player_availability(news, player, date, now, *, store=None):
+    """Merge exact official designations with dated news, preserving cautions.
+
+    Omitted stores keep the original news-only contract. An official Available
+    designation says nothing about a starting role or unrestricted minutes.
+    """
+    news_result = _news_player_availability(news, player, date, now)
+    if store is None:
+        return news_result
+    from structured_availability import current_official_availability
+    official = current_official_availability(store, player, date, now, max_age_seconds=6*3600)
+    result = {**news_result, 'official_designation': official,
+              'official_designation_known': bool(official.get('known')),
+              'confirmed_starter': None, 'expected_minutes': None, 'minutes_restriction': None}
+    if not official.get('known'):
+        return result
+    stamp = _aware(official['report_at'])
+    designation = official['status']
+    source = {'state': 'official_' + designation.lower(),
+              'source': 'Official NBA injury report', 'source_kind': 'official_report',
+              'title': player + ': ' + designation, 'url': official['source_url'],
+              'published_at': official['report_at'], 'report_at': official['report_at'],
+              'timing_confirmed': True, 'game_date': date}
+    result['reports'] = [source, *news_result['reports']]
+    if designation in {'Out', 'Questionable', 'Doubtful'}:
+        detail = ('the official NBA report lists this player Out' if designation == 'Out' else
+                  'the official NBA report lists this player ' + designation + '; wait for updated playing clearance')
+        return {**result, 'blocked': True,
+                'note': 'Hold: ' + detail + f" (as of {official['report_at']})."}
+    if designation == 'Available':
+        # Reliable later adverse reports, untimed cautions and actual reported
+        # minutes limits cannot disappear behind an older Available snapshot.
+        adverse = []
+        for report in news_result['reports']:
+            report_stamp = _aware(report.get('published_at'))
+            restriction = re.search(r'\bminutes?\s+(?:restriction|limit)\b', report.get('title', ''), re.I)
+            if (report.get('state') in {'out_report', 'unresolved_report', 'uncertain'}
+                    and (not report_stamp or report_stamp >= stamp or restriction)):
+                adverse.append(report)
+        if adverse:
+            caution = adverse[0]
+            return {**result, 'blocked': True, 'official_superseded_or_limited': True,
+                    'note': 'Hold: a later or unresolved publisher availability/minutes report requires verification: '
+                            + caution['title'] + f" ({caution['source']})."}
+        # An explicit later official clearance can replace an older timed out
+        # headline. It still does not confirm a lineup or unlimited minutes.
+        return {**result, 'blocked': False, 'note': None}
+    # Probable is an official caution, not a clearance that erases an out report.
+    if news_result['blocked'] or news_result['note']:
+        return result
+    return {**result, 'note': 'Availability caution: the official NBA report lists this player '
+            + designation + f" (as of {official['report_at']}); verify playing status and minutes."}
 
 
 def _event(store, leg, now):
@@ -310,7 +364,7 @@ def _watchlist(store, original_legs, news, now, held=None):
             minutes = statistics.fmean(row['minutes'] for row in recent)
             if minutes < 20:
                 continue
-            availability = player_availability(news, player['player'], date, now)
+            availability = player_availability(news, player['player'], date, now, store=store)
             if availability['blocked']:
                 continue
             freshness = assess_pregame_freshness(store, date, team, now, player=player['player'])
@@ -435,7 +489,7 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
                 reason = 'Current game data is not ready: ' + ' '.join(freshness['reasons'])
         availability = None
         if not event_issue:
-            availability = player_availability(news, leg.get('player', ''), leg['date'][:10], now)
+            availability = player_availability(news, leg.get('player', ''), leg['date'][:10], now, store=store)
             if availability['blocked']:
                 reason = availability['note']
         if reason:

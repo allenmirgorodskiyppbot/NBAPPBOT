@@ -38,7 +38,9 @@ def main():
 
     asyncio.BaseEventLoop.run_forever = run_with_tick
     unittest.IsolatedAsyncioTestCase._callTestMethod = bounded_test
-    faulthandler.dump_traceback_later(90, repeat=True)
+    # A complete suite now normally takes over two minutes; individual async
+    # tests keep their separate 30-second deadline above.
+    faulthandler.dump_traceback_later(300, repeat=True)
     try:
         suite = unittest.defaultTestLoader.discover(root, pattern='test_*.py')
         result = unittest.TextTestRunner(verbosity=2).run(suite)

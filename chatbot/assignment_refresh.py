@@ -101,14 +101,14 @@ def _rosters(db, now):
     return result
 
 
-def _candidate_check(name, role, expected_team, rosters, news, game_date, now):
+def _candidate_check(name, role, expected_team, rosters, news, game_date, now, *, store=None):
     from board_shortlist import player_availability
     row = rosters.get(name)
     state = ('unknown' if row is None else 'conflicting_observations' if row['conflicting_teams']
              else 'team_conflict' if row['team'] != expected_team else 'observed_with_expected_team')
     game_day = _day(game_date)
     near_game = game_day and 0 <= (game_day - now.astimezone(EASTERN).date()).days <= 2
-    availability = (player_availability(news, name, game_date, now) if near_game else
+    availability = (player_availability(news, name, game_date, now, store=store) if near_game else
                     {'blocked': False, 'note': None, 'reports': []})
     return {'player': name, 'role': role, 'expected_team': expected_team,
             'roster_state': state, 'observed_team': row.get('team') if row else None,
@@ -187,11 +187,11 @@ def refresh_assignments(master, now=None):
         game = next_games.get(original['opponent_team'])
         game_date = game['date'] if game else None
         checks = [_candidate_check(original['selected_player'], 'selected_player', 'NYK',
-                                   rosters, news, game_date, now)]
+                                   rosters, news, game_date, now, store=master)]
         for role in ('primary', 'alternate'):
             if original.get(role):
                 checks.append(_candidate_check(original[role], role, original['opponent_team'],
-                                               rosters, news, game_date, now))
+                                               rosters, news, game_date, now, store=master))
         needs_review = any(check['roster_state'] in {'team_conflict', 'conflicting_observations'}
                            or check['availability']['blocked'] for check in checks)
         history = _measured_history(measured, original['selected_player'], original['opponent_team'], rosters, now)

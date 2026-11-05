@@ -176,7 +176,7 @@ def build_research_discussion(store, picks, slots=None, now=None):
         if not valid:
             result['held'].append({'player': name, 'reason': 'The projection or source dates could not be validated.'})
             continue
-        availability = player_availability(store.recent_news(150), player['player'], day.isoformat(), now)
+        availability = player_availability(store.recent_news(150), player['player'], day.isoformat(), now, store=store)
         readiness = assess_pregame_freshness(store, day.isoformat(), team, now, player=player['player'], stat=stat)
         cautions = ([] if readiness.get('ready') else
                     readiness.get('reasons') or ['Current game-data readiness is unverified.'])

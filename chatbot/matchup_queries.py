@@ -72,10 +72,20 @@ def answer_matchup_question(store, question, history=None, master=None):
             and re.search(r'percent|%|shoot|field.goal', text, re.I)):
         return None
     records = _records(store)
+    if master is not None:
+        from measured_history import measured_records
+        records = measured_records(master, records)
     players = sorted({str(row[field]) for row in records for field in ('offense_player', 'defense_player')})
     mentioned = _names(text, players)
     defensive = bool(re.search(r'defen|allow\w*|guarding', text, re.I))
-    if re.search(r'\b(last|recent|career|historical|history|since|before|after|home|away|difference|'
+    career = bool(re.search(r'\b(career|lifetime|historical|history|all.time)\b', text, re.I))
+    if career and master is None:
+        return None
+    if career and len(mentioned) < 2 and not re.search(r'defen|guard|allow', text, re.I):
+        # A player's career shooting against a team is whole-game research,
+        # not a claim about one named defender.
+        return None
+    if re.search(r'\b(last|recent|home|away|difference|'
                  r'differential|effective|efg|rim|three|3pt|3p)\b', text, re.I):
         return None
     if len(mentioned) == 1 and re.search(r'\b(his|he|him|their)\b', text, re.I):
@@ -104,19 +114,31 @@ def answer_matchup_question(store, question, history=None, master=None):
     if not fg:
         return result(f'Do you mean field-goal percentage allowed when {defender} defends {offense}, '
                       'or a different defensive metric? You do not need to supply shot counts.')
-    season_match = re.search(r'\b(20\d{2})[-–](\d{2})\b', text)
+    season_match = re.search(r'\b(20\d{2})[-–](\d{2})\b(?!-\d{2})', text)
     season = season_match.group(0).replace('–', '-') if season_match else None
     if season is None and re.search(r'\b(this|current) season\b', text, re.I):
         current = dt.datetime.now(ZoneInfo('America/New_York'))
         year = current.year if current.month >= 7 else current.year - 1
         season = f'{year}-{(year + 1) % 100:02d}'
-    phase = 'Playoffs' if 'playoff' in text.casefold() else 'Regular Season'
-    if master is not None and phase=='Regular Season':
+    phase = ('Play-In' if re.search(r'play[ -]?in', text, re.I) else
+             'Playoffs' if 'playoff' in text.casefold() else 'Regular Season')
+    windows = re.findall(r'\b(as of|before|after|since)\s+(20\d\d-\d\d-\d\d)\b', text, re.I)
+    if re.search(r'\b(as of|before|after|since)\b', text, re.I) and not windows:
+        return result('Give the cutoff date as year-month-day, such as since 2024-01-01.')
+    for _, value in windows:
+        try:
+            dt.date.fromisoformat(value)
+        except ValueError:
+            return result('That date is invalid. Use a date such as 2026-11-04.')
+    if master is not None and phase=='Regular Season' and not career and not windows:
         import json
         current=dt.datetime.now(ZoneInfo('America/New_York'));year=current.year-(current.month<7)
         selected_season=season or f'{year}-{str(year+1)[-2:]}'
+        has_dated = any(row.get('offense_player') == offense and row.get('defense_player') == defender
+                        and row.get('season') == selected_season and row.get('season_type') == phase
+                        for row in records)
         with master.connect() as db:
-            fresh=db.execute("SELECT payload_json FROM refreshed_tracking WHERE category='Named pair' AND entity=? AND season=?",(offense+' | '+defender,selected_season)).fetchone()
+            fresh = None if has_dated else db.execute("SELECT payload_json FROM refreshed_tracking WHERE category='Named pair' AND entity=? AND season=?",(offense+' | '+defender,selected_season)).fetchone()
         if fresh:
             record=json.loads(fresh[0]);fields=record.get('fields',{});made=fields.get('fgm');attempts=fields.get('fga')
             if made is not None and attempts and 0<=made<=attempts:
@@ -125,15 +147,22 @@ def answer_matchup_question(store, question, history=None, master=None):
     today = dt.datetime.now(ZoneInfo('America/New_York')).date().isoformat()
     pair = [row for row in records if row['offense_player'] == offense and row['defense_player'] == defender
             and str(row.get('date', ''))[:10] <= today and str(row.get('season_type', '')).casefold() == phase.casefold()]
-    if season is None and pair:
+    for operator, value in windows:
+        operator = operator.lower()
+        pair = [r for r in pair if (str(r['date'])[:10] <= value if operator == 'as of' else
+                str(r['date'])[:10] < value if operator == 'before' else
+                str(r['date'])[:10] > value if operator == 'after' else str(r['date'])[:10] >= value)]
+    if season is None and pair and not career and not windows:
         season = max(str(row.get('season') or '') for row in pair)
-    pair = [row for row in pair if row.get('season') == season]
+    pair = [row for row in pair if season is None or row.get('season') == season]
     if not pair:
         return result(f'No dated measured {phase} matchup rows for {offense} against {defender}'
                       + (f' in {season}' if season else '') + ' were found. Whole-game coappearances '
                       'do not establish who guarded whom, so I cannot substitute them for defensive FG%.')
     valid, seen = [], {}
     for row in pair:
+        if row.get('_measured_conflict'):
+            return result('Conflicting measured matchup rows were found. The percentage needs source review.')
         key = (row['game_id'], row['offense_player'], row['defense_player'])
         counts = (row.get('fgm'), row.get('fga'))
         if key in seen and seen[key] != counts:
@@ -152,16 +181,22 @@ def answer_matchup_question(store, question, history=None, master=None):
                       'A percentage cannot be calculated from missing data or zero attempts.')
     dates = sorted({str(row['date'])[:10] for row in valid})
     games = len({row['game_id'] for row in valid})
-    rows = ', '.join(str(row['_row']) for row in valid)
+    rows = ', '.join(str(row['_row']) for row in valid if row.get('_row') is not None)
     sources = ', '.join(sorted({str(row.get('source_id') or 'unknown') for row in valid}))
+    source_urls = sorted({row['source'] for row in valid if row.get('source')})
+    source_text = (f"Source: {'; '.join(source_urls[:2])}." if source_urls else
+                   f'Source: Pair_Tracking, Excel row(s) {rows}; source ID(s): {sources}.')
+    scope_text = season or ('available historical archive' if career else 'dated available sample')
     answer = (f'{offense} shot {made / attempted * 100:.1f}% with {defender} recorded as defender '
               f'in the stored measured matchup rows: {made:g} makes / {attempted:g} attempts across {games} game(s).\n'
-              f'Scope: {season} {phase}; {dates[0]} through {dates[-1]}. '
+              f'Scope: {scope_text} {phase}; {dates[0]} through {dates[-1]}. '
               'This is FG% allowed in that tracked sample, not an overall defensive rating.\n'
-              f'Source: Pair_Tracking, Excel row(s) {rows}; source ID(s): {sources}.\n'
+              f'{source_text}\n'
               'Small tracked samples do not establish defensive ability or predict the next matchup.')
     if len(valid) < len(seen):
         answer += f' {len(seen) - len(valid)} row(s) with missing/invalid shooting counts were excluded.'
+    if career:
+        answer += ' The public measured archive begins in 2017–18; this is available observed guarding history, not verified complete lifetime coverage.'
     return {'answer': answer, 'ai_used': False,
             'sources': [{'tool': 'measured_matchup', 'arguments': {'offense': offense, 'defender': defender,
                           'season': season, 'phase': phase}}]}

@@ -7,6 +7,10 @@ on:
       - 'chatbot/nba_daily_export.py'
       - 'chatbot/mirror_sources.py'
       - 'chatbot/advanced_refresh.py'
+      - 'chatbot/tracking_publications.py'
+      - 'chatbot/historical_matchup_refresh.py'
+      - 'chatbot/structured_availability.py'
+      - 'chatbot/official_injury_pdf.py'
       - 'chatbot/career_history_refresh.py'
       - 'chatbot/history_backfill.py'
       - 'chatbot/matchup_history_targets.json'
@@ -23,7 +27,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +35,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install httpx==0.28.1 pyarrow==22.0.0
+      - name: Date for verified source cache
+        id: source-cache-date
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      - name: Restore verified historical tracking source bytes
+        uses: actions/cache@v4
+        with:
+          path: data/.nba-tracking-cache
+          key: nba-tracking-v1-${{ runner.os }}-${{ steps.source-cache-date.outputs.day }}-${{ hashFiles('chatbot/historical_matchup_refresh.py', 'chatbot/tracking_publications.py') }}
+          restore-keys: |
+            nba-tracking-v1-${{ runner.os }}-
+      - run: python -m pip install httpx==0.28.1 pyarrow==22.0.0 pypdf==6.1.3
       - name: Refresh existing dataset entities and preserve prior successful data
         run: python chatbot/nba_daily_export.py --output data/live --days 7
       - name: Publish changed dataset inputs

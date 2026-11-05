@@ -1,0 +1,20 @@
+{
+  "format": "nba-supplemental-data-v1",
+  "history_manifest": {
+    "bytes": 283938,
+    "file": "history_manifest.json",
+    "sha256": "3b11adddbff90cfad3f629a80447de3efa5d7ad39de8dc698a5c22eaf9d12d31"
+  },
+  "policy": "Historical source evidence only; no current-game freshness certification.",
+  "provider_crosswalk": {
+    "bytes": 165427,
+    "file": "game_scores_provider_crosswalk.jsonl.gz",
+    "sha256": "6b23f50e6297d53b6be69b12f592ab9191746077568f7cc804815937affc22c1"
+  },
+  "schema_version": 1,
+  "starter_roster": {
+    "bytes": 164552,
+    "file": "historical_starter_flags_dated.jsonl.gz",
+    "sha256": "097fb5bd3dbddf26a06b5c68fb61738e57503c0f9ed830862fc4bba753abfd93"
+  }
+}
