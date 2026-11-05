@@ -159,14 +159,18 @@ class TelegramLineupPreferencesTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(state, 'store', None, create=True), patch.object(state, 'master', self.store, create=True), \
              patch.object(state, 'phase', 'ready', create=True), patch.object(state, 'detail', 'Ready', create=True), \
              patch.object(state, 'chat_lock', asyncio.Lock(), create=True), \
+             patch('chat_flow.try_fast_answer', AsyncMock(return_value=None)) as fast, \
              patch.object(app, 'answer_question', AsyncMock(return_value={'answer': 'A conversation reply.'})) as answer, \
              patch.object(app, 'observe_ai_result'):
             result = await app.telegram_answer('Hello', [], {'both_teams': True, 'pick_count': 5,
                                                            'player': 'LeBron James', 'line': 10})
         self.assertEqual(result, 'A conversation reply.')
+        fast.assert_awaited_once()
+        fast_request = fast.call_args.args[2]
         request = answer.call_args.args[1]
-        self.assertEqual(request.history, [])
-        self.assertEqual(request.lineup_preferences, {'both_teams': True, 'pick_count': 5})
+        for routed in (fast_request, request):
+            self.assertEqual(routed.history, [])
+            self.assertEqual(routed.lineup_preferences, {'both_teams': True, 'pick_count': 5})
 
 
 class RequestPreferenceValidationTests(unittest.TestCase):

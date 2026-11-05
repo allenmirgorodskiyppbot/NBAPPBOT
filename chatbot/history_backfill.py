@@ -7,17 +7,26 @@ master observations win conflicts; historical imports cannot rewrite live data.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from contextlib import closing
 import datetime as dt
 import gzip
 import hashlib
+import io
 import json
 import math
 from pathlib import Path
+import sqlite3
+import tempfile
 
 from feeds import TEAM_WORDS, canonical_game, canonical_player, canonical_team, numeric
 from game_phase import regular_phase_exclusion
 from master import GAME_FIELDS, PLAYER_FIELDS
 from nba_daily_export import validate_final
+
+MAX_BUNDLE_RECORDS = 2_000_000
+MAX_BUNDLE_COMPRESSED_BYTES = 128_000_000
+MAX_BUNDLE_EXPANDED_BYTES = 2_000_000_000
+MAX_RECORD_CHARS = 100_000
 
 PHASES = {2: 'Regular Season', 3: 'Playoffs', 5: 'Play-In'}
 # Preserve the historical franchise label in observations. These mappings are
@@ -208,8 +217,15 @@ def insert_missing(store, games, observations, db, conflict_sink=None):
                     if conflict_sink:
                         conflict_sink({'kind': kind, 'key': {k: row[k] for k in keys}, 'differences': differences})
                 continue
-            upsert(row, db=db)
-            counts[kind + '_inserted'] += 1
+            # A real insert-only statement preserves a live key even if it
+            # appeared after source planning. No known field is rewritten.
+            names = fields + ['updated_at']
+            values = [str(row[field]) if field in keys else row.get(field) for field in fields]
+            cursor = db.execute('INSERT OR IGNORE INTO ' + table + ' (' + ','.join(names) + ') VALUES ('
+                + ','.join('?' for _ in names) + ')', values + [str(row.get('updated_at') or dt.datetime.now(dt.timezone.utc).isoformat())])
+            if cursor.rowcount:
+                store._snapshot(db, table, ':'.join(str(row[field]) for field in keys), row)
+                counts[kind + '_inserted'] += 1
     return dict(counts)
 
 
@@ -276,13 +292,16 @@ def _validate_existing_game(db, row, kind):
 
 
 def import_history_bundle(store, manifest_path):
-    """Apply local, verified published bundle parts once; safe to retry on startup.
+    """Validate under a read snapshot, then atomically insert only missing keys.
 
-    The caller may download the manifest and parts from its pinned SOURCE_REF.
-    Relative paths are confined to the manifest directory. There are no network
-    calls, credentials, changes to existing statistics, or entry-ledger writes.
+    Source rows spool to a bounded private temporary SQLite file. A republished
+    full career history does not hold the master writer lock while decompressing
+    or checking its existing observations. No known values or freshness gates
+    are changed, and a bad final record cannot commit any part of the bundle.
     """
     path = Path(manifest_path).resolve()
+    if path.stat().st_size > 4_000_000:
+        raise ValueError('History manifest exceeds its byte bound')
     manifest_blob = path.read_bytes()
     manifest = json.loads(manifest_blob)
     if manifest.get('schema_version') != 1 or manifest.get('format') != 'nba-history-jsonl-gzip-v1':
@@ -297,48 +316,126 @@ def import_history_bundle(store, manifest_path):
     prior = store.get_checkpoint(key, {})
     if prior.get('complete'):
         return {**prior, 'already_imported': True}
-    verified = []
-    for part in manifest['parts']:
+    parts = manifest.get('parts')
+    if not isinstance(parts, list) or not 1 <= len(parts) <= 100:
+        raise ValueError('History bundle part count invalid')
+    verified = []; compressed = 0; expected_records = 0
+    for part in parts:
         target = (path.parent / part['file']).resolve()
-        if target.parent != path.parent or target == path or target.stat().st_size != part['bytes']:
+        size, records = part.get('bytes'), part.get('records')
+        if (target.parent != path.parent or target == path or type(size) is not int
+                or not 0 < size <= 32_000_000 or type(records) is not int or records <= 0
+                or target.stat().st_size != size):
             raise ValueError('History part path or size invalid')
-        blob = target.read_bytes()
-        if len(blob) > 32_000_000 or hashlib.sha256(blob).hexdigest() != part['sha256']:
-            raise ValueError('History part checksum/size invalid')
+        compressed += size; expected_records += records
+        if compressed > MAX_BUNDLE_COMPRESSED_BYTES or expected_records > MAX_BUNDLE_RECORDS:
+            raise ValueError('History bundle exceeds its byte or record bound')
         verified.append((part, target))
-    totals = Counter(); seen = set()
-    with store.connect() as db:
-        db.execute('BEGIN IMMEDIATE')
-        for part, target in verified:
-            games = []; rows = []; count = 0
-            with gzip.open(target, 'rt', encoding='utf-8') as stream:
-                for line in stream:
-                    if len(line) > 100_000:
-                        raise ValueError('Oversized history record')
-                    event = json.loads(line); kind = event.get('kind'); row = event.get('data')
-                    _validate_bundle_record(kind, row, identities, through)
-                    _validate_existing_game(db, row, kind)
-                    identity = (kind, row['id']) if kind == 'game' else (kind, row['game_id'], row['player_id'])
-                    if identity in seen:
-                        raise ValueError('Duplicate history bundle observation key')
-                    seen.add(identity)
-                    (games if kind == 'game' else rows).append(row)
-                    count += 1
-                    if count > part['records']:
-                        raise ValueError('History part record count exceeds manifest')
-            if count != part['records']:
-                raise ValueError('History part record count mismatch')
-            totals.update(insert_missing(store, games, rows, db))
-        # Row and game records may span parts. Reject dangling newly imported keys.
-        if db.execute('SELECT 1 FROM player_games p LEFT JOIN games g ON g.id=p.game_id WHERE g.id IS NULL LIMIT 1').fetchone():
-            raise ValueError('History bundle has orphan player observations')
-        result = {**dict(totals), 'complete': True, 'source_data_through_date': through,
-            'manifest_sha256': bundle_hash, 'completed_at': dt.datetime.now(dt.timezone.utc).isoformat(),
-            'policy': 'Missing keys only; existing observations retained on every conflict.'}
-        db.execute('INSERT OR REPLACE INTO checkpoints(name,value_json) VALUES (?,?)', (key, json.dumps(result, sort_keys=True)))
-        db.execute('INSERT OR REPLACE INTO checkpoints(name,value_json) VALUES (?,?)',
-                   ('career_history_status', json.dumps(result, sort_keys=True)))
-    return result
+    with tempfile.TemporaryDirectory(prefix='nba-history-plan-') as temporary:
+        plan_path = Path(temporary) / 'plan.sqlite'
+        with closing(sqlite3.connect(str(plan_path))) as plan:
+            plan.execute('PRAGMA journal_mode=OFF')
+            plan.execute('PRAGMA synchronous=OFF')
+            plan.execute('CREATE TABLE records (kind TEXT,gid TEXT,pid TEXT,payload TEXT,initially_missing INTEGER,PRIMARY KEY(kind,gid,pid))')
+            plan.execute('CREATE INDEX initial_missing_kind ON records(kind) WHERE initially_missing=1')
+            plan.execute('CREATE TABLE game_identity (gid TEXT PRIMARY KEY,day TEXT,team_a TEXT,team_b TEXT)')
+            totals = Counter(); expanded = 0
+            with store.connect() as reader:
+                reader.execute('BEGIN')
+                for part, target in verified:
+                    # Parse the exact verified bytes; never reopen a mutable
+                    # source file after checking its content digest.
+                    blob = target.read_bytes()
+                    if len(blob) != part['bytes'] or hashlib.sha256(blob).hexdigest() != part['sha256']:
+                        raise ValueError('History part checksum/size invalid')
+                    count = 0
+                    with gzip.open(io.BytesIO(blob), 'rt', encoding='utf-8') as stream:
+                        while line := stream.readline(MAX_RECORD_CHARS + 1):
+                            if len(line) > MAX_RECORD_CHARS:
+                                raise ValueError('Oversized history record')
+                            expanded += len(line.encode('utf-8')); count += 1
+                            if expanded > MAX_BUNDLE_EXPANDED_BYTES:
+                                raise ValueError('History bundle exceeds its expanded byte bound')
+                            if count > part['records']:
+                                raise ValueError('History part record count exceeds manifest')
+                            event = json.loads(line)
+                            if not isinstance(event, dict):
+                                raise ValueError('Unsupported history record')
+                            kind = event.get('kind'); row = event.get('data')
+                            _validate_bundle_record(kind, row, identities, through)
+                            _validate_existing_game(reader, row, kind)
+                            gid = row['id'] if kind == 'game' else row['game_id']
+                            pid = '' if kind == 'game' else str(row['player_id'])
+                            teams = sorted((row['home_team'], row['away_team']) if kind == 'game' else (row['team'], row['opponent']))
+                            plan.execute('INSERT OR IGNORE INTO game_identity VALUES (?,?,?,?)', (gid,row['date'],*teams))
+                            table, fields = ('games', GAME_FIELDS) if kind == 'game' else ('player_games', PLAYER_FIELDS)
+                            old = reader.execute('SELECT * FROM '+table+' WHERE '+
+                                ('id=?' if kind == 'game' else 'game_id=? AND player_id=?'),
+                                (gid,) if kind == 'game' else (gid,pid)).fetchone()
+                            if old:
+                                totals[kind + '_overlap'] += 1
+                                differences = [field for field in fields if field in row and field != 'source' and old[field] != row[field]]
+                                if differences:
+                                    totals[kind + '_conflicts'] += 1
+                                    totals.update(kind + '_conflict_' + field for field in differences)
+                            try:
+                                plan.execute('INSERT INTO records VALUES (?,?,?,?,?)',
+                                    (kind,gid,pid,json.dumps(row,sort_keys=True,ensure_ascii=False),int(old is None)))
+                            except sqlite3.IntegrityError:
+                                raise ValueError('Duplicate history bundle observation key') from None
+                    if count != part['records']:
+                        raise ValueError('History part record count mismatch')
+                for (gid,) in plan.execute("SELECT gid FROM game_identity"):
+                    if not reader.execute('SELECT 1 FROM games WHERE id=?', (gid,)).fetchone() and not plan.execute(
+                            "SELECT 1 FROM records WHERE kind='game' AND gid=?", (gid,)).fetchone():
+                        raise ValueError('History bundle has orphan player observations')
+                for (gid,) in reader.execute('SELECT DISTINCT p.game_id FROM player_games p LEFT JOIN games g ON g.id=p.game_id WHERE g.id IS NULL'):
+                    if not plan.execute("SELECT 1 FROM records WHERE kind='game' AND gid=?", (gid,)).fetchone():
+                        raise ValueError('History bundle has orphan player observations')
+            plan.commit()
+            with store.connect() as db:
+                db.execute('ATTACH DATABASE ? AS history_plan', (str(plan_path),))
+                db.execute('BEGIN IMMEDIATE')
+                completed = db.execute('SELECT value_json FROM checkpoints WHERE name=?', (key,)).fetchone()
+                if completed and (saved := json.loads(completed[0])).get('complete'):
+                    return {**saved, 'already_imported': True}
+                # One check per game also covers overlapping rows: concurrent
+                # identity corrections cannot be certified by an old read plan.
+                for row in db.execute('''SELECT i.gid,i.day,i.team_a,i.team_b,g.date,g.home_team,g.away_team
+                        FROM history_plan.game_identity i JOIN main.games g ON g.id=i.gid'''):
+                    if row['date'] and row['date'] != row['day']:
+                        raise ValueError('Existing game date conflicts with history identity')
+                    if row['home_team'] and row['away_team'] and {row['home_team'],row['away_team']} != {row['team_a'],row['team_b']}:
+                        raise ValueError('Existing game participants conflict with history identity')
+                for kind in ('game','player_game'):
+                    table = 'games' if kind == 'game' else 'player_games'
+                    match = 'known.id=r.gid' if kind == 'game' else 'known.game_id=r.gid AND known.player_id=r.pid'
+                    missing = 'known.id IS NULL' if kind == 'game' else 'known.game_id IS NULL'
+                    # Count a newly arrived live observation as an overlap,
+                    # preserving its values and its conflict diagnostics.
+                    raced = 'SELECT r.payload FROM history_plan.records r JOIN main.'+table+' known ON '+match+' WHERE r.kind=? AND r.initially_missing=1'
+                    for (payload,) in db.execute(raced,(kind,)):
+                        row = json.loads(payload)
+                        totals.update(insert_missing(store,[row] if kind=='game' else [],
+                            [row] if kind=='player_game' else [],db))
+                    # Indexed SQL joins identify missing keys at the actual
+                    # writer lease, including deletions/new live rows that raced
+                    # with planning. Existing payloads are never reparsed here.
+                    query = 'SELECT r.payload FROM history_plan.records r LEFT JOIN main.'+table+' known ON '+match+' WHERE r.kind=? AND '+missing
+                    for (payload,) in db.execute(query,(kind,)):
+                        row = json.loads(payload)
+                        _validate_existing_game(db,row,kind)
+                        totals.update(insert_missing(store,[row] if kind=='game' else [],
+                            [row] if kind=='player_game' else [],db))
+                if db.execute('SELECT 1 FROM player_games p LEFT JOIN games g ON g.id=p.game_id WHERE g.id IS NULL LIMIT 1').fetchone():
+                    raise ValueError('History bundle has orphan player observations')
+                result = {**dict(totals), 'complete':True, 'source_data_through_date':through,
+                    'manifest_sha256':bundle_hash,'completed_at':dt.datetime.now(dt.timezone.utc).isoformat(),
+                    'policy':'Missing keys only; existing observations retained on every conflict.',
+                    'overlap_check_basis':'Read snapshot; actual game identities and missing keys rechecked atomically before insertion.'}
+                db.execute('INSERT OR REPLACE INTO checkpoints(name,value_json) VALUES (?,?)',(key,json.dumps(result,sort_keys=True)))
+                db.execute('INSERT OR REPLACE INTO checkpoints(name,value_json) VALUES (?,?)',('career_history_status',json.dumps(result,sort_keys=True)))
+            return result
 
 
 def main():

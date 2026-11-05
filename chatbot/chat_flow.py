@@ -13,6 +13,38 @@ from pick_discussion import build_pick_discussion, format_pick_discussion
 from master import normalized_name
 from board_shortlist import MARKET_NAMES
 
+MODEL_DISCUSSION_SECONDS = 35
+_DEEP_DISCUSSION = re.compile(r'\b(?:compar(?:e|ing|ison)|in[- ]depth|in detail|detail(?:ed|s)?|'
+    r'deep(?:er)?|breakdown|walk me through|tell me more|elaborat\w*|other factors|alternatives?|what else)\b', re.I)
+
+
+def _wants_model(question):
+    """Use generation for requested synthesis, not a computed side or short follow-up."""
+    return bool(_DEEP_DISCUSSION.search(question))
+
+
+def _direct_reply(answer, cards=(), *, sources=None):
+    from grounded_reply import _natural_sources
+    return {'answer': answer, 'sources': _natural_sources(cards) if cards else (sources or []),
+            'ai_used': False, 'response_mode': 'computed',
+            'grounding': ('Computed from checked saved evidence; current-game checks remain separate.'
+                          if cards else 'Deterministic conversation; no current statistics asserted.')}
+
+
+def _bounded_request(request):
+    # Resolve slots from the full history first. The model only needs a small
+    # presentation excerpt alongside the independently retrieved source cards.
+    if not callable(getattr(request, 'model_copy', None)):
+        return request
+    history = []
+    for item in request.history[-4:]:
+        if not callable(getattr(item, 'model_copy', None)):
+            return request
+        history.append(item.model_copy(update={'content': item.content[:300]}))
+    while sum(len(item.content) for item in history) > 900 and len(history) > 1:
+        history.pop(0)
+    return request.model_copy(update={'history': history})
+
 
 def _context(turn):
     context = {key:turn[key] for key in ('intent','slots','constraints') if turn.get(key)}
@@ -35,6 +67,10 @@ def _conversational_fallback(turn, question):
                 'saved evidence supports; I’ll explain any conflict rather than switch sides just to agree.')
     if re.search(r'\b(?:thanks?|thank you|thank u|ty|thx)\b', query):
         return 'You’re welcome.'
+    if re.fullmatch(r'\s*(?:ok(?:ay)?|cool|got it|sounds good|nice)[.!?\s]*', query):
+        return 'Got it.'
+    if re.fullmatch(r'\s*(?:hi|hello|hey)[.!?\s]*', query):
+        return 'Hi, I’m here.'
     if re.search(r'blowout|bench|minutes|playing time', query):
         return ('If playing time drops, shot attempts and other counting stats can drop too. That’s a risk to '
                 'check, not a prediction that anyone will be benched.')
@@ -49,15 +85,15 @@ def _conversational_fallback(turn, question):
 async def _generate_reply(generate, request, progress, master, cards, *, dialogue, fallback):
     """A failed explanation must still deliver the checked answer, never model prose."""
     try:
-        result = await generate(request, progress, master, cards, natural=True,
-                                dialogue=dialogue, fallback=fallback)
+        async with asyncio.timeout(MODEL_DISCUSSION_SECONDS):
+            result = await generate(_bounded_request(request), progress, master, cards, natural=True,
+                                    dialogue=dialogue, fallback=fallback)
     except asyncio.CancelledError:
         raise
     except Exception:
         result = None
     if not isinstance(result, dict) or not str(result.get('answer') or '').strip():
-        return {'answer':fallback, 'sources':list(dict.fromkeys(
-            str(card.get('source')) for card in cards if card.get('source'))), 'ai_used':False}
+        return _direct_reply(fallback, cards)
     return result
 
 
@@ -111,7 +147,8 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
         cards.extend(research.get('cards', []))
         checks.extend({key:item[key] for key in ('player','stat','team','date')}
                       for item in research.get('assessments', []) if item.get('data_readiness', {}).get('ready'))
-        assessments.extend({key:item[key] for key in ('player','stat','status','reason','cautions') if key in item}
+        assessments.extend({key:item[key] for key in ('player','stat','status','reason','cautions',
+                           'date','line_kind','offer_verified') if key in item}
                            for item in research.get('assessments', []))
         assessments.extend({**item, 'status':'held', 'decision':'pass'} for item in research.get('held', []))
         if not research.get('cards'):
@@ -171,7 +208,8 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
         if report.get('data_readiness', {}).get('ready'):
             checks.append({key:report[key] for key in ('player','stat','team','date')})
     fallback = '\n\n'.join(lines)
-    fallback_result = {'answer':fallback, 'sources':list(dict.fromkeys(sources)), 'ai_used':False}
+    fallback_result = _direct_reply(fallback, cards, sources=list(dict.fromkeys(sources)))
+    fallback_result['discussion'] = {**discussion, 'assessments':assessments}
     discussion.update(assessments=assessments, action=(
         'Explain every supplied pick, including held picks. Research targets are hypothetical, '
         'not actual offers. Supplied priced lines remain user-provided and unverified. '
@@ -180,7 +218,10 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
         discussion['action'] += ' The user’s ordinal identifies the selected player in the lineup; explain why that player and market were selected.'
     # The bounded model/validator supports four evidence cards. Larger lineups
     # still get every computed explanation instead of silently dropping legs.
-    if len(cards) > 4:
+    if len(cards) > 4 or not _wants_model(request.message):
+        changed = await asyncio.to_thread(_changed_readiness, master, checks)
+        if changed:
+            return changed
         return fallback_result
     result = await _generate_reply(generate, request, progress, master, cards,
                                    dialogue=discussion, fallback=fallback)
@@ -201,14 +242,21 @@ async def _explain_picks(master, turn, request, progress, generate, discussion):
     return result
 
 
-async def answer_conversation(store, master, request, progress, generate, turn=None):
+async def answer_conversation(store, master, request, progress, generate, turn=None, *, fast_only=False):
     history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
     turn = turn or await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
         preferences=getattr(request, 'lineup_preferences', None))
     if turn.get('clarification'):
         return {'answer':turn['clarification'], 'sources':[], 'ai_used':False}
     intent = turn['intent']
+    if intent == 'upcoming_game':
+        from upcoming_game import build_preview
+        from pick_discussion import _now
+        return await asyncio.to_thread(build_preview, master, request.message, history, now=_now(None),
+                                       team=turn.get('state', {}).get('upcoming_game_team'))
     if intent == 'research':
+        return None
+    if fast_only and _wants_model(request.message) and intent != 'lineup_constraint':
         return None
     if (intent == 'explanation' and turn.get('slots', {}).get('player')
             and not turn.get('complete_prop') and not turn.get('recent_picks')):
@@ -224,10 +272,12 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         discussion['action'] = ('Acknowledge that a complete lineup must include at least one qualified '
             'player from each team. If one side lacks evidence, explain that rather than fill a leg.'
             if both else 'Acknowledge the requested team preference. The game and offer rules still need checking.')
-        return await _generate_reply(generate, request, progress, master, [], dialogue=discussion,
-            fallback=('I’ll include at least one qualified player from each team when building the lineup. '
+        answer = ('I’ll include at least one qualified player from each team when building the lineup. '
                       'If I can’t support both sides, I’ll tell you instead of filling a leg.' if both else
-                      'I understand the team preference. I’ll still check the available evidence and offer rules.'))
+                      'I understand the team preference. I’ll still check the available evidence and offer rules.')
+        result = _direct_reply(answer)
+        result['constraints'] = turn.get('constraints', {})
+        return result
     if intent in {'prop','explanation','preference'} and turn.get('complete_prop'):
         report = await asyncio.to_thread(build_pick_discussion, master, turn['slots'])
         if not report.get('available'):
@@ -242,9 +292,12 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         focused = [r for r in risks if any(word in query and word in r.casefold()
                    for word in ('blowout','minutes','payout','threes','attempts','motivation'))]
         discussion['relevant_risks'] = (focused or risks[-1:])[:2]
-        progress['detail'] = 'Explaining the line and its main risk'
-        result = await _generate_reply(generate, request, progress, master, report['evidence_cards'],
-                                       dialogue=discussion, fallback=report['fallback_answer'])
+        progress['detail'] = 'Checking the line and its main risk'
+        if _wants_model(request.message):
+            result = await _generate_reply(generate, request, progress, master, report['evidence_cards'],
+                                           dialogue=discussion, fallback=report['fallback_answer'])
+        else:
+            result = _direct_reply(report['fallback_answer'], report['evidence_cards'])
         if report.get('data_readiness', {}).get('ready'):
             changed = await asyncio.to_thread(_changed_readiness, master,
                 [{key:report[key] for key in ('player','stat','team','date')}])
@@ -259,6 +312,8 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
             result['answer'] = 'Pass for now.\n\n' + result['answer']
         result['discussion'] = {'player':report['player'],'stat':report['stat'],'line':report['line'],
                                 'date':report['date'],'decision':report['decision']}
+        if discussion.get('selected_pick'):
+            result['discussion']['selected_pick'] = discussion['selected_pick']
         return result
     if intent == 'explanation' and turn.get('recent_picks'):
         # Explain the selected identities, recomputing every claim from data.
@@ -271,7 +326,27 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
     elif intent == 'explanation':
         discussion['action'] = ('Explain the general mechanism using the conversation. If several '
             'picks could be meant, ask which one; do not choose an arbitrary player.')
+    if intent == 'preference' and not _wants_model(request.message):
+        result = _direct_reply(_conversational_fallback(turn, request.message))
+        result['constraints'] = turn.get('constraints', {})
+        return result
+    if intent == 'chat' and re.fullmatch(r'\s*(?:thanks?(?: you)?|thank u|ty|thx|hi|hello|hey|'
+                                      r'ok(?:ay)?|cool|got it|sounds good|nice)[.!?\s]*', request.message, re.I):
+        return _direct_reply(_conversational_fallback(turn, request.message))
     cards = (await asyncio.to_thread(_preference_evidence, store, master, turn, history)
              if intent == 'preference' and turn.get('slots', {}).get('player') else [])
+    if fast_only:
+        return None
     return await _generate_reply(generate, request, progress, master, cards, dialogue=discussion,
                                 fallback=_conversational_fallback(turn, request.message))
+
+
+async def try_fast_answer(store, master, request, progress=None):
+    """Return a checked routine answer before model readiness/queue guards.
+
+    This path performs no inference or live schedule fetch. The saved freshness
+    checks still decide whether a prop is eligible, so missing verification
+    returns a Pass rather than an invented current recommendation.
+    """
+    return await answer_conversation(store, master, request, progress if progress is not None else {},
+                                     None, fast_only=True)

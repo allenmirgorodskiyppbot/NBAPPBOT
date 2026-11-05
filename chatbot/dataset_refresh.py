@@ -160,13 +160,68 @@ def scope_revision(document):
     return hashlib.sha256(json.dumps({k:v for k,v in document.items() if k!='revision'},sort_keys=True).encode()).hexdigest()
 
 
-def expand_current_player_scope(scope, rows):
+def _registered_provider_bindings():
+    """Independent, bundled NBA/ESPN bindings; aliases never establish a new link."""
+    path=Path(__file__).with_name('matchup_history_targets.json')
+    records=json.loads(path.read_text()).get('players',[])
+    bindings={}
+    for row in records:
+        nba,espn=str(row.get('nba_player_id') or ''),str(row.get('espn_player_id') or '')
+        if nba.isdigit() and int(nba)>0 and espn.isdigit() and int(espn)>0:
+            bindings.setdefault(normalized_name(row.get('player') or ''),set()).add((nba,espn))
+    return bindings
+
+
+def _provider_completion_proof(player,provider,rows,scope,bindings):
+    import datetime as dt
+    import re
+    from feeds import canonical_game,canonical_team,TEAM_WORDS
+    name=normalized_name(player['player'])
+    nba=str(player.get('nba_player_id') or '')
+    if bindings.get(name)!={(nba,provider)}:
+        raise ValueError('Missing provider identity lacks one independent primary-name/NBA/ESPN binding.')
+    source=scope.get('history_identity_source')
+    match=re.fullmatch(r'https://github\.com/sportsdataverse/sportsdataverse-data/releases/download/'
+                      r'espn_nba_player_boxscores/player_box_(\d{4})\.parquet',str(source or ''))
+    if not match:raise ValueError('Missing provider identity requires a current-season source registry.')
+    year=int(match.group(1));season=f'{year-1}-{str(year)[-2:]}'
+    relevant=[row for row in rows if str(row.get('espn_player_id') or '')==provider]
+    named=[row for row in rows if normalized_name(row.get('player') or '')==name]
+    if (not relevant or {normalized_name(row.get('player') or '') for row in relevant}!={name}
+            or {str(row.get('espn_player_id') or '') for row in named}!={provider}):
+        raise ValueError('Missing provider identity has ambiguous current source names or IDs.')
+    games,dates=set(),set()
+    for row in relevant:
+        try:day=dt.date.fromisoformat(str(row.get('date')))
+        except (ValueError,TypeError):raise ValueError('Provider completion needs dated current game evidence.') from None
+        team,opponent=canonical_team(row.get('team')),canonical_team(row.get('opponent'))
+        if (row.get('source')!=source or row.get('season')!=season or row.get('season_type')!='Regular Season'
+                or not dt.date(year-1,7,1)<=day<dt.date(year,7,1)
+                or team not in TEAM_WORDS or opponent not in TEAM_WORDS or team==opponent
+                or row.get('game_id')!=canonical_game(day.isoformat(),team,opponent)
+                or row.get('nba_player_id') is not None and str(row['nba_player_id'])!=nba
+                or normalized_name(row.get('player') or '')!=name):
+            raise ValueError('Provider completion evidence conflicts with its current source, phase or NBA identity.')
+        games.add(row['game_id']);dates.add(day.isoformat())
+    return {'player':player['player'],'nba_player_id':nba,'espn_player_id':provider,'field':'espn_player_id',
+        'match_basis':'unique_primary_name_and_registered_provider_ids','source_player_name':player['player'],
+        'season':season,'season_type':'Regular Season','source_url':source,
+        'source_game_ids':sorted(games),'source_dates':sorted(dates),
+        'primary_name_unique':True,'provider_id_unique':True,'upstream_full_game_validated':True}
+
+
+def expand_current_player_scope(scope, rows, *, provider_completions=None,provider_completion_baseline=None):
     """Add current NBA debuts only from fully validated, normalized source games."""
     from feeds import TEAM_WORDS, canonical_team
     from game_phase import regular_phase_exclusion
     import copy
     if scope.get('population')!='all_current_nba_players':return scope
     result=copy.deepcopy(scope)
+    rows=list(rows)
+    bindings=_registered_provider_bindings()
+    baseline=provider_completion_baseline or scope
+    missing_before={normalized_name(p['player']) for p in baseline['players'] if p.get('espn_player_id') is None}
+    proofs={}
     ids={str(p['espn_player_id']):p for p in result['players'] if p.get('espn_player_id')}
     names={}
     for player in result['players']:
@@ -184,14 +239,25 @@ def expand_current_player_scope(scope, rows):
             player=ids[provider]
             if normalized not in {normalized_name(n) for n in [player['player'],*player.get('aliases',[])]}:
                 raise ValueError('Current source player ID changed names without an authorized alias.')
+            if normalized in missing_before and normalized==normalized_name(player['player']):
+                proofs[normalized]=_provider_completion_proof(player,provider,rows,scope,bindings)
             continue
         if normalized in names:
-            raise ValueError('New provider identity collides with an existing authorized full name.')
+            candidates=[p for p in result['players'] if normalized_name(p['player'])==normalized]
+            if (len(candidates)!=1 or names[normalized]!={candidates[0]['player']}
+                    or candidates[0].get('espn_player_id') is not None or not candidates[0].get('nba_player_id')):
+                raise ValueError('New provider identity collides with an existing authorized full name.')
+            player=candidates[0]
+            proof=_provider_completion_proof(player,provider,rows,scope,bindings)
+            player['espn_player_id']=provider
+            ids[provider]=player;proofs[normalized]=proof
+            continue
         player={'player':name,'player_id':canonical_player(name),'espn_player_id':provider,'aliases':[name]}
         result['players'].append(player);ids[provider]=player;names[normalized]={name}
     if len(result['players'])>2000:raise ValueError('Current player scope exceeds its population bound.')
     result['players'].sort(key=lambda player:normalized_name(player['player']))
     result['revision']=scope_revision(result)
+    if provider_completions is not None:provider_completions.extend(proofs[key] for key in sorted(proofs))
     return result
 
 
@@ -248,10 +314,61 @@ def validate_published_scope(document, bundled, previous, now):
                 if not value.isdigit() or int(value)<=0 or value in seen:
                     raise ValueError('Published roster scope has an invalid or duplicate provider identity.')
                 seen[value]=identity
+    completion_rows=document.get('provider_completions',[])
+    if not isinstance(completion_rows,list) or len(completion_rows)>len(scope['players']):
+        raise ValueError('Published provider completion proofs exceed their identity scope.')
+    completion_proofs={}
+    for proof in completion_rows:
+        if not isinstance(proof,dict):raise ValueError('Published provider completion proof is invalid.')
+        identity=canonical_player(proof.get('player') or '')
+        if identity in completion_proofs:raise ValueError('Published provider completion proof repeats an identity.')
+        completion_proofs[identity]=proof
+    bindings=_registered_provider_bindings() if completion_proofs else {}
     prior_by_id={canonical_player(p['player']):p for p in previous['players']}
+    bundled_by_id={canonical_player(p['player']):p for p in bundled['players']}
+    used_proofs=set()
     for identity,player in prior_by_id.items():
-        if identities.get(identity)!=player:
-            raise ValueError('Published roster scope removes or rewrites an existing identity.')
+        updated=identities.get(identity)
+        if updated==player:
+            baseline=bundled_by_id.get(identity,player)
+            if baseline==updated or baseline.get('espn_player_id') is not None:
+                continue
+            player=baseline
+        provider=str(updated.get('espn_player_id') or '') if isinstance(updated,dict) else ''
+        expected_player={**player,'espn_player_id':provider}
+        proof=completion_proofs.get(identity,{})
+        if (player.get('espn_player_id') is not None or not player.get('nba_player_id') or updated!=expected_player
+                or bindings.get(normalized_name(player['player']))!={(str(player['nba_player_id']),provider)}
+                or proof.get('player')!=player['player'] or proof.get('nba_player_id')!=str(player['nba_player_id'])
+                or proof.get('espn_player_id')!=provider or proof.get('field')!='espn_player_id'
+                or proof.get('match_basis')!='unique_primary_name_and_registered_provider_ids'
+                or normalized_name(proof.get('source_player_name') or '')!=normalized_name(player['player'])
+                or proof.get('season')!=season or proof.get('season_type')!='Regular Season'
+                or proof.get('source_url')!=source or proof.get('source_content_sha256')!=document['source_content_sha256']
+                or _aware(proof.get('source_published_at'))!=published
+                or any(proof.get(key) is not True for key in
+                       ('primary_name_unique','provider_id_unique','upstream_full_game_validated'))):
+            raise ValueError('Published roster scope removes or rewrites an existing identity without validated missing-provider proof.')
+        dates,games=proof.get('source_dates'),proof.get('source_game_ids')
+        try:
+            if (not isinstance(dates,list) or not 1<=len(dates)<=200 or len(set(dates))!=len(dates)
+                    or any(dt.date.fromisoformat(value)>day or dt.date.fromisoformat(value)>published.date()
+                           or not dt.date(year,7,1)<=dt.date.fromisoformat(value)<dt.date(year+1,7,1) for value in dates)
+                    or not isinstance(games,list) or not 1<=len(games)<=200 or len(set(games))!=len(games)):
+                raise ValueError
+            observed_dates=set()
+            from feeds import canonical_game
+            for game in games:
+                prefix,game_day,home,away=game.split(':')
+                if (prefix!='nba' or home not in TEAM_WORDS or away not in TEAM_WORDS or home==away
+                        or game_day not in dates or canonical_game(game_day,home,away)!=game):raise ValueError
+                observed_dates.add(game_day)
+            if observed_dates!=set(dates):raise ValueError
+        except (ValueError,TypeError,AttributeError):
+            raise ValueError('Published missing-provider proof has invalid current game/date evidence.') from None
+        used_proofs.add(identity)
+    if set(completion_proofs)!=used_proofs:
+        raise ValueError('Published provider proof is not a missing-field completion of an existing identity.')
     for identity,player in identities.items():
         if identity not in prior_by_id and (not player.get('espn_player_id') or
                 set(player)-{'player','player_id','espn_player_id','aliases'}):

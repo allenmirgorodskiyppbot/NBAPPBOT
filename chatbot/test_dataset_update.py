@@ -1,15 +1,20 @@
 """Manual updates compare real values and keep slow jobs guarded until complete."""
 import asyncio
+from contextlib import contextmanager
 import copy
 import datetime as dt
 import json
 from pathlib import Path
 import tempfile
+import sqlite3
+import threading
+import time
+import tracemalloc
 import unittest
 from unittest.mock import AsyncMock,patch
 
 from dataset_refresh import initialize_scope
-from dataset_update import DatasetUpdateController,data_fingerprint,format_update_report
+from dataset_update import DatasetUpdateController,data_fingerprint,format_update_report,_ControllerStore
 from master import MasterStore
 from nightly_data import NightlyNBARefresh
 
@@ -216,6 +221,153 @@ class DatasetUpdateTests(unittest.IsolatedAsyncioTestCase):
         report=await self.controller(export_refresh=export).refresh()
         self.assertEqual(self.store.get_checkpoint('history_upgrade_status'),newer)
         self.assertEqual(report['export']['phase'],'failed')
+
+    async def test_fingerprint_is_independent_of_insertion_order_and_keeps_real_changes(self):
+        with self.store.connect() as db:
+            db.execute('CREATE TABLE refreshed_assignments(source_key TEXT PRIMARY KEY,payload_json TEXT)')
+            db.executemany('INSERT INTO refreshed_assignments VALUES (?,?)',[
+                ('b',json.dumps({'primary':'Defender B'})),('a',json.dumps({'primary':'Defender A'}))])
+        before=data_fingerprint(self.store)
+        with self.store.connect() as db:
+            db.execute('DELETE FROM refreshed_assignments')
+            db.executemany('INSERT INTO refreshed_assignments VALUES (?,?)',[
+                ('a',json.dumps({'primary':'Defender A'})),('b',json.dumps({'primary':'Defender B'}))])
+        self.assertEqual(data_fingerprint(self.store),before)
+        with self.store.connect() as db:
+            db.execute('UPDATE refreshed_assignments SET payload_json=? WHERE source_key=?',
+                       (json.dumps({'primary':'Different defender'}),'a'))
+        self.assertNotEqual(data_fingerprint(self.store),before)
+
+    async def test_fingerprint_large_text_population_has_bounded_python_memory(self):
+        payload=json.dumps({'selected_player':'Jalen Brunson','primary':'Defender',
+                            'reason':'Published contextual evidence. '*150})
+        with self.store.connect() as db:
+            db.execute('CREATE TABLE refreshed_assignments(source_key TEXT PRIMARY KEY,payload_json TEXT)')
+            db.executemany('INSERT INTO refreshed_assignments VALUES (?,?)',
+                           ((f'row-{index:05d}',payload) for index in range(5000)))
+        tracemalloc.start()
+        try:
+            digest=data_fingerprint(self.store)
+            _,peak=tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        self.assertEqual(len(digest),64)
+        self.assertLess(peak,8_000_000,'Fingerprinting must not retain the whole text population in Python.')
+
+    async def test_status_reports_active_stage_and_elapsed_without_starting_another_update(self):
+        entered=asyncio.Event();release=asyncio.Event()
+        async def supplemental():
+            entered.set();await release.wait();return {'phase':'updated'}
+        controller=self.controller(supplemental_refresh=supplemental)
+        task=asyncio.create_task(controller.refresh())
+        await entered.wait()
+        self.now[0]+=dt.timedelta(seconds=90)
+        before=self.store.get_checkpoint('nightly_nba_refresh')
+        status=controller.status()
+        self.assertEqual(status['phase'],'checking');self.assertTrue(status['active'])
+        self.assertEqual(status['stage'],'history_availability')
+        self.assertEqual((status['elapsed_seconds'],status['stage_elapsed_seconds']),(90,90))
+        self.assertEqual(self.store.get_checkpoint('nightly_nba_refresh'),before)
+        self.assertEqual(self.calls,[('nightly',False)])
+        release.set();await task
+        self.now[0]+=dt.timedelta(minutes=5)
+        final=controller.status()
+        self.assertFalse(final['active']);self.assertEqual(final['stage'],'finished')
+        self.assertEqual(final['elapsed_seconds'],90)
+
+    async def test_stale_saved_checking_state_does_not_claim_an_active_refresh(self):
+        self.store.set_checkpoint('dataset_update_status',{'phase':'checking','stage':'excel',
+            'detail':'Rebuilding the master Excel file','started_at':(NOW-dt.timedelta(minutes=8)).isoformat()})
+        report=self.controller().status()
+        self.assertEqual(report['phase'],'interrupted');self.assertFalse(report['active'])
+        self.assertIn('retry',report['detail'])
+
+    async def hold_writer(self):
+        entered=threading.Event();release=threading.Event()
+        def writer():
+            db=sqlite3.connect(self.store.path,timeout=1)
+            try:
+                db.execute('BEGIN IMMEDIATE');entered.set();release.wait(3)
+                db.rollback()
+            finally:db.close()
+        thread=threading.Thread(target=writer,daemon=True);thread.start()
+        self.addCleanup(thread.join,2);self.addCleanup(release.set)
+        self.assertTrue(await asyncio.to_thread(entered.wait,1))
+        return release
+
+    async def test_real_writer_contention_keeps_heartbeat_running_and_saves_one_completion(self):
+        release=await self.hold_writer()
+        stamps=[];done=False
+        async def heartbeat():
+            while not done:
+                stamps.append(time.monotonic());await asyncio.sleep(.01)
+        pulse=asyncio.create_task(heartbeat())
+        async def unlock():await asyncio.sleep(.4);release.set()
+        unlocker=asyncio.create_task(unlock())
+        try:
+            report=await self.controller().refresh()
+        finally:
+            done=True;release.set();await pulse;await unlocker
+        self.assertGreater(len(stamps),15)
+        self.assertLess(max(b-a for a,b in zip(stamps,stamps[1:])),.2)
+        self.assertEqual(self.calls,[('nightly',False)])
+        self.assertEqual(self.store.get_checkpoint('dataset_update_status')['phase'],report['phase'])
+
+    async def test_cancel_during_writer_wait_drains_short_attempt_without_orphan_or_endless_cleanup(self):
+        release=await self.hold_writer();controller=self.controller()
+        task=asyncio.create_task(controller.refresh())
+        await asyncio.sleep(.18);task.cancel()
+        with self.assertRaises(asyncio.CancelledError):await asyncio.wait_for(task,.7)
+        self.assertFalse(self.nightly.manual_update_active);self.assertFalse(controller.lock.locked())
+        self.assertEqual(self.calls,[])
+        self.assertFalse(release.is_set())
+        release.set();await asyncio.sleep(.2)
+        self.assertEqual(self.calls,[])
+        self.assertEqual(controller.status()['phase'],'interrupted')
+
+    async def test_readonly_database_failure_is_visible_and_never_retried_as_writer_contention(self):
+        attempts=[]
+        @contextmanager
+        def readonly():
+            db=sqlite3.connect(Path(self.store.path).as_uri()+'?mode=ro',uri=True)
+            db.row_factory=sqlite3.Row
+            try:
+                attempts.append(True)
+                with db:yield db
+            finally:db.close()
+        with patch.object(self.store,'connect',readonly):
+            with self.assertRaises(sqlite3.OperationalError) as caught:
+                await asyncio.wait_for(self.controller().refresh(),1)
+        self.assertEqual(caught.exception.sqlite_errorcode,sqlite3.SQLITE_READONLY)
+        self.assertEqual(len(attempts),2) # One prior-state read, then one failed stage write.
+        self.assertFalse(self.nightly.manual_update_active);self.assertEqual(self.calls,[])
+
+    async def test_full_and_uncoded_operational_errors_are_not_hidden_or_retried(self):
+        for code in (sqlite3.SQLITE_FULL,None):
+            calls=[]
+            error=sqlite3.OperationalError('database is locked')
+            if code is not None:error.sqlite_errorcode=code
+            def failed():calls.append(True);raise error
+            with self.subTest(code=code),self.assertRaises(sqlite3.OperationalError):
+                await self.controller()._database(failed)
+            self.assertEqual(len(calls),1)
+
+    async def test_initial_database_wait_reports_this_active_job_instead_of_old_interruption(self):
+        entered=threading.Event();release=threading.Event();original=_ControllerStore.get_checkpoint
+        controller=self.controller();controller._progress={'phase':'interrupted','detail':'Previous job'}
+        def first_read(store,name,default=None):
+            if name=='dataset_update_status' and not entered.is_set():
+                entered.set();release.wait(2)
+            return original(store,name,default)
+        with patch.object(_ControllerStore,'get_checkpoint',first_read):
+            task=asyncio.create_task(controller.refresh())
+            try:
+                self.assertTrue(await asyncio.to_thread(entered.wait,1))
+                report=controller.status()
+                self.assertEqual(report['phase'],'checking');self.assertTrue(report['active'])
+                self.assertEqual(report['stage'],'prepare')
+            finally:release.set()
+            await task
 
 
 class NightlyManualNoticeTests(unittest.IsolatedAsyncioTestCase):

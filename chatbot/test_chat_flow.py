@@ -109,8 +109,9 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second['discussion']['stat'], 'pra')
         self.assertEqual(second['discussion']['line'], 22.5)
         self.assertEqual(second['discussion']['decision'], 'less')
-        self.assertTrue(self.generated[-1]['natural'])
-        self.assertTrue(self.generated[-1]['cards'])
+        self.assertFalse(second['ai_used'])
+        self.assertTrue(second['sources'])
+        self.generate.assert_not_awaited()
         self.remember(history, question, second)
 
         question = 'Up or down choose'
@@ -122,10 +123,10 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
         last = await self.ask('Why do you think that is a good pick?', history, through_app=True)
         self.assertEqual(last['discussion']['player'], 'Josh Hart')
         self.assertEqual(last['discussion']['line'], 22.5)
-        self.assertEqual(self.generated[-1]['dialogue']['intent'], 'explanation')
-        facts = [fact for card in self.generated[-1]['cards'] for fact in card.get('approved_facts', [])]
-        self.assertTrue(any(fact.get('entity') == 'Josh Hart' for fact in facts))
-        self.assertTrue(all(fact.get('entity') != 'Julius Randle' for fact in facts))
+        self.generate.assert_not_awaited()
+        facts = ' '.join(source.get('text','') for source in last['sources'])
+        self.assertIn('Josh Hart',facts)
+        self.assertNotIn('Julius Randle',facts)
         self.assertEqual(before, self.snapshot())
 
     async def test_randal_typo_reaches_three_point_assessment(self):
@@ -134,17 +135,18 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['discussion']['stat'], 'tpm')
         self.assertEqual(result['discussion']['line'], 1.5)
         self.assertEqual(result['discussion']['decision'], 'more')
-        self.assertTrue(self.generated[-1]['cards'])
-        self.assertIn('shooting accuracy', self.generated[-1]['fallback'])
+        self.assertTrue(result['sources'])
+        self.assertIn('shooting accuracy',result['answer'])
+        self.generate.assert_not_awaited()
 
     async def test_both_team_rule_acknowledges_constraint_without_team_stat_dump(self):
         text = 'The picks we choose we must have at least one from each team. Can’t be all Knicks'
         before = self.snapshot()
         result = await self.ask(text, through_app=True)
         self.assertIn('each team', result['answer'])
-        self.assertEqual(self.generated[-1]['cards'], [])
-        self.assertEqual(self.generated[-1]['dialogue']['intent'], 'lineup_constraint')
-        self.assertTrue(self.generated[-1]['dialogue']['constraints']['both_teams'])
+        self.assertEqual(result['sources'], [])
+        self.assertTrue(result['constraints']['both_teams'])
+        self.generate.assert_not_awaited()
         self.assertEqual(before, self.snapshot())
 
     async def test_unrelated_data_requests_are_left_to_legacy_retrieval(self):
@@ -174,9 +176,9 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
         history = [{'role': 'user', 'content': 'Brunson more 19.5 points'}]
         result = await self.ask('I liked the attempts more', history, through_app=True)
         self.assertNotIn('discussion', result)
-        self.assertTrue(self.generated[-1]['cards'])
-        self.assertIn('Jalen Brunson', str(self.generated[-1]['cards']))
-        self.assertNotIn('19.5', self.generated[-1]['request'].message)
+        self.assertIn('attempts count whether the shot goes in',result['answer'])
+        self.assertNotIn('19.5',result['answer'])
+        self.generate.assert_not_awaited()
 
     async def test_named_matchup_with_brevity_request_uses_real_scoped_evidence(self):
         base = 'How does Jalen Brunson match up against Brooklyn, and what could affect his scoring?'
@@ -199,11 +201,12 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn('discussion', result)
         self.assertEqual(before, self.snapshot())
 
-    async def test_social_thanks_is_generated_without_old_statistics(self):
+    async def test_social_thanks_is_direct_without_old_statistics(self):
         history = [{'role': 'user', 'content': 'Julius Randle more 1.5 threes'}]
-        await self.ask('thank you', history, through_app=True)
-        self.assertEqual(self.generated[-1]['dialogue']['intent'], 'chat')
-        self.assertEqual(self.generated[-1]['cards'], [])
+        result=await self.ask('thank you', history, through_app=True)
+        self.assertEqual(result['answer'],'You’re welcome.')
+        self.assertEqual(result['sources'],[])
+        self.generate.assert_not_awaited()
 
     async def test_supported_shortlist_followup_recomputes_facts_from_database(self):
         history = [{'role': 'assistant', 'content': 'My shortlist\n'
@@ -211,12 +214,10 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
             'Why: A previous explanation may be stale.\n'
             '2. Julius Randle — More 1.5 3-pointers made (Demon offer)'}]
         before = self.snapshot()
-        await self.ask('Why did you choose those picks?', history, through_app=True)
-        generated = self.generated[-1]
-        self.assertTrue(generated['cards'])
-        entities = {fact['entity'] for card in generated['cards'] for fact in card.get('approved_facts', [])}
-        self.assertEqual(entities, {'Josh Hart', 'Julius Randle'})
-        self.assertEqual({row['player'] for row in generated['dialogue']['assessments']}, entities)
+        result=await self.ask('Why did you choose those picks?', history, through_app=True)
+        self.assertTrue(result['sources'])
+        self.assertEqual({row['player'] for row in result['discussion']['assessments']}, {'Josh Hart','Julius Randle'})
+        self.generate.assert_not_awaited()
         self.assertEqual(before, self.snapshot())
 
     async def test_research_target_followup_has_evidence_without_claiming_actual_offer(self):
@@ -231,14 +232,14 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
                     '2. Jalen Brunson · points: 25.5\n'
                     'More if line ≤19.5; Less if line ≥31.5.'}]
         before = self.snapshot()
-        await self.ask('Why did you choose those picks?', history, through_app=True)
-        generated = self.generated[-1]
-        self.assertTrue(generated['cards'], 'Research-target explanations still need freshly retrieved evidence.')
-        self.assertNotIn('line', generated['dialogue'].get('slots', {}),
+        result=await self.ask('Why did you choose those picks?', history, through_app=True)
+        self.assertTrue(result['sources'], 'Research-target explanations still need freshly retrieved evidence.')
+        self.assertNotIn('line', result['discussion'].get('slots', {}),
                          'An independent target is not a quoted PrizePicks offer.')
-        text = str(generated)
+        text = str(result)
         self.assertIn('Josh Hart', text)
         self.assertIn('Jalen Brunson', text)
+        self.generate.assert_not_awaited()
         self.assertEqual(before, self.snapshot())
 
     async def test_research_target_explanation_uses_header_event_not_today(self):
@@ -250,12 +251,12 @@ class ChatFlowTests(unittest.IsolatedAsyncioTestCase):
                    '1. Josh Hart · PTS+REB+AST: 20\n'
                    'More if line ≤15.5; Less if line ≥24.5.'}]
         before = self.snapshot()
-        await self.ask('Why this pick?', history, through_app=True)
-        generated = self.generated[-1]
-        self.assertTrue(generated['cards'])
-        self.assertEqual(generated['dialogue']['date'], '2026-11-05')
-        self.assertTrue(all(card['line_kind'] == 'research_target' and not card['offer_verified']
-                            for card in generated['cards']))
+        result=await self.ask('Why this pick?', history, through_app=True)
+        self.assertTrue(result['sources'])
+        self.assertEqual(result['discussion']['date'], '2026-11-05')
+        self.assertTrue(all(item['line_kind']=='research_target' and not item['offer_verified']
+                            for item in result['discussion']['assessments']))
+        self.generate.assert_not_awaited()
         self.assertEqual(before, self.snapshot())
 
     async def test_research_target_with_insufficient_history_is_explained_without_model_invention(self):

@@ -355,6 +355,15 @@ async def main_async(args):
                 # A refused or incomplete inventory source cannot establish an
                 # offday or turn a published subset into verified full coverage.
                 print(day, 'independent inventory unavailable:', type(error).__name__, flush=True)
+                try:
+                    # An explicit past calendar date must also have exact
+                    # independent NBA final results and complete ESPN boxes.
+                    # This never verifies today's live schedule or an off day.
+                    inventory=await mirror.historical_inventory(day,result)
+                    result=reconcile_day_inventory(result,inventory,day,mirror.scope)
+                    print(day,'published historical inventory corroborated',flush=True)
+                except Exception as fallback_error:
+                    print(day,'published historical inventory unavailable:',type(fallback_error).__name__,flush=True)
             if result is None:
                 # Direct endpoints were tested and are optional; do not hammer a
                 # known unavailable source just because a public mirror is late.

@@ -174,7 +174,7 @@ class CheckedConversationFallbackTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancellation_is_not_hidden_as_a_successful_fallback(self):
         self.generate.side_effect = asyncio.CancelledError
         with self.assertRaises(asyncio.CancelledError):
-            await self.ask('Randle more 1.5 threes')
+            await self.ask('Explain Randle more 1.5 threes in detail')
 
     async def test_failed_explanation_of_plain_proposal_uses_computed_risk_answer(self):
         history = [{'role': 'user', 'content': 'Give me a Jalen Brunson pick.'},

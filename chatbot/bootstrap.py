@@ -33,7 +33,7 @@ APP_FILES = [
     'tracking_publications.py', 'historical_matchup_refresh.py', 'measured_history.py',
     'official_injury_pdf.py', 'supplemental_data.py',
     'game_stat_completion.py',
-    'dataset_update.py',
+    'dataset_update.py', 'upcoming_game.py', 'published_game_inventory.py',
 ]
 
 

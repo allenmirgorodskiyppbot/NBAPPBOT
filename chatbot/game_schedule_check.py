@@ -5,6 +5,7 @@ import asyncio
 import datetime as dt
 import hashlib
 import json
+import sqlite3
 from zoneinfo import ZoneInfo
 
 from feeds import ESPN, TEAM_WORDS, parse_game
@@ -15,6 +16,56 @@ CHECKPOINT = 'nba_schedule_today'
 CHECK_SECONDS = 900
 SUCCESS_CACHE_SECONDS = 840
 RELAY_URL = 'https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/main/data/live/schedule_today.json'
+
+
+async def _database_write(operation, *args, **kwargs):
+    """Keep locks owned until each real DB attempt settles; retry BUSY/LOCKED only."""
+    from dataset_update import _complete_callback, _sqlite_contention
+    delay = .05
+    while True:
+        try:
+            return await _complete_callback(lambda: asyncio.to_thread(operation, *args, **kwargs))
+        except sqlite3.Error as error:
+            if not _sqlite_contention(error):
+                raise
+            await asyncio.sleep(delay)
+            delay = min(1, delay * 2)
+
+
+def _metadata(store):
+    from dataset_update import _ControllerStore
+    return _ControllerStore(store)
+
+
+def _merge_current_events(store, known, events):
+    """One short transaction; timing only, preserving final scores and statistics."""
+    conflicts, matched = [], []
+    with store.connect() as db:
+        db.execute('PRAGMA busy_timeout=100')
+        db.execute('BEGIN IMMEDIATE')
+        for identity in sorted(set(known) & set(events)):
+            event = events[identity]
+            old = db.execute('SELECT * FROM games WHERE id=?', (identity,)).fetchone()
+            old = dict(old) if old else {}
+            reported = event['status']
+            status = 'past_schedule_only' if reported == 'final' else reported
+            if old.get('status') == 'final':
+                status = 'final'
+            elif old.get('status') in {'live', 'suspended', 'past_schedule_only'} and status == 'scheduled':
+                status = old['status']; conflicts.append(identity)
+            observation = {key: event[key] for key in ('id', 'date', 'home_team', 'away_team',
+                           'start_time', 'provider_game_id', 'source')}
+            observation['status'] = status
+            if old.get('status') != 'final':
+                store.upsert_game({**old, **observation}, db=db)
+            matched.append({**observation, 'reported_status': reported})
+    return conflicts, matched
+
+
+def _record_cancelled(store, report):
+    metadata = _metadata(store)
+    metadata.set_checkpoint(CHECKPOINT, {**report, 'status': 'failed', 'error': 'CancelledError'})
+    metadata.feed_failure('nba_schedule_today', 'CancelledError; current event timing is unverified.')
 
 
 def _known_games(store, day):
@@ -152,51 +203,36 @@ async def refresh_game_schedule(store, worker, now=None):
         report = {'date':day, 'status':'failed', 'checked_at':now.isoformat(), 'source':source,
                   'expected_game_ids':sorted(known), 'games':prior.get('games', []) if prior.get('date') == day else [],
                   'last_success_at':prior.get('last_success_at'), 'error':None}
-        store.set_checkpoint(CHECKPOINT, {**report, 'status':'checking'})
+        await _database_write(_metadata(store).set_checkpoint, CHECKPOINT, {**report, 'status':'checking'})
         try:
             events, verified_at, source, relay, attempts = await _current_events(worker, day, now)
             report.update(checked_at=verified_at.isoformat(), attempted_at=now.isoformat(),
                           source=source, relay_url=relay, attempts=attempts)
             missing = sorted(set(known)-set(events))
-            conflicts = []
-            matched = []
-            with store.connect() as db:
-                db.execute('BEGIN IMMEDIATE')
-                for identity in sorted(set(known)&set(events)):
-                    event = events[identity]
-                    old = db.execute('SELECT * FROM games WHERE id=?', (identity,)).fetchone()
-                    old = dict(old) if old else {}
-                    reported = event['status']
-                    status = 'past_schedule_only' if reported == 'final' else reported
-                    if old.get('status') == 'final':
-                        status = 'final'
-                    elif old.get('status') in {'live','suspended','past_schedule_only'} and status == 'scheduled':
-                        status = old['status']; conflicts.append(identity)
-                    # A scoreboard changes event timing/state only. It must not
-                    # overwrite validated scores or create final player results.
-                    observation = {key:event[key] for key in ('id','date','home_team','away_team',
-                                   'start_time','provider_game_id','source')}
-                    observation['status'] = status
-                    if old.get('status') != 'final':
-                        store.upsert_game({**old, **observation}, db=db)
-                    matched.append({**observation, 'reported_status':reported})
+            conflicts, matched = await _database_write(_merge_current_events, store, known, events)
             report.update(games=matched, missing_game_ids=missing, conflicting_game_ids=conflicts)
             if missing or conflicts:
                 report.update(status='partial', error='Current event inventory is missing or conflicts with saved events.')
             else:
                 report.update(status='success', last_success_at=verified_at.isoformat())
         except asyncio.CancelledError:
-            store.set_checkpoint(CHECKPOINT, {**report, 'status':'failed', 'error':'CancelledError'})
-            store.feed_failure('nba_schedule_today', 'CancelledError; current event timing is unverified.')
+            from dataset_update import _complete_callback, _sqlite_contention
+            try:
+                await _complete_callback(lambda: asyncio.to_thread(_record_cancelled, store, report))
+            except sqlite3.Error as error:
+                if not _sqlite_contention(error):
+                    raise
+            raise
+        except sqlite3.Error:
             raise
         except Exception as error:
             code = getattr(getattr(error, 'response', None), 'status_code', None)
             attempts = getattr(error, 'schedule_attempts', [])
             report['attempts'] = attempts
             report['error'] = attempts[0]['error'] if attempts else type(error).__name__ + (f': HTTP {code}' if code else '')
-        store.set_checkpoint(CHECKPOINT, report)
+        await _database_write(_metadata(store).set_checkpoint, CHECKPOINT, report)
         if report['status'] == 'success':
-            store.feed_success('nba_schedule_today', 'Current event timing checked; existing games only; no player statistics imported.')
+            await _database_write(_metadata(store).feed_success, 'nba_schedule_today', 'Current event timing checked; existing games only; no player statistics imported.')
         else:
-            store.feed_failure('nba_schedule_today', report['error'] + '; current event timing is unverified.')
+            await _database_write(_metadata(store).feed_failure, 'nba_schedule_today', report['error'] + '; current event timing is unverified.')
         return report

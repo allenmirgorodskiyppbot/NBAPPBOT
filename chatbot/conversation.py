@@ -335,7 +335,7 @@ def _selection_preference(text, names):
 
 def _empty_state():
     return {'version': 1, 'slots': {}, 'constraints': {}, 'recent_picks': [], 'ambiguous_players': [],
-            'selected_pick_index': None, 'pending_clarification': None}
+            'selected_pick_index': None, 'pending_clarification': None, 'upcoming_game_team': None}
 
 
 def _pick_reference(text, cards):
@@ -385,6 +385,8 @@ def _clean_state(state, names, now):
             stale = True
     if stale:
         return result
+    if isinstance(state.get('upcoming_game_team'), str) and state['upcoming_game_team'] in TEAM_NAMES:
+        result['upcoming_game_team'] = state['upcoming_game_team']
     raw = state.get('slots', {})
     if isinstance(raw, dict):
         if raw.get('player') in names:
@@ -497,6 +499,28 @@ def _apply_user(text, state, names, now):
     slots = state['slots']
     prior = dict(slots)
     prior_pick_index = state.get('selected_pick_index')
+    from upcoming_game import wants_next_game_request
+    team_focus = state.get('upcoming_game_team')
+    focus_history = ([{'role':'assistant','content':f'Next game for {team_focus} (saved team focus):'}]
+                     if team_focus else [])
+    if team_focus and not wants_next_game_request('what next?', focus_history+[{'role':'user','content':text}]):
+        state['upcoming_game_team'] = None
+        focus_history = []
+    if wants_next_game_request(text, focus_history):
+        state['upcoming_game_team'] = (entities['teams'][0] if len(entities['teams']) == 1
+                                       else state.get('upcoming_game_team') or 'NYK')
+        keep_count = slots.get('pick_count')
+        slots.clear()
+        if keep_count is not None:
+            slots['pick_count'] = keep_count
+        state['recent_picks'] = []
+        state['ambiguous_players'] = []
+        state['selected_pick_index'] = None
+        state['pending_clarification'] = None
+        return {'intent':'upcoming_game','slots':dict(slots),'original_question':text,
+                'canonical_question':text,'clarification':None,'errors':[],'inherited':[],'entities':entities}
+    if players:
+        state['upcoming_game_team'] = None
     game_date, date_error, spans = _date(text, now)
     pick_index, reference_error, reference_spans = _pick_reference(text, state['recent_picks'])
     spans += reference_spans
@@ -537,6 +561,12 @@ def _apply_user(text, state, names, now):
             and line is None and not choosing and not minutes_market and (explanation or followup)):
         stat = None
         explanation = True
+    if (market_error == 'unsupported_market' and prior.get('player') and prior.get('stat')
+            and line is None and explanation and re.search(r'blowout|bench|\bsits?\b|playing time', text, re.I)
+            and not re.search(r'\b(?:line|prop|market)\b|(?:half|quarter)\s+(?:points?|rebounds?|assists?|pra)\b', text, re.I)):
+        # "He sits most of the second half in a blowout" discusses workload;
+        # it does not replace an already supplied full-game prop with a 2H offer.
+        market_error = None
     inherited = []
     intent = 'chat'
     if social:

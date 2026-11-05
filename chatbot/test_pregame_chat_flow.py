@@ -28,7 +28,7 @@ class PregameChatFlowTests(unittest.IsolatedAsyncioTestCase):
     async def run_turn(self, picks, **slots):
         before = self.snapshot()
         result = await answer_conversation(None, self.master,
-            app.ChatRequest(message='Why these picks?'), {}, self.generate,
+            app.ChatRequest(message='Explain these picks in detail.'), {}, self.generate,
             turn=self.turn(picks, **slots))
         self.assertEqual(before, self.snapshot())
         return result
@@ -105,7 +105,8 @@ class PregameChatFlowTests(unittest.IsolatedAsyncioTestCase):
         self.generate.return_value = {'answer':'Julius Randle has recorded attempts, but coverage is unverified.', 'sources':[]}
         result = await self.ask('Julius Randle more 1.5 threes', through_app=True)
         self.assertEqual(result['discussion']['decision'], 'pass')
-        self.assertTrue(result['answer'].startswith('Pass for now.'))
+        self.assertIn('Pass for now',result['answer'])
+        self.generate.assert_not_awaited()
 
     async def test_tipoff_during_generation_holds_the_previously_eligible_pick(self):
         async def late_answer(*args, **kwargs):
@@ -114,7 +115,7 @@ class PregameChatFlowTests(unittest.IsolatedAsyncioTestCase):
             self.addCleanup(clock.stop)
             return {'answer':'Julius Randle: tentative More based on the supplied sample.', 'sources':[]}
         self.generate.side_effect = late_answer
-        result = await self.ask('Julius Randle more 1.5 threes', through_app=True)
+        result = await self.ask('Explain Julius Randle more 1.5 threes in detail', through_app=True)
         self.assertEqual(result['discussion']['decision'], 'pass')
         self.assertFalse(result['ai_used'])
         self.assertIn('readiness changed', result['answer'])
@@ -134,7 +135,8 @@ class PregameChatFlowTests(unittest.IsolatedAsyncioTestCase):
         result = await self.ask('Why the second one?', history, through_app=True)
         self.assertEqual(result['discussion']['player'], 'Julius Randle')
         self.assertEqual(result['discussion']['stat'], 'tpm')
-        self.assertEqual(self.generated[-1]['dialogue']['selected_pick']['position'], 2)
+        self.assertEqual(result['discussion']['selected_pick']['position'],2)
+        self.generate.assert_not_awaited()
         history += [{'role':'user','content':'Why the second one?'},
                     {'role':'assistant','content':result['answer']}]
         corrected = await self.ask('Actually 2.5, not 1.5', history, through_app=True)

@@ -1,5 +1,8 @@
 """Offline recovery tests; no live workers, model calls, or Telegram messages."""
 import asyncio
+from pathlib import Path
+import sqlite3
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -7,6 +10,31 @@ import service_runtime
 
 
 class ServiceRuntimeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_real_sqlite_failure_retains_only_safe_engine_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'PRIVATE_DATABASE_FILENAME.sqlite'
+            first = sqlite3.connect(path, timeout=0)
+            second = sqlite3.connect(path, timeout=0)
+            try:
+                first.execute('CREATE TABLE private_rows(value TEXT)')
+                first.commit()
+                first.execute('BEGIN IMMEDIATE')
+                registry = {}
+                async def worker():
+                    second.execute("INSERT INTO private_rows VALUES ('PRIVATE_VALUE')")
+                    second.commit()
+                async def retry(delay):
+                    first.rollback()
+                with patch.object(service_runtime, 'sleep', retry), self.assertLogs('knicks.services') as logs:
+                    await service_runtime.supervise_service('fixture', worker, registry)
+                self.assertEqual(registry['fixture']['last_failure_category'], 'OperationalError')
+                self.assertEqual(registry['fixture']['last_failure_sqlite_code'] & 255, sqlite3.SQLITE_BUSY)
+                self.assertEqual(registry['fixture']['last_failure_sqlite_name'], 'SQLITE_BUSY')
+                self.assertNotIn('PRIVATE_', repr(registry) + repr(logs.output))
+            finally:
+                first.close()
+                second.close()
+
     async def test_unexpected_failure_restarts_fresh_coroutine_and_preserves_safe_diagnostics(self):
         registry, attempts, phases, delays = {}, [], [], []
 
@@ -84,6 +112,28 @@ class ServiceRuntimeTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await task
         self.assertTrue(cleaned.is_set())
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(registry['feeds']['stopped_reason'], 'cancelled')
+        self.assertEqual(registry['feeds']['restart_count'], 0)
+        self.assertIsNone(registry['feeds']['next_restart_at'])
+
+    async def test_cleanup_failure_during_shutdown_does_not_restart_service(self):
+        entered = asyncio.Event()
+        registry, calls = {}, []
+
+        async def service():
+            calls.append(None)
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                raise RuntimeError('cleanup failed while shutting down')
+
+        task = asyncio.create_task(service_runtime.supervise_service('feeds', service, registry))
+        await asyncio.wait_for(entered.wait(), 1)
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 1)
         self.assertEqual(len(calls), 1)
         self.assertEqual(registry['feeds']['stopped_reason'], 'cancelled')
         self.assertEqual(registry['feeds']['restart_count'], 0)

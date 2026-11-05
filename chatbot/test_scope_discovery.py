@@ -11,6 +11,7 @@ from unittest.mock import patch
 from dataset_refresh import (expand_current_player_scope,scope_revision,validate_published_scope,
                              refresh_published_scope,load_scope,initialize_scope)
 from feeds import TEAM_WORDS
+from feeds import canonical_game
 from master import MasterStore
 
 NOW=dt.datetime(2026,11,5,3,tzinfo=dt.timezone.utc)
@@ -35,6 +36,95 @@ def manifest(bundled,result):
 
 
 class ScopeDiscoveryTests(unittest.TestCase):
+    def missing_kon(self):
+        old=scope()
+        old['history_identity_source']='https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet'
+        old['players'].append({'player':'Kon Knueppel','nba_player_id':'1642851'})
+        old['revision']=scope_revision(old)
+        row={**observation('Kon Knueppel','5061575'),'source':old['history_identity_source'],
+             'team':'CHA','opponent':'BKN','game_id':canonical_game('2026-11-03','CHA','BKN')}
+        return old,row
+
+    def completed_manifest(self,old,result,proofs):
+        document=manifest(old,result)
+        document['provider_completions']=[{**proof,'source_content_sha256':document['source_content_sha256'],
+            'source_published_at':document['source_published_at']} for proof in proofs]
+        return document
+
+    def test_known_nba_provider_gap_completes_only_independently_bound_missing_field(self):
+        old,row=self.missing_kon();before=copy.deepcopy(old);proofs=[]
+        rows=[row,observation('Dalen Terry','4433159'),observation('Dylan Cardwell','4433174')]
+        result=expand_current_player_scope(old,rows,provider_completions=proofs)
+        self.assertEqual(old,before)
+        prior=next(p for p in old['players'] if p['player']=='Kon Knueppel')
+        updated=next(p for p in result['players'] if p['player']=='Kon Knueppel')
+        self.assertEqual(updated,{**prior,'espn_player_id':'5061575'})
+        self.assertEqual(len(result['players']),len(old['players'])+2)
+        self.assertEqual(len(proofs),1)
+        document=self.completed_manifest(old,result,proofs)
+        self.assertEqual(validate_published_scope(document,old,old,NOW),result)
+        self.assertEqual(validate_published_scope(document,old,result,NOW),result)
+        again=[]
+        self.assertEqual(expand_current_player_scope(result,rows,provider_completions=again,
+            provider_completion_baseline=old),result)
+        self.assertEqual(again,proofs)
+
+    def test_completion_rejects_unknown_registered_id_alias_only_and_old_season(self):
+        old,row=self.missing_kon()
+        aliases=copy.deepcopy(old);aliases['players'][-1]['aliases']=['Other Full Name']
+        variants=[(old,{**row,'espn_player_id':'932'}),(old,{**row,'nba_player_id':'999'}),
+            (aliases,{**row,'player':'Other Full Name'}),(old,{**row,'season':'2025-26'}),
+            (old,{**row,'source':row['source'].replace('2027','2005')}),
+            (old,{**row,'game_id':'invented-event'})]
+        for original,changed in variants:
+            with self.subTest(changed=changed),self.assertRaises(ValueError):
+                expand_current_player_scope(original,[changed])
+
+    def test_ambiguous_source_bindings_do_not_mutate_scope_or_leak_proof(self):
+        old,row=self.missing_kon();before=copy.deepcopy(old)
+        for other in ({**row,'espn_player_id':'9999'},{**row,'player':'Other Player'}):
+            proofs=[]
+            with self.subTest(other=other),self.assertRaises(ValueError):
+                expand_current_player_scope(old,[row,other],provider_completions=proofs)
+            self.assertEqual(old,before);self.assertEqual(proofs,[])
+
+    def test_provider_already_bound_elsewhere_and_known_provider_changes_still_reject(self):
+        old,row=self.missing_kon()
+        old['players'][0]['espn_player_id']='5061575'
+        with self.assertRaises(ValueError):expand_current_player_scope(old,[row])
+        old,row=self.missing_kon();old['players'][-1]['espn_player_id']='9999'
+        with self.assertRaises(ValueError):expand_current_player_scope(old,[row])
+
+    def test_retired_namesake_id_cannot_fill_a_current_nba_players_missing_provider(self):
+        old,row=self.missing_kon()
+        old['players'][-1]={'player':'Brandon Williams','nba_player_id':'1630314'}
+        old['revision']=scope_revision(old)
+        retired={**row,'player':'Brandon Williams','espn_player_id':'932'}
+        with self.assertRaisesRegex(ValueError,'independent primary-name/NBA/ESPN binding'):
+            expand_current_player_scope(old,[retired])
+
+    def test_missing_provider_manifest_requires_exact_own_source_proof_and_preserves_all_other_fields(self):
+        old,row=self.missing_kon();proofs=[]
+        result=expand_current_player_scope(old,[row],provider_completions=proofs)
+        good=self.completed_manifest(old,result,proofs)
+        for change in ('absent','wrong_hash','wrong_pub','old_date','nba','aliases','canonical_id','known_id'):
+            document=copy.deepcopy(good)
+            if change=='absent':document.pop('provider_completions')
+            elif change=='wrong_hash':document['provider_completions'][0]['source_content_sha256']='b'*64
+            elif change=='wrong_pub':document['provider_completions'][0]['source_published_at']='2026-11-01T00:00:00Z'
+            elif change=='old_date':document['provider_completions'][0]['source_dates']=['2025-11-03']
+            else:
+                player=next(p for p in document['scope']['players'] if p['player']=='Kon Knueppel')
+                if change=='nba':player['nba_player_id']='9999'
+                elif change=='aliases':player['aliases']=['New guessed alias']
+                elif change=='canonical_id':player['player_id']='name:konknueppel'
+                else:document['scope']['players'][0]['espn_player_id']='5061575'
+                document['scope']['revision']=scope_revision(document['scope'])
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                validate_published_scope(document,old,old,NOW)
+        without=copy.deepcopy(good);without.pop('provider_completions')
+        with self.assertRaises(ValueError):validate_published_scope(without,old,result,NOW)
+
     def test_new_unique_source_player_added_without_rewriting_prior(self):
         old=scope();before=copy.deepcopy(old)
         new=expand_current_player_scope(old,[observation()])

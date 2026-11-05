@@ -6,6 +6,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import sqlite3
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -13,6 +14,7 @@ from feeds import canonical_game, canonical_team, TEAM_WORDS
 from nba_daily_export import validate_final
 from game_phase import regular_phase_exclusion
 from news_digest import _aware
+from game_schedule_check import _database_write, _metadata
 
 EASTERN=ZoneInfo('America/New_York')
 DEFAULT_BASE='https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/main/data/live'
@@ -194,6 +196,15 @@ class NightlyNBARefresh:
         self.manual_update_active=False
         self.lock=asyncio.Lock()
 
+    async def _checkpoint(self, *args):
+        return await _database_write(_metadata(self.store).set_checkpoint, *args)
+
+    async def _feed_success(self, *args):
+        return await _database_write(_metadata(self.store).feed_success, *args)
+
+    async def _feed_failure(self, *args):
+        return await _database_write(_metadata(self.store).feed_failure, *args)
+
     async def refresh_now(self,*,export=True):
         """Explicit request bypasses scheduler timers, never worker/source guards."""
         return await self.tick(force=True,export=export)
@@ -212,13 +223,13 @@ class NightlyNBARefresh:
             from game_schedule_check import refresh_game_schedule
             await refresh_game_schedule(self.store,self.worker,now=now)
             if not self.enabled and not force:
-                self.store.set_checkpoint('nightly_nba_refresh',{'enabled':False});return
+                await self._checkpoint('nightly_nba_refresh',{'enabled':False});return
             if force:
                 from dataset_refresh import refresh_published_scope
                 await refresh_published_scope(self.store,self.worker,now,force=True)
             if not self.store.get_checkpoint('dataset_refresh_scope'):
                 status={'enabled':self.enabled,'phase':'waiting_for_existing_dataset_scope'}
-                self.store.set_checkpoint('nightly_nba_refresh',status)
+                await self._checkpoint('nightly_nba_refresh',status)
                 if not force:await self._notify_daily(status,now)
                 return status
             due=str(status.get('handled_target_date',''))<target
@@ -298,25 +309,26 @@ class NightlyNBARefresh:
                         if document.get('scope_revision')!=self.store.get_checkpoint('dataset_refresh_scope',{}).get('revision'):
                             from dataset_refresh import refresh_published_scope
                             await refresh_published_scope(self.store,self.worker,now)
-                        report=await asyncio.to_thread(import_daily_snapshot,self.store,document,day,now)
+                        report=await _database_write(import_daily_snapshot,self.store,document,day,now)
                         if report.get('ignored_older_publication'):
                             pending.append(day)
-                            self.store.feed_failure('nba_daily_refresh','Older publication ignored for '+day+
+                            await self._feed_failure('nba_daily_refresh','Older publication ignored for '+day+
                                 '; prior verified values retained; hourly retry is automatic.')
                         elif report['complete']:
                             # Only this validated date was imported. The upstream
                             # file may also contain later games or tracking data.
                             through=max(str(through or ''),day)
-                            self.store.feed_success('nba_daily_refresh',f"Authorized NBA statistics for {day}: {report['games']} published games, {report['player_rows']} existing-player observations.")
+                            await self._feed_success('nba_daily_refresh',f"Authorized NBA statistics for {day}: {report['games']} published games, {report['player_rows']} existing-player observations.")
                         else:
                             pending.append(day)
                     except asyncio.CancelledError:raise
+                    except sqlite3.Error:raise
                     except Exception as error:
                         pending.append(day)
                         code=getattr(getattr(error,'response',None),'status_code',None)
                         check_error=type(error).__name__+(f': HTTP {code}' if code else '')
-                        await asyncio.to_thread(_daily_check,self.store,day,now,error=check_error)
-                        self.store.feed_failure('nba_daily_refresh',type(error).__name__+(f': HTTP {code}' if code else '')+
+                        await _database_write(_daily_check,self.store,day,now,error=check_error)
+                        await self._feed_failure('nba_daily_refresh',type(error).__name__+(f': HTTP {code}' if code else '')+
                             '; previous-day data not available for '+day+'. Prior verified values retained; hourly retry is automatic.')
                 status['last_attempt']=now.isoformat()
                 # A corrected publication can retract a prior complete day.
@@ -334,36 +346,38 @@ class NightlyNBARefresh:
                         from dataset_refresh import refresh_published_scope
                         await refresh_published_scope(self.store,self.worker,now)
                     from advanced_refresh import import_tracking
-                    await asyncio.to_thread(import_tracking,self.store,tracking,now)
+                    await _database_write(import_tracking,self.store,tracking,now)
                     coverage=self.store.get_checkpoint('tracking_refresh_status',{}).get('coverage',[])
                     status['tracking_refresh_phase']=('partial' if any(c.get('status')!='collected' for c in coverage)
                         else 'collected' if coverage else 'unavailable')
                     status['tracking_source_data_through_date']=self.store.get_checkpoint('tracking_refresh_status',{}).get('source_data_through_date')
                 except asyncio.CancelledError:raise
+                except sqlite3.Error:raise
                 except Exception as error:
                     status['tracking_refresh_phase']='unavailable'
-                    self.store.feed_failure('existing_tracking_refresh',type(error).__name__+
+                    await self._feed_failure('existing_tracking_refresh',type(error).__name__+
                         '; missing tracking fields keep their original source dates and are not inferred from game totals.')
                 status['last_tracking_attempt']=now.isoformat()
             if game_attempt or tracking_attempt:
                 try:
                     from assignment_refresh import refresh_assignments
-                    await asyncio.to_thread(refresh_assignments,self.store,now)
+                    await _database_write(refresh_assignments,self.store,now)
                 except asyncio.CancelledError:raise
+                except sqlite3.Error:raise
                 except Exception as error:
-                    self.store.feed_failure('assignment_refresh',type(error).__name__+
+                    await self._feed_failure('assignment_refresh',type(error).__name__+
                         '; prior tentative source dates retained; no new defender assumed.')
             pending=list(dict.fromkeys(pending))
             waiting=target in pending or not through or through<target
             if waiting and status.get('last_attempt'):
-                self.store.feed_failure('nba_daily_refresh','Waiting for publication of '+target+
+                await self._feed_failure('nba_daily_refresh','Waiting for publication of '+target+
                     '; latest published covered game date is '+str(through or 'unknown')+'. Hourly catch-up remains enabled.')
             elif game_attempt:
                 older_pending=[day for day in pending if day<target]
                 detail='Required published game inventory for '+target+' imported.'
                 if older_pending:
                     detail+=f' {len(older_pending)} older dates remain pending; hourly catch-up is automatic. See pending_dates.'
-                self.store.feed_success('nba_daily_refresh',detail)
+                await self._feed_success('nba_daily_refresh',detail)
             next_run=deadline if local<deadline else dt.datetime.combine(today+dt.timedelta(days=1),dt.time(11,30),EASTERN)
             target_inventory=self.store.get_checkpoint('daily_nba:'+target,{})
             inventory_verified=target_inventory.get('inventory_verified') is True
@@ -382,7 +396,7 @@ class NightlyNBARefresh:
                           tracking_retry_seconds=3600,
                           source='Independently published public NBA extracts; authorized NBA player population',
                           note='Game refresh status covers imported game observations only. Tracking metrics and tentative assignments have separate coverage and source dates; rebuilding Excel does not make every field current.')
-            self.store.set_checkpoint('nightly_nba_refresh',status)
+            await self._checkpoint('nightly_nba_refresh',status)
             # Persist current coverage before rebuilding, including failed or
             # unchanged source checks. A new file time is never a source date.
             export_last=_aware(status.get('last_export_attempt'))
@@ -392,19 +406,20 @@ class NightlyNBARefresh:
                 from pathlib import Path
                 status['last_export_attempt']=now.isoformat()
                 try:
-                    await asyncio.to_thread(self.exporter,self.store,Path(self.data_dir)/'exports')
+                    await _database_write(self.exporter,self.store,Path(self.data_dir)/'exports')
                     status['master_export_updated_at']=now.isoformat()
                     status['master_export_error']=None
-                    self.store.feed_success('master_export',
+                    await self._feed_success('master_export',
                         'Master Excel rebuilt from saved records; source freshness remains separate in Refresh_Coverage.')
                 except asyncio.CancelledError:raise
+                except sqlite3.Error:raise
                 except Exception as error:
                     status['master_export_error']=type(error).__name__
-                    self.store.feed_failure('master_export',type(error).__name__+'; previous Excel export retained.')
-                self.store.set_checkpoint('nightly_nba_refresh',status)
+                    await self._feed_failure('master_export',type(error).__name__+'; previous Excel export retained.')
+                await self._checkpoint('nightly_nba_refresh',status)
             if game_attempt or tracking_attempt or export_retry:
                 status['last_finished_at']=self.now().isoformat()
-                self.store.set_checkpoint('nightly_nba_refresh',status)
+                await self._checkpoint('nightly_nba_refresh',status)
             if not force:
                 await self._notify_daily(status,now)
             return status
@@ -425,19 +440,20 @@ class NightlyNBARefresh:
         report.update(notification_day=day,notification_event_key='dataset-daily:'+day)
         attempt={'phase':'queueing','last_attempt':started.isoformat(),
                  'notification_day':day,'event_key':report['notification_event_key']}
-        self.store.set_checkpoint(checkpoint,attempt)
+        await self._checkpoint(checkpoint,attempt)
         try:
             queued=await self.notifier(format_update_report(report,daily=True),report)
             if queued is True:
                 attempt.update(phase='queued',queued_at=self.now().isoformat())
-                self.store.feed_success('daily_refresh_notification','Daily refresh result queued for '+day+'.')
+                await self._feed_success('daily_refresh_notification','Daily refresh result queued for '+day+'.')
             else:
                 attempt.update(phase='not_queued',detail='Notifier did not confirm queueing; retry remains enabled.')
         except asyncio.CancelledError:raise
+        except sqlite3.Error:raise
         except Exception as error:
             attempt.update(phase='failed',error_type=type(error).__name__)
-            self.store.feed_failure('daily_refresh_notification',type(error).__name__+'; daily notice will retry.')
-        self.store.set_checkpoint(checkpoint,attempt)
+            await self._feed_failure('daily_refresh_notification',type(error).__name__+'; daily notice will retry.')
+        await self._checkpoint(checkpoint,attempt)
 
     async def run(self):
         while True:
@@ -445,6 +461,8 @@ class NightlyNBARefresh:
                 await self.tick()
             except asyncio.CancelledError:
                 raise
+            except sqlite3.Error:
+                raise
             except Exception as error:
-                self.store.feed_failure('nba_daily_refresh',type(error).__name__)
+                await self._feed_failure('nba_daily_refresh',type(error).__name__)
             await asyncio.sleep(60 if self.store.get_checkpoint('dataset_refresh_scope') else 5)

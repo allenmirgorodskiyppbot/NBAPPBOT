@@ -297,6 +297,10 @@ class TelegramReliabilityTests(unittest.IsolatedAsyncioTestCase):
         bot._process_photos = process_photos
         task = asyncio.create_task(bot.run())
         await asyncio.wait_for(continued.wait(), 1)
+        async def album_ready():
+            while not bot._album_batches:
+                await asyncio.sleep(.01)
+        await asyncio.wait_for(album_ready(), 1)
         self.assertTrue(bot._album_batches)
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)

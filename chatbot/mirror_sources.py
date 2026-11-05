@@ -56,7 +56,8 @@ def tracking_coverage(record, previous):
     return record
 
 
-def existing_game_snapshots(content,scope,published_at,source,discovered_scope=None):
+def existing_game_snapshots(content,scope,published_at,source,discovered_scope=None,
+                            provider_completions=None,provider_completion_baseline=None):
     grouped={}
     for raw in csv.DictReader(io.StringIO(content.decode('utf-8-sig'))):
         if str(raw.get('season_type'))!='2' or regular_phase_exclusion(raw):continue
@@ -98,7 +99,8 @@ def existing_game_snapshots(content,scope,published_at,source,discovered_scope=N
         except ValueError:
             target['pending_game_ids'].append(game_id);target['errors'].append({'game_id':game_id,'error_type':'SourceValidationError'})
     if discovered_scope is not None:
-        scope=expand_current_player_scope(scope,[row for target in days.values() for row in target['player_games']])
+        scope=expand_current_player_scope(scope,[row for target in days.values() for row in target['player_games']],
+            provider_completions=provider_completions,provider_completion_baseline=provider_completion_baseline)
         discovered_scope.update(scope)
     through=max(days) if days else None
     for day,target in days.items():
@@ -150,20 +152,30 @@ class PublishedNBAData:
             buffer=io.StringIO()
             writer=csv.DictWriter(buffer,fieldnames=table.column_names);writer.writeheader()
             writer.writerows(raw_rows)
-            discovered={}
-            days=existing_game_snapshots(buffer.getvalue().encode(),self.scope,meta['updated_at'],meta['browser_download_url'],discovered)
+            discovered={};provider_completions=[]
+            days=existing_game_snapshots(buffer.getvalue().encode(),self.scope,meta['updated_at'],meta['browser_download_url'],discovered,
+                provider_completions=provider_completions,provider_completion_baseline=self.bundled_scope)
+            digest=hashlib.sha256(content).hexdigest()
+            for snapshot in days.values():
+                snapshot['source_content_sha256']=digest
+            for proof in provider_completions:
+                proof.update(source_content_sha256=digest,source_published_at=meta['updated_at'])
             effective=discovered or self.scope
             scope_document={'schema_version':1,'base_revision':self.bundled_scope['revision'],
                 'season':self.season,'scope':effective,'upstream_full_game_validated':True,
                 'source_url':meta['browser_download_url'],'source_published_at':meta['updated_at'],
                 'source_checked_at':self.now.isoformat(),'source_data_through_date':max(days) if days else None,
-                'source_content_sha256':hashlib.sha256(content).hexdigest(),
+                'source_content_sha256':digest,'provider_completions':provider_completions,
                 'validated_player_rows':sum(len(item['player_games']) for item in days.values()),
                 'rejected_game_ids':sorted({identity for item in days.values() for identity in item.get('pending_game_ids',[])}),
                 'coverage_note':'Published current-season game inventory; roster additions use validated complete boxes, not a claim of complete league history.'}
             validate_published_scope(scope_document,self.bundled_scope,self.scope,self.now)
             self.scope,self.days,self.scope_document=effective,days,scope_document
         return self.days.get(day)
+
+    async def historical_inventory(self,day,snapshot):
+        from published_game_inventory import fetch_historical_inventory
+        return await fetch_historical_inventory(self,day,snapshot)
 
     def configure_scope(self, output):
         target=Path(output)/'existing_dataset_scope.json'

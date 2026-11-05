@@ -485,11 +485,11 @@ class ConversationTests(unittest.TestCase):
         self.assertEqual(supplied['slots']['opponent'], 'PHI')
         self.assertEqual(supplied['slots']['game_date'], '2026-11-05')
 
-    def test_new_game_discards_list_focus_and_requests_an_actual_date(self):
+    def test_new_game_discards_list_focus_and_requests_saved_upcoming_preview(self):
         previous = self.resolve('Why the second pick?', [assistant(FOUR_OFFERS)])
         result = self.resolve('What about the next game?', state=previous['state'])
-        self.assertEqual(result['intent'], 'clarification')
-        self.assertIn('game date', result['clarification'])
+        self.assertEqual(result['intent'], 'upcoming_game')
+        self.assertIsNone(result['clarification'])
         self.assertEqual(result['recent_picks'], [])
         self.assertIsNone(result['state']['selected_pick_index'])
         for field in ('line', 'opponent', 'game_date'):

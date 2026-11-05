@@ -238,6 +238,15 @@ def master_context(master):
 
 async def telegram_answer(text, history=None, lineup_preferences=None):
     state = app.state
+    # Routine conversation uses saved evidence and must not wait for inference.
+    # Resolve it before the older research path can reuse an unrelated prop.
+    if getattr(state, 'master', None) is not None:
+        from chat_flow import try_fast_answer
+        fast_request = ChatRequest(message=str(text)[:3000], history=history or [],
+                                   lineup_preferences=lineup_preferences or {})
+        fast_result = await try_fast_answer(state.store, state.master, fast_request)
+        if fast_result is not None:
+            return fast_result['answer']
     from conversation import resolve_conversation
     discussion = await asyncio.to_thread(resolve_conversation, state.store, state.master, text, history or [],
                                          preferences=lineup_preferences)
@@ -297,6 +306,14 @@ async def telegram_refresh_dataset():
     if controller is None:
         return 'The dataset update service is still starting. Try /refresh again shortly.'
     return await controller.refresh()
+
+
+async def telegram_refresh_status():
+    """Read progress without starting another update or using the model."""
+    controller = getattr(app.state, 'dataset_updates', None)
+    if controller is None:
+        return {'phase': 'starting', 'detail': 'The dataset update service is still starting.'}
+    return await asyncio.to_thread(controller.status)
 
 
 def configure_dataset_updates(state):
@@ -586,7 +603,8 @@ async def lifespan(application):
                 await worker.collect_news_sources()
     state.telegram = TelegramBot(state.master, telegram_answer, model_status_callback=ai_status,
                                 self_test_callback=self_test, research_refresh_callback=refresh_board_news,
-                                answer_preferences_callback=telegram_answer, manual_refresh_callback=telegram_refresh_dataset)
+                                answer_preferences_callback=telegram_answer, manual_refresh_callback=telegram_refresh_dataset,
+                                manual_refresh_status_callback=telegram_refresh_status)
     state.temporary = tempfile.TemporaryDirectory(prefix='knicks-')
     state.startup_task = asyncio.create_task(initialize_with_retry(application))
     try:
@@ -602,6 +620,9 @@ async def lifespan(application):
             task.cancel()
         if state.service_tasks:
             await asyncio.gather(*state.service_tasks, return_exceptions=True)
+        shutdown_telegram = getattr(state.telegram, 'shutdown', None)
+        if callable(shutdown_telegram):
+            await shutdown_telegram()
         tasks = [job['task'] for job in state.jobs.values() if not job['task'].done()]
         for task in tasks:
             task.cancel()

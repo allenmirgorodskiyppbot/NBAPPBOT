@@ -176,11 +176,13 @@ class CurrentResearchRoutingTests(unittest.IsolatedAsyncioTestCase):
             stack.enter_context(patch('matchup_queries.answer_matchup_question', return_value=None))
             stack.enter_context(patch('basketball_research.research_context', return_value={}))
             stack.enter_context(patch('grounded_reply.evidence_cards', return_value=[]))
-            stack.enter_context(patch.object(app, 'generated_evidence_reply', AsyncMock(return_value={'answer': "You're welcome"})))
+            generator = stack.enter_context(patch.object(app, 'generated_evidence_reply', AsyncMock(return_value={'answer': "You're welcome"})))
             builder = stack.enter_context(patch('refresh_export.build_export_tables'))
             result = await app.answer_question(SimpleNamespace(sheets={}), app.ChatRequest(message='Thanks'), {})
         builder.assert_not_called()
-        self.assertEqual(result['answer'], "You're welcome")
+        generator.assert_not_awaited()
+        self.assertEqual(result['answer'], 'You’re welcome.')
+        self.assertFalse(result['ai_used'])
 
 
 if __name__ == '__main__':

@@ -1,11 +1,13 @@
 """Explicit refresh orchestration and honest, reusable dataset status messages."""
 from __future__ import annotations
 import asyncio
+from contextlib import contextmanager
 import datetime as dt
 import hashlib
 import inspect
 import json
 import math
+import sqlite3
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -16,6 +18,64 @@ VOLATILE={'updated_at','retrieved_at','checked_at','last_checked','last_checked_
           'publication_source','last_attempt','generated_at'}
 DATA_TABLES=('games','player_games','season_schedule','refreshed_tracking',
              'measured_pair_history','structured_availability','refreshed_assignments')
+CONTROLLER_BUSY_TIMEOUT_MS=100
+
+
+def _sqlite_contention(error):
+    code=getattr(error,'sqlite_errorcode',None)
+    return (isinstance(error,sqlite3.OperationalError) and type(code) is int
+            and code & 255 in {sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED})
+
+
+class _ControllerStore:
+    """Use fresh short transactions without changing the shared store's connection policy."""
+    def __init__(self,store):self.store=store
+
+    @contextmanager
+    def connect(self):
+        with self.store.connect() as db:
+            db.execute('PRAGMA busy_timeout='+str(CONTROLLER_BUSY_TIMEOUT_MS))
+            yield db
+
+    def get_checkpoint(self,name,default=None):
+        with self.connect() as db:
+            row=db.execute('SELECT value_json FROM checkpoints WHERE name=?',(name,)).fetchone()
+            return json.loads(row[0]) if row else default
+
+    def set_checkpoint(self,name,value):
+        from master import encoded
+        with self.connect() as db:
+            db.execute('INSERT INTO checkpoints VALUES (?,?) ON CONFLICT(name) DO UPDATE SET value_json=excluded.value_json',
+                       (name,encoded(value)))
+
+    def feed_success(self,name,detail):
+        from master import now
+        stamp=now()
+        with self.connect() as db:
+            db.execute('INSERT INTO feed_status(name,last_success,last_attempt,detail,error) VALUES (?,?,?,?,NULL) '
+                'ON CONFLICT(name) DO UPDATE SET last_success=excluded.last_success,last_attempt=excluded.last_attempt,'
+                'detail=excluded.detail,error=NULL',(name,stamp,stamp,str(detail)[:1000]))
+
+    def feed_failure(self,name,error):
+        from master import now
+        stamp=now()
+        with self.connect() as db:
+            db.execute('INSERT INTO feed_status(name,last_error,last_attempt,error) VALUES (?,?,?,?) '
+                'ON CONFLICT(name) DO UPDATE SET last_error=excluded.last_error,last_attempt=excluded.last_attempt,'
+                'error=excluded.error',(name,stamp,stamp,str(error)[:1000]))
+
+
+def _record_interrupted(store,progress,stamp):
+    """One short atomic cleanup attempt; cancellation never retries forever."""
+    from master import encoded
+    with store.connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row=db.execute("SELECT value_json FROM checkpoints WHERE name='nightly_nba_refresh'").fetchone()
+        state=json.loads(row[0]) if row else {}
+        state.update(master_export_error='ManualUpdateInterrupted',last_export_attempt=stamp)
+        for name,value in (('nightly_nba_refresh',state),('dataset_update_status',progress)):
+            db.execute('INSERT INTO checkpoints VALUES (?,?) ON CONFLICT(name) DO UPDATE SET value_json=excluded.value_json',
+                       (name,encoded(value)))
 
 
 def _instant(value):
@@ -37,7 +97,7 @@ def _semantic(value):
 
 
 def data_fingerprint(store):
-    """Hash actual saved values, including corrections that keep row counts equal."""
+    """Stream actual values in stable primary-key order, without a table-sized list."""
     digest=hashlib.sha256()
     with store.connect() as db:
         db.execute('BEGIN')
@@ -45,16 +105,23 @@ def data_fingerprint(store):
         for table in DATA_TABLES:
             if table not in available:
                 continue
-            normalized=[]
-            for raw in db.execute('SELECT * FROM '+table):
+            columns=list(db.execute('PRAGMA table_info('+table+')'))
+            keys=[row[1] for row in sorted(columns,key=lambda row:row[5]) if row[5]]
+            # Known tables have primary keys. The fallback also keeps a future
+            # keyless table deterministic without collecting its rows in Python.
+            fields=[row[1] for row in columns if row[1] not in VOLATILE]
+            order=keys or fields
+            quote=lambda field:'"'+field.replace('"','""')+'"'
+            query='SELECT '+','.join(map(quote,fields))+' FROM '+table
+            if order:query+=' ORDER BY '+','.join(map(quote,order))
+            digest.update(table.encode())
+            for raw in db.execute(query):
                 row=dict(raw)
                 if isinstance(row.get('payload_json'),str):
                     try:row['payload_json']=json.loads(row['payload_json'])
                     except ValueError:pass
-                normalized.append(json.dumps(_semantic(row),sort_keys=True,separators=(',',':'),default=str))
-            digest.update(table.encode())
-            for row in sorted(normalized):
-                digest.update(row.encode());digest.update(b'\n')
+                encoded=json.dumps(_semantic(row),sort_keys=True,separators=(',',':'),default=str)
+                digest.update(encoded.encode());digest.update(b'\n')
         scope=store.get_checkpoint('dataset_refresh_scope',{}) or {}
         digest.update(json.dumps(_semantic(scope),sort_keys=True,separators=(',',':'),default=str).encode())
     return digest.hexdigest()
@@ -178,43 +245,91 @@ class DatasetUpdateController:
         self.schedule_refresh=schedule_refresh
         self.export_refresh=export_refresh
         self.lock=asyncio.Lock()
+        self._progress=None
+        self._database_waiters=0
+
+    async def _database(self,operation,*args,**kwargs):
+        """Never block the loop; retry only real BUSY/LOCKED with a fresh operation."""
+        delay=.05
+        waiting=False
+        try:
+            while True:
+                try:
+                    return await _complete_callback(lambda:asyncio.to_thread(operation,*args,**kwargs))
+                except sqlite3.Error as error:
+                    if not _sqlite_contention(error):raise
+                    if not waiting:
+                        waiting=True;self._database_waiters+=1
+                    await asyncio.sleep(delay)
+                    delay=min(1,delay*2)
+        finally:
+            if waiting:self._database_waiters-=1
+
+    def status(self):
+        """Read progress and real elapsed time without launching another refresh."""
+        active=self.lock.locked() or getattr(self.nightly,'manual_update_active',False)
+        if self._progress and (active or self._progress.get('phase')=='interrupted'):
+            report=dict(self._progress)
+        else:
+            report=dict(_ControllerStore(self.nightly.store).get_checkpoint('dataset_update_status',{}) or {})
+        started=_instant(report.get('started_at'))
+        stage_started=_instant(report.get('stage_started_at'))
+        now=self.nightly.now()
+        finished=_instant(report.get('finished_at'))
+        endpoint=now if report.get('phase')=='checking' else finished or now
+        if started:report['elapsed_seconds']=max(0,(endpoint-started).total_seconds())
+        if stage_started:report['stage_elapsed_seconds']=max(0,(endpoint-stage_started).total_seconds())
+        report['active']=bool(active and report.get('phase')=='checking')
+        report['database_waiting']=self._database_waiters>0
+        if report.get('phase')=='checking' and not active:
+            report.update(phase='interrupted',detail='The previous refresh stopped before recording a result. Use /refresh to retry.')
+        return report
 
     async def refresh(self,progress=None):
         if self.lock.locked() or getattr(self.nightly,'manual_update_active',False):
             return {'phase':'busy','changed':False}
         async with self.lock:
             self.nightly.manual_update_active=True
-            store=self.nightly.store
+            store=_ControllerStore(self.nightly.store)
             started=self.nightly.now()
-            previous_update=store.get_checkpoint('dataset_update_status',{}) or {}
-            interrupted_export=previous_update.get('phase') in {'checking','interrupted','failed'}
+            self._progress={'phase':'checking','stage':'prepare','detail':'Preparing the dataset refresh',
+                'started_at':started.isoformat(),'stage_started_at':started.isoformat()}
+            interrupted_export=False
             errors=[]
-            async def stage(detail):
-                store.set_checkpoint('dataset_update_status',{'phase':'checking','started_at':started.isoformat(),'detail':detail})
+            async def stage(detail,name):
+                current=self.nightly.now()
+                self._progress={'phase':'checking','started_at':started.isoformat(),
+                    'detail':detail,'stage':name,'stage_started_at':current.isoformat(),
+                    'updated_at':current.isoformat(),'elapsed_seconds':max(0,(current-started).total_seconds())}
+                await self._database(store.set_checkpoint,'dataset_update_status',self._progress)
                 if progress:
                     result=progress(detail)
                     if inspect.isawaitable(result):await result
             try:
-                before=await asyncio.to_thread(data_fingerprint,store)
-                await stage('Checking game statistics and tracking')
+                previous_update=await self._database(store.get_checkpoint,'dataset_update_status',{}) or {}
+                interrupted_export=previous_update.get('phase') in {'checking','interrupted','failed'}
+                await stage('Comparing the saved dataset','snapshot_before')
+                before=await self._database(data_fingerprint,store)
+                await stage('Checking game statistics and tracking','games_tracking')
                 try:
                     await _complete_callback(lambda:self.nightly.refresh_now(export=False))
                 except Exception as error:
                     errors.append('Game refresh failed: '+type(error).__name__+'.')
                 supplemental=None
                 if self.supplemental_refresh:
-                    await stage('Checking historical statistics and availability')
+                    await stage('Checking historical statistics and availability','history_availability')
                     try:supplemental=await _complete_callback(self.supplemental_refresh)
                     except Exception as error:errors.append('Supplemental refresh failed: '+type(error).__name__+'.')
                 if self.schedule_refresh:
-                    await stage('Checking the current game schedule')
+                    await stage('Checking the current game schedule','schedule')
                     try:await _complete_callback(self.schedule_refresh)
                     except Exception as error:errors.append('Schedule check failed: '+type(error).__name__+'.')
-                after=await asyncio.to_thread(data_fingerprint,store)
+                await stage('Comparing refreshed values','snapshot_after')
+                after=await self._database(data_fingerprint,store)
                 changed=before!=after
                 export=None
-                saved=store.get_checkpoint('nightly_nba_refresh',{}) or {}
-                history_export=store.get_checkpoint('history_upgrade_status',{}) or {}
+                saved=await self._database(store.get_checkpoint,'nightly_nba_refresh',{}) or {}
+                history_export=await self._database(store.get_checkpoint,'history_upgrade_status',{}) or {}
                 directory=getattr(self.nightly,'data_dir',None)
                 good_export=bool(not interrupted_export and directory and (Path(directory)/'exports'/'NBA_Master.xlsx').is_file()
                     and saved.get('master_export_updated_at') and not saved.get('master_export_error')
@@ -222,32 +337,40 @@ class DatasetUpdateController:
                 if not changed and good_export:
                     export={'phase':'ready','updated_at':saved['master_export_updated_at'],'reused':True}
                 elif self.export_refresh:
-                    await stage('Rebuilding the master Excel file')
-                    state=store.get_checkpoint('nightly_nba_refresh',{}) or {}
+                    await stage('Rebuilding the master Excel file','excel')
+                    state=await self._database(store.get_checkpoint,'nightly_nba_refresh',{}) or {}
                     state['last_export_attempt']=self.nightly.now().isoformat()
                     state['master_export_error']='RebuildInProgress'
-                    store.set_checkpoint('nightly_nba_refresh',state)
+                    await self._database(store.set_checkpoint,'nightly_nba_refresh',state)
                     try:
                         await _complete_callback(self.export_refresh)
-                        _clear_history_export_error(store,history_export)
+                        await self._database(_clear_history_export_error,store,history_export)
                         state.update(master_export_updated_at=self.nightly.now().isoformat(),master_export_error=None)
                         export={'phase':'ready','updated_at':state['master_export_updated_at']}
-                        store.feed_success('master_export','Master Excel rebuilt after all requested imports; source freshness remains separate.')
+                        await self._database(store.feed_success,'master_export','Master Excel rebuilt after all requested imports; source freshness remains separate.')
                     except Exception as error:
                         state['master_export_error']=type(error).__name__
                         export={'phase':'failed','error_type':type(error).__name__}
-                        store.feed_failure('master_export',type(error).__name__+'; previous Excel export retained.')
-                    store.set_checkpoint('nightly_nba_refresh',state)
-                report=build_saved_report(store,supplemental=supplemental,now=self.nightly.now(),
+                        await self._database(store.feed_failure,'master_export',type(error).__name__+'; previous Excel export retained.')
+                    await self._database(store.set_checkpoint,'nightly_nba_refresh',state)
+                report=await self._database(build_saved_report,store,supplemental=supplemental,now=self.nightly.now(),
                     started_at=started,changed=changed,export=export,errors=errors)
-                store.set_checkpoint('dataset_update_status',report)
+                report.update(stage='finished',detail='Refresh completed with remaining source gaps.' if report['remaining_gaps']
+                    else 'Refresh completed.',elapsed_seconds=max(0,(self.nightly.now()-started).total_seconds()))
+                self._progress=report
+                await self._database(store.set_checkpoint,'dataset_update_status',report)
                 return report
             except asyncio.CancelledError:
-                state=store.get_checkpoint('nightly_nba_refresh',{}) or {}
-                state.update(master_export_error='ManualUpdateInterrupted',last_export_attempt=self.nightly.now().isoformat())
-                store.set_checkpoint('nightly_nba_refresh',state)
-                store.set_checkpoint('dataset_update_status',{'phase':'interrupted','started_at':started.isoformat(),
-                    'detail':'Refresh was interrupted after active work settled; a complete recheck remains available.'})
+                self._progress={'phase':'interrupted','started_at':started.isoformat(),
+                    'finished_at':self.nightly.now().isoformat(),'stage':'interrupted',
+                    'elapsed_seconds':max(0,(self.nightly.now()-started).total_seconds()),
+                    'detail':'Refresh was interrupted after active work settled; a complete recheck remains available.'}
+                try:
+                    await _complete_callback(lambda:asyncio.to_thread(_record_interrupted,store,self._progress,self.nightly.now().isoformat()))
+                except sqlite3.Error as error:
+                    # A previous checking checkpoint and the durable Telegram
+                    # job retain retryability if an unrelated writer remains.
+                    if not _sqlite_contention(error):raise
                 raise
             finally:
                 self.nightly.manual_update_active=False

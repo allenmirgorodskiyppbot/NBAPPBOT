@@ -39,6 +39,24 @@ RESPONSIVE_COMMANDS = {'/start', '/help', '/status', '/ai_status', '/clear', '/n
                        '/reminder', '/usage', '/freshness', '/strategy', '/refresh', '/update'}
 
 
+TRANSPORT_BUSY_TIMEOUT_MS = 100
+
+
+def sqlite_contention(error):
+    """Only genuine SQLite BUSY/LOCKED codes are transient writer contention."""
+    code = getattr(error, 'sqlite_errorcode', None)
+    return (isinstance(error, sqlite3.OperationalError) and type(code) is int
+            and code & 255 in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED})
+
+
+def sqlite_diagnostic(error):
+    code = getattr(error, 'sqlite_errorcode', None)
+    name = getattr(error, 'sqlite_errorname', None)
+    return {'error_type': type(error).__name__,
+            'sqlite_errorcode': code if type(code) is int else None,
+            'sqlite_errorname': name if isinstance(name, str) and re.fullmatch(r'SQLITE_[A-Z0-9_]{1,60}', name) else None}
+
+
 class TelegramAPIError(RuntimeError):
     """Safe error metadata; never retain provider text or token-bearing URLs."""
     def __init__(self, code, retry_after=None):
@@ -92,6 +110,7 @@ HELP = '''Knicks Research bot
 /status — feed freshness and bot status
 /freshness — daily import coverage and next game’s data readiness, without AI
 /refresh (or /update) — check for dataset updates now; results arrive when the check finishes
+/refresh status (or /update status) — current stage, elapsed time, and last result
 /ai_status — local AI readiness, busy state and last failure category
 /selftest — isolated data/backup tests and read-only live health checks
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
@@ -419,11 +438,16 @@ def parse_board_text(argument: str):
 class TelegramBot:
     def __init__(self, store, answer_callback, *, token=None, allowed_user_ids=None, client=None,
                  model_status_callback=None, self_test_callback=None, research_refresh_callback=None,
-                 answer_preferences_callback=None, manual_refresh_callback=None):
+                 answer_preferences_callback=None, manual_refresh_callback=None,
+                 manual_refresh_status_callback=None):
         self.store = store
         self.answer_callback = answer_callback
         self.answer_preferences_callback = answer_preferences_callback
         self.manual_refresh_callback = manual_refresh_callback
+        self.manual_refresh_status_callback = manual_refresh_status_callback
+        self._database_health = {'phase': 'ready'}
+        self._database_waiters = 0
+        self._shutting_down = False
         self._dataset_refresh_tasks = set()
         self._dataset_refresh_pending_results = {}
         self.model_status_callback = model_status_callback
@@ -434,6 +458,7 @@ class TelegramBot:
         self._album_batches = {}
         self._album_tasks = set()
         self._delivery_lock = asyncio.Lock()
+        self._known_deliveries = {}
         self.token = token if token is not None else os.getenv('TELEGRAM_BOT_TOKEN', '')
         configured = (os.getenv('TELEGRAM_ALLOWED_USER_IDS') or
                       os.getenv('TELEGRAM_ALLOWED_USER_ID', ''))
@@ -450,11 +475,63 @@ class TelegramBot:
         self.connected = False
         self._initialize_database()
 
-    def _db(self):
-        db = sqlite3.connect(self.database_path, timeout=30)
+    def _db(self, *, busy_timeout_ms=30000):
+        db = sqlite3.connect(self.database_path, timeout=busy_timeout_ms / 1000)
         db.row_factory = sqlite3.Row
-        db.execute('PRAGMA busy_timeout=30000')
+        db.execute('PRAGMA busy_timeout=' + str(int(busy_timeout_ms)))
         return db
+
+    async def _retry_db(self, operation, *args, **kwargs):
+        """Retry fresh idempotent transactions off-loop only for BUSY/LOCKED."""
+        delay, waiting = .05, False
+        try:
+            while True:
+                try:
+                    return await asyncio.to_thread(operation, *args, **kwargs)
+                except sqlite3.Error as error:
+                    transient = sqlite_contention(error)
+                    self._database_health = {'phase': 'waiting_for_writer' if transient else 'failed',
+                                             'checked_at': utcnow(), **sqlite_diagnostic(error)}
+                    if not transient:
+                        raise
+                    if not waiting:
+                        waiting = True
+                        self._database_waiters += 1
+                    await asyncio.sleep(delay)
+                    delay = min(1, delay * 2)
+        finally:
+            if waiting:
+                self._database_waiters -= 1
+                if self._database_waiters == 0 and self._database_health.get('phase') == 'waiting_for_writer':
+                    self._database_health = {**self._database_health, 'phase': 'ready', 'recovered_at': utcnow()}
+
+    def _transport_sql(self, sql, values=(), *, fetch=None):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                cursor = db.execute(sql, values)
+                if fetch == 'one':
+                    row = cursor.fetchone()
+                    return dict(row) if row is not None else None
+                if fetch == 'all':
+                    return [dict(row) for row in cursor.fetchall()]
+                return cursor.rowcount
+        finally:
+            db.close()
+
+    def _transport_state(self, name, default=''):
+        row = self._transport_sql('SELECT value FROM telegram_state WHERE name=?', (name,), fetch='one')
+        return row['value'] if row else default
+
+    def _transport_states(self, values):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                db.executemany('INSERT INTO telegram_state(name,value) VALUES (?,?) '
+                               'ON CONFLICT(name) DO UPDATE SET value=excluded.value',
+                               [(name, str(value)) for name, value in values.items()])
+        finally:
+            db.close()
 
     def _initialize_database(self):
         with self._db() as db:
@@ -530,6 +607,10 @@ class TelegramBot:
 
     def _remember(self, chat_id, update_id, question, answer=None):
         with self._db() as db:
+            reset = db.execute('SELECT value FROM telegram_state WHERE name=?',
+                               (f'conversation_reset_update:{chat_id}',)).fetchone()
+            if reset and update_id <= int(reset['value']):
+                return
             if answer is None:
                 inserted = db.execute('INSERT OR IGNORE INTO telegram_conversation VALUES (?,?,?,?,?)',
                            (chat_id, update_id, question[:3000], None, utcnow())).rowcount
@@ -580,6 +661,22 @@ class TelegramBot:
                 changes['pick_count'] = request['count']
         return changes
 
+    def _clear_conversation(self, chat_id, update_id):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                db.execute('BEGIN IMMEDIATE')
+                key = f'conversation_reset_update:{chat_id}'
+                old = db.execute('SELECT value FROM telegram_state WHERE name=?', (key,)).fetchone()
+                if old and int(old['value']) > update_id:
+                    return
+                db.execute('DELETE FROM telegram_conversation WHERE chat_id=?', (chat_id,))
+                db.execute('DELETE FROM telegram_state WHERE name=?', (f'lineup_preferences:{chat_id}',))
+                db.execute('INSERT INTO telegram_state(name,value) VALUES (?,?) '
+                           'ON CONFLICT(name) DO UPDATE SET value=excluded.value', (key, str(update_id)))
+        finally:
+            db.close()
+
     def _lineup_preferences(self, chat_id):
         """Private durable user choices; never player focus or source evidence."""
         from conversation import validated_lineup_preferences
@@ -620,7 +717,7 @@ class TelegramBot:
                 'last_error': self._get_state('last_delivery_error') or self._get_state('last_error') or None,
                 'last_poll_error': self._get_state('last_error') or None,
                 'last_delivery_error': self._get_state('last_delivery_error') or None,
-                'offset': int(self._get_state('offset', '0'))}
+                'offset': int(self._get_state('offset', '0')), 'database': dict(self._database_health)}
 
     def _authorized(self, message):
         sender = message.get('from') or {}
@@ -640,36 +737,97 @@ class TelegramBot:
         with self._db() as db:
             self._queue_in_db(db, chat_id, text, event_key, expires_at)
 
-    def _start_dataset_refresh(self, chat_id, update_id):
+    def _reserve_dataset_refresh(self, chat_id, update_id):
+        job_id = uuid.uuid4().hex
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                db.execute('BEGIN IMMEDIATE')
+                active = db.execute("SELECT id,chat_id FROM telegram_dataset_jobs WHERE status='running'").fetchone()
+                recovered = None
+                if active:
+                    pending = self._dataset_refresh_pending_results.get(active['id'])
+                    if pending is None:
+                        return 'A dataset refresh is already in progress. Use /refresh status for its stage and elapsed time.', None, None
+                    # A completed task whose result write failed cannot strand the
+                    # busy marker. Retry that exact result atomically before a new
+                    # explicit request starts; never replay its data imports.
+                    saved_text, saved_status = pending
+                    self._queue_in_db(db, active['chat_id'], saved_text, 'dataset-refresh-result:' + active['id'])
+                    db.execute('UPDATE telegram_dataset_jobs SET status=?,completed_at=?,result_text=? WHERE id=?',
+                               (saved_status, utcnow(), saved_text[:10000], active['id']))
+                    recovered = active['id']
+                db.execute('INSERT INTO telegram_dataset_jobs VALUES (?,?,?,?,?,?,?)',
+                           (job_id, update_id, chat_id, 'running', utcnow(), None, None))
+                self._queue_in_db(db, chat_id, 'Checking dataset updates… Large Excel rebuilds can take several minutes. Use /refresh status for progress; I’ll send the result when the checks finish.',
+                                  'dataset-refresh-start:' + job_id)
+        finally:
+            db.close()
+        return None, job_id, recovered
+
+    async def _start_dataset_refresh(self, chat_id, update_id):
+        if self._shutting_down:
+            return 'The bot is shutting down. Please try /refresh after it restarts.'
         if self.manual_refresh_callback is None:
             return 'Dataset refresh is not configured for this deployment. /status shows the saved update checks.'
-        job_id = uuid.uuid4().hex
-        with self._db() as db:
-            db.execute('BEGIN IMMEDIATE')
-            active = db.execute("SELECT id,chat_id FROM telegram_dataset_jobs WHERE status='running'").fetchone()
-            recovered = None
-            if active:
-                pending = self._dataset_refresh_pending_results.get(active['id'])
-                if pending is None:
-                    return 'A dataset refresh is already in progress. Wait for it to finish before requesting another.'
-                # A completed task whose result write failed cannot strand the
-                # busy marker. Retry that exact result atomically before a new
-                # explicit request starts; never replay its data imports.
-                saved_text, saved_status = pending
-                self._queue_in_db(db, active['chat_id'], saved_text, 'dataset-refresh-result:' + active['id'])
-                db.execute('UPDATE telegram_dataset_jobs SET status=?,completed_at=?,result_text=? WHERE id=?',
-                           (saved_status, utcnow(), saved_text[:10000], active['id']))
-                recovered = active['id']
-            db.execute('INSERT INTO telegram_dataset_jobs VALUES (?,?,?,?,?,?,?)',
-                       (job_id, update_id, chat_id, 'running', utcnow(), None, None))
-            self._queue_in_db(db, chat_id, 'Checking dataset updates… I’ll send the results when the check finishes.',
-                              'dataset-refresh-start:' + job_id)
+        response, job_id, recovered = await self._retry_db(self._reserve_dataset_refresh, chat_id, update_id)
+        if response is not None:
+            return response
         if recovered is not None:
             self._dataset_refresh_pending_results.pop(recovered, None)
         task = asyncio.create_task(self._run_dataset_refresh(job_id), name='dataset-refresh:' + job_id)
         self._dataset_refresh_tasks.add(task)
         task.add_done_callback(self._dataset_refresh_finished)
         return None
+
+    def _read_dataset_refresh_status(self):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            job = db.execute("SELECT id,status,created_at,completed_at,result_text FROM telegram_dataset_jobs "
+                             "ORDER BY (status='running') DESC,rowid DESC LIMIT 1").fetchone()
+            checkpoint = {}
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='checkpoints'").fetchone():
+                row = db.execute("SELECT value_json FROM checkpoints WHERE name='dataset_update_status'").fetchone()
+                if row:
+                    try: checkpoint = json.loads(row['value_json'])
+                    except (ValueError, TypeError): pass
+            return dict(job) if job else None, checkpoint if isinstance(checkpoint, dict) else {}
+        finally:
+            db.close()
+
+    async def _dataset_refresh_status(self):
+        job, progress = await self._retry_db(self._read_dataset_refresh_status)
+        if self.manual_refresh_status_callback is not None:
+            value = await self.manual_refresh_status_callback()
+            if isinstance(value, dict): progress = value
+        if not job:
+            return 'No dataset refresh is running. Use /refresh to check for updates.'
+        pending_result = self._dataset_refresh_pending_results.get(job['id'])
+        if pending_result is not None:
+            return ('The refresh check finished, but saving its result is waiting for the database. '
+                    'Use /refresh to retry saving it.\n' + str(pending_result[0])[:1800])
+        running = job['status'] == 'running'
+        lines = ['Dataset refresh is running.' if running else 'Last dataset refresh: ' + job['status'] + '.']
+        if running:
+            detail = progress.get('detail') or progress.get('stage')
+            if isinstance(detail, str) and detail.strip(): lines.append('Stage: ' + detail[:200] + '.')
+            try:
+                started = datetime.fromisoformat(job['created_at'].replace('Z', '+00:00'))
+                seconds = max(0, int((datetime.now(timezone.utc) - started).total_seconds()))
+                lines.append(f'Elapsed: {seconds // 60}m {seconds % 60}s.')
+            except (ValueError, TypeError): pass
+            lines.append('Large Excel rebuilds can take several minutes. The result will arrive when checks finish.')
+        elif job.get('result_text'):
+            lines.append(str(job['result_text'])[:1800])
+        return '\n'.join(lines)
+
+    async def shutdown(self):
+        """Only application shutdown owns cancellation of independent data jobs."""
+        self._shutting_down = True
+        tasks = list(self._dataset_refresh_tasks)
+        for task in tasks: task.cancel()
+        if tasks: await asyncio.gather(*tasks, return_exceptions=True)
+        self._dataset_refresh_tasks.clear()
 
     def _dataset_refresh_finished(self, task):
         self._dataset_refresh_tasks.discard(task)
@@ -721,7 +879,12 @@ class TelegramBot:
         with self._db() as db:
             db.execute('BEGIN IMMEDIATE')
             rows = db.execute("SELECT id,chat_id,update_id FROM telegram_dataset_jobs WHERE status='running'").fetchall()
+            owned = {task.get_name().split(':', 1)[1] for task in list(self._dataset_refresh_tasks)
+                     if not task.done() and task.get_name().startswith('dataset-refresh:')}
+            owned.update(self._dataset_refresh_pending_results)
             for row in rows:
+                if row['id'] in owned:
+                    continue
                 text = 'A dataset refresh was interrupted by a restart. Existing saved data remains available. Use /refresh to check again.'
                 self._queue_in_db(db, row['chat_id'], text, 'dataset-refresh-result:' + row['id'])
                 db.execute("UPDATE telegram_dataset_jobs SET status='interrupted',completed_at=?,result_text=? WHERE id=?",
@@ -746,7 +909,7 @@ class TelegramBot:
             return False
         key = event_key or 'notification:' + uuid.uuid4().hex
         for user_id in self.allowed_user_ids:
-            self._queue(user_id, text, key, expires_at=expires_at)
+            await self._retry_db(self._queue, user_id, text, key, expires_at=expires_at)
         return True
 
     async def _api(self, method, payload):
@@ -796,21 +959,28 @@ class TelegramBot:
             await self._flush_outbox()
 
     async def _flush_outbox(self):
-        with self._db() as db:
-            db.execute("UPDATE telegram_outbox SET status='expired' WHERE status='pending' "
-                       'AND expires_at IS NOT NULL AND expires_at<=?', (time.time(),))
-            rows = db.execute("SELECT * FROM telegram_outbox WHERE status='pending' "
-                              'AND next_attempt<=? ORDER BY id LIMIT 20', (time.time(),)).fetchall()
-        if float(self._get_state('delivery_retry_at', '0')) > time.time():
+        await self._retry_db(self._transport_sql, "UPDATE telegram_outbox SET status='expired' WHERE status='pending' "
+                             'AND expires_at IS NOT NULL AND expires_at<=?', (time.time(),))
+        rows = await self._retry_db(self._transport_sql, "SELECT * FROM telegram_outbox WHERE status='pending' "
+                                   'AND next_attempt<=? ORDER BY id LIMIT 20', (time.time(),), fetch='all')
+        if float(await self._retry_db(self._transport_state, 'delivery_retry_at', '0')) > time.time():
             return
         for row in rows:
+            known_delivery = self._known_deliveries.get(row['id'])
+            if known_delivery is not None:
+                # Polling may restart while a successful send waits for its DB
+                # mark. Preserve that known result on this bot instance and
+                # finish only the mark, never send the same reply again.
+                await self._retry_db(self._transport_sql,
+                    "UPDATE telegram_outbox SET status='delivered',delivered_at=? WHERE id=?", (known_delivery, row['id']))
+                self._known_deliveries.pop(row['id'], None)
+                await self._retry_db(self._transport_states, {'last_delivery': known_delivery})
+                continue
             if row['expires_at'] is not None and row['expires_at'] <= time.time():
-                with self._db() as db:
-                    db.execute("UPDATE telegram_outbox SET status='expired' WHERE id=?", (row['id'],))
+                await self._retry_db(self._transport_sql, "UPDATE telegram_outbox SET status='expired' WHERE id=?", (row['id'],))
                 continue
             if row['chat_id'] not in self.allowed_user_ids:
-                with self._db() as db:
-                    db.execute("UPDATE telegram_outbox SET status='blocked' WHERE id=?", (row['id'],))
+                await self._retry_db(self._transport_sql, "UPDATE telegram_outbox SET status='blocked' WHERE id=?", (row['id'],))
                 continue
             try:
                 await self._api('sendMessage', {'chat_id': row['chat_id'], 'text': row['text'],
@@ -822,22 +992,21 @@ class TelegramBot:
                     retry_delay = max(retry_delay, error.retry_after)
                     # Telegram rate limits can apply across outgoing messages.
                     # Retain the cooldown on disk so a restart will honor it.
-                    self._set_state('delivery_retry_at', time.time() + retry_delay)
-                with self._db() as db:
-                    db.execute('UPDATE telegram_outbox SET attempts=?,next_attempt=? WHERE id=?',
-                               (attempts, time.time() + retry_delay, row['id']))
-                self._set_state('last_delivery_error', 'Telegram delivery failed; queued for retry.')
+                    await self._retry_db(self._transport_states, {'delivery_retry_at': time.time() + retry_delay})
+                await self._retry_db(self._transport_sql, 'UPDATE telegram_outbox SET attempts=?,next_attempt=? WHERE id=?',
+                                     (attempts, time.time() + retry_delay, row['id']))
+                await self._retry_db(self._transport_states, {'last_delivery_error': 'Telegram delivery failed; queued for retry.'})
                 return
-            with self._db() as db:
-                db.execute("UPDATE telegram_outbox SET status='delivered',delivered_at=? WHERE id=?",
-                           (utcnow(), row['id']))
-            self._set_state('last_delivery', utcnow())
-        with self._db() as db:
-            failed_pending = db.execute("SELECT 1 FROM telegram_outbox WHERE status='pending' "
-                                        'AND attempts>0 LIMIT 1').fetchone()
+            delivered_at = utcnow()
+            self._known_deliveries[row['id']] = delivered_at
+            await self._retry_db(self._transport_sql, "UPDATE telegram_outbox SET status='delivered',delivered_at=? WHERE id=?",
+                                 (delivered_at, row['id']))
+            self._known_deliveries.pop(row['id'], None)
+            await self._retry_db(self._transport_states, {'last_delivery': delivered_at})
+        failed_pending = await self._retry_db(self._transport_sql, "SELECT 1 FROM telegram_outbox WHERE status='pending' "
+                                             'AND attempts>0 LIMIT 1', fetch='one')
         if not failed_pending:
-            self._set_state('last_delivery_error', '')
-            self._set_state('delivery_retry_at', '0')
+            await self._retry_db(self._transport_states, {'last_delivery_error': '', 'delivery_retry_at': '0'})
 
     async def _download(self, file_id, declared_size=0, *, max_bytes=MAX_UPLOAD):
         limit_message = (f'Upload is too large. The limit is {max_bytes // (1024 * 1024)} MB. '
@@ -1076,7 +1245,7 @@ class TelegramBot:
                 from master_upgrade import merge_enriched_workbook
                 payload = await self._download(document['file_id'], document.get('file_size', 0),
                                                max_bytes=MAX_MASTER_UPLOAD)
-                self._queue(message['chat']['id'],
+                await self._retry_db(self._queue, message['chat']['id'],
                     'File received. Validating and merging the master dataset. A large file can take several minutes. '
                     'Keep your original file until the completion reply arrives.',
                     event_key=f'master-import-start:{update_id}')
@@ -1100,7 +1269,7 @@ class TelegramBot:
                 return ('Manual statistics import complete — user-supplied data, not independently verified:\n'
                         + self._compact(report))
             legs = parse_board_document(filename, payload)
-            board = self.store.create_board(legs, source=f'telegram:{update_id}:{filename[:100]}')
+            board = await asyncio.to_thread(self.store.create_board, legs, source=f'telegram:{update_id}:{filename[:100]}')
             return await self._board_saved_reply(board, message['chat']['id'])
         text = str(message.get('text', '')).strip()
         if not text:
@@ -1120,20 +1289,20 @@ class TelegramBot:
                     'For files over 20 MB, use Import master Excel on the bot website. '
                     'Importing history does not verify today’s schedule or injuries.')
         if command in {'/refresh', '/update'}:
+            if argument.casefold() == 'status':
+                return await self._dataset_refresh_status()
             if argument:
-                return 'Use /refresh or /update alone to check for dataset updates.'
-            return self._start_dataset_refresh(message['chat']['id'], update_id)
+                return 'Use /refresh or /update to check for updates, or /refresh status to see progress.'
+            return await self._start_dataset_refresh(message['chat']['id'], update_id)
         if command == '/picks':
             return await self._independent_picks_reply(parse_picks_request(text), message['chat']['id'], text)
         if command == '/clear':
-            with self._db() as db:
-                db.execute('BEGIN IMMEDIATE')
-                db.execute('DELETE FROM telegram_conversation WHERE chat_id=?', (message['chat']['id'],))
-                db.execute('DELETE FROM telegram_state WHERE name=?',
-                           (f"lineup_preferences:{message['chat']['id']}",))
+            await self._retry_db(self._clear_conversation, message['chat']['id'], update_id)
             return 'Conversation context and lineup preferences cleared. Your dataset and picks remain saved.'
         if command == '/status':
-            return 'Data and worker status:\n' + self._compact(self.store.status()) + '\nTelegram:\n' + self._compact(self.status())
+            data = await self._retry_db(self.store.status)
+            telegram = await self._retry_db(self.status)
+            return 'Data and worker status:\n' + self._compact(data) + '\nTelegram:\n' + self._compact(telegram)
         if command == '/freshness':
             if argument:
                 return 'Use /freshness alone to check saved daily imports and the next game’s data readiness without AI.'
@@ -1195,9 +1364,9 @@ class TelegramBot:
             return 'Public feed connection checks:\n' + self._compact(report)
         if command == '/today':
             today = datetime.now(ZoneInfo('America/New_York')).date().isoformat()
-            return f'NBA games for {today} (Eastern):\n' + self._compact(self.store.games(today))
+            return f'NBA games for {today} (Eastern):\n' + self._compact(await asyncio.to_thread(self.store.games, today))
         if command == '/news':
-            return 'Recent collected news — check each source timestamp:\n' + self._compact(self.store.recent_news(limit=10))
+            return 'Recent collected news — check each source timestamp:\n' + self._compact(await asyncio.to_thread(self.store.recent_news, limit=10))
         if command == '/reminder':
             from gameday_digest import reminder_status
             return reminder_status(self.store)
@@ -1237,23 +1406,23 @@ class TelegramBot:
             method = getattr(self.store, 'list_boards', None) or self.store.boards
             return 'Uploaded boards:\n' + self._compact(method())
         if command == '/newboard':
-            self._reset_screenshots(message['chat']['id'], update_id)
+            await self._retry_db(self._reset_screenshots, message['chat']['id'], update_id)
             return 'Fresh screenshot set started. Send the current cards; previous saved boards and entries are unchanged.'
         if command == '/entries':
-            return 'Tracked entries:\n' + self._compact(self.store.list_entries())
+            return 'Tracked entries:\n' + self._compact(await asyncio.to_thread(self.store.list_entries))
         if command == '/results':
-            return 'Results — projected grades and confirmed account returns are separate:\n' + self._compact(self.store.ledger_summary())
+            return 'Results — projected grades and confirmed account returns are separate:\n' + self._compact(await asyncio.to_thread(self.store.ledger_summary))
         if command == '/board':
             if not argument:
                 return 'Paste available lines with their game date:\n' + BOARD_EXAMPLE
             legs = parse_board_text(argument)
-            board = self.store.create_board(legs, source=f'telegram:{update_id}')
+            board = await asyncio.to_thread(self.store.create_board, legs, source=f'telegram:{update_id}')
             return await self._board_saved_reply(board, message['chat']['id'])
         if command == '/track':
             parts = argument.split()
             if len(parts) not in {3, 4}:
                 return 'Use /track BOARD_ID STAKE power|flex [DISPLAYED_MULTIPLIER]. This records that you actually placed the entire 2–6 pick board.'
-            board = self.store.get_board(parts[0])
+            board = await asyncio.to_thread(self.store.get_board, parts[0])
             if not board:
                 raise ValueError('Board not found. Use /boards to see uploaded boards.')
             if str(board.get('source', '')).startswith('screenshot:'):
@@ -1261,7 +1430,7 @@ class TelegramBot:
                         'placed with /board, then /track that board with its stake and displayed payout.')
             if not 2 <= len(board['legs']) <= 6:
                 raise ValueError('A placed entry needs 2–6 selections. Save a smaller board containing the exact selections you placed.')
-            entry = self.store.create_entry(board['legs'], float(parts[1]), parts[2],
+            entry = await asyncio.to_thread(self.store.create_entry, board['legs'], float(parts[1]), parts[2],
                                             payout_multiplier=float(parts[3]) if len(parts) == 4 else None,
                                             source=f'telegram:{update_id}:board:{board["id"]}')
             return f'Placed entry recorded: {entry["id"]}\nOriginal selections and stake saved. Final-stat grades will be provisional until reconciled with PrizePicks settlement.'
@@ -1269,7 +1438,7 @@ class TelegramBot:
             parsed = json.loads(argument)
             if not isinstance(parsed, dict):
                 raise ValueError('Use /entry followed by an object with legs, stake, entry_type and the actual payout multiplier.')
-            entry = self.store.create_entry(parsed['legs'], parsed['stake'], parsed['entry_type'],
+            entry = await asyncio.to_thread(self.store.create_entry, parsed['legs'], parsed['stake'], parsed['entry_type'],
                                             payout_multiplier=parsed.get('payout_multiplier'),
                                             source=f'telegram:{update_id}')
             return f'Placed entry recorded: {entry["id"]}\nThe original selections are saved. Results will update after final stats; PrizePicks settlement exceptions may need review.'
@@ -1277,13 +1446,13 @@ class TelegramBot:
             pieces = argument.split(maxsplit=2)
             if len(pieces) < 2:
                 return 'Use /settle ENTRY_ID TOTAL_RETURN [note]. Total return includes the original stake; enter 0 for a loss.'
-            result = self.store.mark_settlement(pieces[0], float(pieces[1]),
+            result = await asyncio.to_thread(self.store.mark_settlement, pieces[0], float(pieces[1]),
                                                 pieces[2] if len(pieces) > 2 else 'User confirmed via Telegram')
             return 'Actual PrizePicks return recorded:\n' + self._compact(result)
         if command == '/analyze':
             if not argument:
                 return 'Use /analyze BOARD_ID after uploading available lines.'
-            board = self.store.get_board(argument)
+            board = await asyncio.to_thread(self.store.get_board, argument)
             if not board:
                 raise ValueError('Board not found. Use /boards to see uploaded boards.')
             await self._refresh_board_news()
@@ -1294,44 +1463,93 @@ class TelegramBot:
             return 'Unknown command. Use /help to see available commands.'
         independent_request = parse_picks_request(text)
         if independent_request is not None:
-            self._remember(message['chat']['id'], update_id, text)
+            await self._retry_db(self._remember, message['chat']['id'], update_id, text)
             response = await self._independent_picks_reply(independent_request, message['chat']['id'], text)
-            self._remember(message['chat']['id'], update_id, text, response)
+            await self._retry_db(self._remember, message['chat']['id'], update_id, text, response)
             return response
         if len(text) > 3000:
             raise ValueError('Please keep questions under 3000 characters, or upload a CSV/JSON board.')
         chat_id = message['chat']['id']
-        history = self._conversation(chat_id)
-        self._remember(chat_id, update_id, text)
+        history = await self._retry_db(self._conversation, chat_id)
+        await self._retry_db(self._remember, chat_id, update_id, text)
         typing = asyncio.create_task(self._typing(chat_id))
         try:
             if self.answer_preferences_callback is not None:
-                response = await self.answer_preferences_callback(text, history, self._lineup_preferences(chat_id))
+                response = await self.answer_preferences_callback(text, history, (await self._retry_db(self._lineup_preferences, chat_id)))
             else:
                 response = await self.answer_callback(text, history)
         finally:
             typing.cancel()
             await asyncio.gather(typing, return_exceptions=True)
-        self._remember(chat_id, update_id, text, response)
+        await self._retry_db(self._remember, chat_id, update_id, text, response)
         return response
 
-    async def process_update(self, update, *, overloaded=False):
+    def _receive_batch(self, updates):
+        """Persist the entire fetched inventory before confirming its max offset."""
+        if not isinstance(updates, list):
+            raise RuntimeError('Telegram returned an invalid update inventory.')
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                received = set()
+                old = db.execute("SELECT value FROM telegram_state WHERE name='offset'").fetchone()
+                offset = int(old['value']) if old else 0
+                for update in updates:
+                    if not isinstance(update, dict) or not isinstance(update.get('update_id'), int):
+                        continue
+                    update_id = update['update_id']; message = update.get('message') or {}
+                    allowed = self._authorized(message)
+                    chat_id = message.get('chat', {}).get('id') if allowed else None
+                    inserted = db.execute('INSERT OR IGNORE INTO telegram_updates '
+                        '(update_id,chat_id,status,received_at) VALUES (?,?,?,?)',
+                        (update_id, chat_id, 'processing' if allowed else 'ignored', utcnow())).rowcount
+                    if inserted: received.add(update_id)
+                    offset = max(offset, update_id + 1)
+                db.execute("INSERT INTO telegram_state(name,value) VALUES ('offset',?) "
+                           'ON CONFLICT(name) DO UPDATE SET value=excluded.value', (str(offset),))
+                return received
+        finally:
+            db.close()
+
+    def _receive_update(self, update_id, chat_id, authorized):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                inserted = db.execute('INSERT OR IGNORE INTO telegram_updates '
+                    '(update_id,chat_id,status,received_at) VALUES (?,?,?,?)',
+                    (update_id, chat_id, 'processing' if authorized else 'ignored', utcnow())).rowcount
+                old = db.execute("SELECT value FROM telegram_state WHERE name='offset'").fetchone()
+                offset = max(int(old['value']) if old else 0, update_id + 1)
+                db.execute("INSERT INTO telegram_state(name,value) VALUES ('offset',?) "
+                           'ON CONFLICT(name) DO UPDATE SET value=excluded.value', (str(offset),))
+                return inserted
+        finally:
+            db.close()
+
+    def _complete_update(self, update_id, chat_id, authorized, response):
+        db = self._db(busy_timeout_ms=TRANSPORT_BUSY_TIMEOUT_MS)
+        try:
+            with db:
+                if authorized and response is not None:
+                    self._queue_in_db(db, chat_id, response, f'reply:{update_id}')
+                db.execute('UPDATE telegram_updates SET status=?,completed_at=? WHERE update_id=?',
+                           ('done' if authorized else 'ignored', utcnow(), update_id))
+                old = db.execute("SELECT value FROM telegram_state WHERE name='offset'").fetchone()
+                offset = max(int(old['value']) if old else 0, update_id + 1)
+                db.execute("INSERT INTO telegram_state(name,value) VALUES ('offset',?) "
+                           'ON CONFLICT(name) DO UPDATE SET value=excluded.value', (str(offset),))
+        finally:
+            db.close()
+
+    async def process_update(self, update, *, overloaded=False, received=False):
         update_id = update.get('update_id')
         if not isinstance(update_id, int):
             return False
         message = update.get('message') or {}
         authorized = self._authorized(message)
         chat_id = message.get('chat', {}).get('id') if authorized else None
-        with self._db() as db:
-            inserted = db.execute('INSERT OR IGNORE INTO telegram_updates '
-                                  '(update_id,chat_id,status,received_at) VALUES (?,?,?,?)',
-                                  (update_id, chat_id, 'processing' if authorized else 'ignored', utcnow())).rowcount
-            # Acknowledge only after a durable marker exists. A restart can then
-            # identify an interrupted command without replaying ledger writes.
-            old = db.execute("SELECT value FROM telegram_state WHERE name='offset'").fetchone()
-            offset = max(int(old['value']) if old else 0, update_id + 1)
-            db.execute("INSERT INTO telegram_state(name,value) VALUES ('offset',?) "
-                       'ON CONFLICT(name) DO UPDATE SET value=excluded.value', (str(offset),))
+        inserted = True if received else await self._retry_db(self._receive_update, update_id, chat_id, authorized)
+        response = None
         if not inserted:
             return False
         if authorized:
@@ -1345,34 +1563,39 @@ class TelegramBot:
                     remember_result = bool(message.get('photo') or message.get('document') or
                                            context_command in {'/picks','/board','/analyze'})
                     if remember_result:
-                        self._remember(chat_id, update_id, text or 'Analyze these uploaded player lines.')
+                        await self._retry_db(self._remember, chat_id, update_id, text or 'Analyze these uploaded player lines.')
                     response = await self._handle_ordered_message(message, update_id)
                     if remember_result and response:
-                        self._remember(chat_id, update_id, text, response)
+                        await self._retry_db(self._remember, chat_id, update_id, text, response)
             except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeError) as error:
                 # Validation errors contain user data or field names, not network credentials.
                 response = 'Could not save that input: ' + str(error)[:500] + '\nUse /help for the required format.'
             except asyncio.CancelledError:
                 raise
+            except sqlite3.Error as error:
+                if not sqlite_contention(error):
+                    raise
+                self._database_health = {'phase': 'waiting_for_writer', 'checked_at': utcnow(), **sqlite_diagnostic(error)}
+                response = ('The database is finishing an update. This command could not finish. '
+                            'Check /status, /boards and /entries before retrying.')
             except Exception:
                 response = 'That command could not finish. Check /status, /boards and /entries before trying again.'
                 log.warning('Telegram command failed for update %s; no credentials logged.', update_id)
-            if response is not None:
-                self._queue(chat_id, response, f'reply:{update_id}')
-        with self._db() as db:
-            db.execute('UPDATE telegram_updates SET status=?,completed_at=? WHERE update_id=?',
-                       ('done' if authorized else 'ignored', utcnow(), update_id))
-            old = db.execute("SELECT value FROM telegram_state WHERE name='offset'").fetchone()
-            offset = max(int(old['value']) if old else 0, update_id + 1)
-            db.execute("INSERT INTO telegram_state(name,value) VALUES ('offset',?) "
-                       'ON CONFLICT(name) DO UPDATE SET value=excluded.value', (str(offset),))
+        await self._retry_db(self._complete_update, update_id, chat_id, authorized, response)
         return authorized
 
     def _recover_interrupted(self):
         self._recover_dataset_refreshes()
         with self._db() as db:
             rows = db.execute("SELECT update_id,chat_id FROM telegram_updates WHERE status='processing'").fetchall()
+        owned = {task.get_name().split(':', 1)[1] for task in list(self._dataset_refresh_tasks)
+                 if not task.done() and task.get_name().startswith('dataset-refresh:')}
+        with self._db() as db:
+            owned_updates = {row['update_id'] for row in db.execute(
+                "SELECT id,update_id FROM telegram_dataset_jobs WHERE status='running'") if row['id'] in owned}
         for row in rows:
+            if row['update_id'] in owned_updates:
+                continue
             if row['chat_id'] in self.allowed_user_ids:
                 self._queue(row['chat_id'], 'A previous command was interrupted by a restart. '
                             'Check /boards and /entries before retrying so an entry is not recorded twice.',
@@ -1386,7 +1609,7 @@ class TelegramBot:
         if not self.enabled:
             log.info('Telegram is disabled until a bot token and numeric user allowlist are configured privately.')
             return
-        self._recover_interrupted()
+        await self._retry_db(self._recover_interrupted)
         if self.client is None:
             self.client = httpx.AsyncClient(timeout=httpx.Timeout(45, connect=10))
             self._owns_client = True
@@ -1398,30 +1621,56 @@ class TelegramBot:
                     await self.flush_outbox()
                 except asyncio.CancelledError:
                     raise
+                except sqlite3.Error as error:
+                    self._database_health = {'phase': 'waiting_for_writer' if sqlite_contention(error) else 'failed',
+                                             'checked_at': utcnow(), **sqlite_diagnostic(error)}
+                    if not sqlite_contention(error):
+                        raise
                 except Exception:
-                    # A database/storage failure may also prevent writing its
-                    # diagnostic. Keep the sender alive to retry once it recovers.
+                    # Do not let failure diagnostics cause a second DB failure.
                     with suppress(Exception):
-                        self._set_state('last_delivery_error', 'Telegram message delivery is retrying.')
+                        await self._retry_db(self._set_state, 'last_delivery_error', 'Telegram message delivery is retrying.')
                 await asyncio.sleep(1)
 
         delivery_task = asyncio.create_task(deliver_messages())
 
+        command_failure = asyncio.get_running_loop().create_future()
+
+        async def poll_updates(payload):
+            poll = asyncio.create_task(self._api('getUpdates', payload))
+            try:
+                await asyncio.wait({poll, delivery_task, command_failure}, return_when=asyncio.FIRST_COMPLETED)
+                if delivery_task.done():
+                    delivery_task.result()
+                    raise RuntimeError('Telegram delivery worker stopped unexpectedly.')
+                if command_failure.done():
+                    raise command_failure.result()
+                return await poll
+            finally:
+                if not poll.done():
+                    poll.cancel()
+                    await asyncio.gather(poll, return_exceptions=True)
+
         def command_finished(task):
             command_tasks.discard(task)
             if not task.cancelled() and task.exception() is not None:
+                error = task.exception()
+                if isinstance(error, sqlite3.Error) and not command_failure.done():
+                    command_failure.set_result(error)
                 log.warning('Telegram command task failed; check persistent worker health.')
 
         try:
             while True:
                 try:
-                    updates = await self._api('getUpdates', {
-                        'offset': int(self._get_state('offset', '0')),
+                    updates = await poll_updates({
+                        'offset': int(await self._retry_db(self._transport_state, 'offset', '0')),
                         'timeout': 25, 'allowed_updates': ['message'], 'limit': 20})
                     self.connected = True
-                    self._set_state('last_poll_success', utcnow())
-                    self._set_state('last_error', '')
+                    await self._retry_db(self._transport_states, {'last_poll_success': utcnow(), 'last_error': ''})
+                    received = await self._retry_db(self._receive_batch, updates or [])
                     for update in updates or []:
+                        if update.get('update_id') not in received:
+                            continue
                         # Keep polling and short commands responsive while a
                         # self-hosted CPU model is answering another question.
                         if len(command_tasks) >= MAX_ACTIVE_COMMANDS:
@@ -1432,9 +1681,9 @@ class TelegramBot:
                                           and not message.get('document'))
                             # Do not stop polling behind slow inference/uploads.
                             # Receipt and any busy response remain deduplicated.
-                            await self.process_update(update, overloaded=not responsive)
+                            await self.process_update(update, overloaded=not responsive, received=True)
                             continue
-                        task = asyncio.create_task(self.process_update(update))
+                        task = asyncio.create_task(self.process_update(update, received=True))
                         command_tasks.add(task)
                         task.add_done_callback(command_finished)
                     # Let newly created tasks persist receipt/checkpoint before
@@ -1442,9 +1691,13 @@ class TelegramBot:
                     await asyncio.sleep(0)
                 except asyncio.CancelledError:
                     raise
+                except sqlite3.Error:
+                    # Permanent errors (FULL/READONLY/etc.) remain visible to
+                    # the supervisor. BUSY/LOCKED retry inside _retry_db.
+                    raise
                 except Exception as error:
                     self.connected = False
-                    self._set_state('last_error', 'Telegram polling failed; check bot token, existing webhook and connectivity.')
+                    await self._retry_db(self._transport_states, {'last_error': 'Telegram polling failed; check bot token, existing webhook and connectivity.'})
                     log.warning('Telegram polling failed; retrying without logging credentials.')
                     delay = max(10, error.retry_after or 0) if isinstance(error, TelegramAPIError) else 10
                     await asyncio.sleep(delay)
@@ -1455,11 +1708,7 @@ class TelegramBot:
                 task.cancel()
             for task in list(self._album_tasks):
                 task.cancel()
-            for task in list(self._dataset_refresh_tasks):
-                task.cancel()
-            await asyncio.gather(delivery_task, *command_tasks, *self._album_tasks,
-                                 *self._dataset_refresh_tasks, return_exceptions=True)
-            self._dataset_refresh_tasks.clear()
+            await asyncio.gather(delivery_task, *command_tasks, *self._album_tasks, return_exceptions=True)
             # run() can be restarted on this instance. Do not let a later album
             # fragment attach to a collector cancelled during the previous run.
             self._album_batches.clear()
