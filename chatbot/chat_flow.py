@@ -293,7 +293,11 @@ async def _explain_picks(master, turn, request, progress, generate, discussion, 
             'text':report['reason'], 'entity':report['player'], 'fact_type':'assessment'}]
         card['text'] = ' '.join(f['text'] for f in card['approved_facts'])
         cards.append(card)
-        brief.append({'id':card['id'],'kind':'prop_interpretation','text':_pick_interpretation(report)})
+        interpretation = {'id':card['id'],'kind':'prop_interpretation',
+                          'text':_pick_interpretation(report), 'sample_decision_role':'context_only'}
+        if report.get('data_readiness', {}).get('ready') is False:
+            interpretation['reason_basis'] = 'game_day_verification'
+        brief.append(interpretation)
         assessments.append({'player':report['player'], 'stat':report['stat'],
                             'decision':report['decision'], 'reason':report['reason'],
                             'held_for_data':not report.get('data_readiness', {}).get('ready', True)})

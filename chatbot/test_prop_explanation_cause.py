@@ -71,6 +71,33 @@ class PropExplanationCauseTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(GOOD, result['answer'])
         self.assertIn('actual hold reason', self.payloads[0]['messages'][0]['content'])
 
+    async def test_short_prop_explanation_uses_the_completion_interface(self):
+        from efficient_ai import efficient_generate
+        with patch('efficient_ai.efficient_generate', wraps=efficient_generate) as completion:
+            result = await self.ask([GOOD])
+        completion.assert_awaited_once()
+        self.assertEqual(completion.await_args.args[1]['_transport'], 'generate')
+        self.assertIn(GOOD, result['answer'])
+        self.assertNotIn('ai_failure_category', result)
+        self.network.assert_not_awaited()
+
+    async def test_known_verification_hold_is_explained_without_requesting_more_records(self):
+        result = await self.ask([GOOD])
+        self.assertIn(GOOD, result['answer'])
+        self.assertEqual(self.payloads[0]['format']['properties']['needs_more_data']['enum'], [False])
+        self.assertIn('verification hold is already known', self.payloads[0]['messages'][0]['content'])
+
+    async def test_untyped_legacy_context_does_not_close_the_retrieval_contract(self):
+        self.brief = [{key:value for key,value in item.items() if key != 'reason_basis'}
+                      for item in self.brief]
+        result = await self.ask([GOOD])
+        self.assertIn(GOOD, result['answer'])
+        self.assertNotIn('enum', self.payloads[0]['format']['properties']['needs_more_data'])
+
+    async def test_prior_proposal_metadata_also_keeps_recent_counts_out_of_the_hold_cause(self):
+        brief = [{'kind':'prop_interpretation', 'sample_decision_role':'context_only'}]
+        self.assertTrue(app._unsupported_sample_hold_reason(SAMPLE_CAUSE, brief))
+
     async def test_descriptions_negated_causes_and_conditional_mechanisms_remain_valid(self):
         for text in (
             GOOD,
