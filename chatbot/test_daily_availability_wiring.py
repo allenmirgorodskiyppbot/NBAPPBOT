@@ -108,7 +108,13 @@ class AvailabilityWiringTests(unittest.IsolatedAsyncioTestCase):
 
 class DailyWorkflowTests(unittest.TestCase):
     def setUp(self):
-        self.workflow=Path(__file__).with_name('nba-daily-data.yml').read_text()
+        root=Path(__file__).resolve().parent
+        # The managed editing workspace is flat; GitHub stores this file in
+        # the repository's workflow directory beside chatbot/.
+        source=root/'nba-daily-data.yml'
+        if not source.is_file():
+            source=root.parent/'.github'/'workflows'/'nba-daily-data.yml'
+        self.workflow=source.read_text()
 
     def test_required_collectors_trigger_workflow_and_dependency_stays_collector_only(self):
         for module in ('tracking_publications','historical_matchup_refresh','structured_availability','official_injury_pdf'):
@@ -118,29 +124,34 @@ class DailyWorkflowTests(unittest.TestCase):
         self.assertNotIn('pypdf',Path(__file__).with_name('requirements.txt').read_text())
         self.assertIn("cron: '15 0-3,15-23 * * *'",self.workflow)
 
-    def test_cache_is_outside_git_added_live_tree_and_publish_behavior_is_preserved(self):
+    def test_verified_source_cache_is_excluded_from_the_scoped_public_publisher(self):
         self.assertIn('uses: actions/cache@v4',self.workflow)
         self.assertIn('path: data/.nba-tracking-cache',self.workflow)
         self.assertIn('steps.source-cache-date.outputs.day',self.workflow)
         self.assertIn("hashFiles('chatbot/historical_matchup_refresh.py', 'chatbot/tracking_publications.py')",self.workflow)
         self.assertIn('nba-tracking-v1-${{ runner.os }}-',self.workflow)
         self.assertIn('python chatbot/nba_daily_export.py --output data/live --days 7',self.workflow)
-        publish=self.workflow.split('      - name: Publish changed dataset inputs',1)[1]
-        self.assertIn('git pull --rebase origin main',publish)
-        self.assertIn('git push origin HEAD:main',publish)
-        prefix=publish.split('        run: |\n',1)[1].split('          if git diff',1)[0]
-        script='\n'.join(line[10:] for line in prefix.splitlines())
+        publish=self.workflow
+        self.assertIn('python chatbot/publish_public_data.py --mode daily',publish)
+        self.assertIn('GITHUB_TOKEN: ${{ github.token }}',publish)
+        self.assertIn('GITHUB_REPOSITORY: ${{ github.repository }}',publish)
+        from publish_public_data import inspect_changes
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
             subprocess.run(['git','init','-q',directory],check=True,capture_output=True)
+            subprocess.run(['git','-c','user.name=Fixture','-c','user.email=fixture@example.invalid',
+                            'commit','--allow-empty','-qm','Isolated publication fixture'],
+                           cwd=root,check=True,capture_output=True)
             live=root/'data'/'live';live.mkdir(parents=True)
             (live/'availability_collection_status.json').write_text('{"phase":"checked"}\n')
             cache=root/'data'/'.nba-tracking-cache';cache.mkdir()
             (cache/'game_matchups_2018.parquet').write_bytes(b'private source cache')
-            subprocess.run(['bash','-e','-c',script],cwd=root,check=True,capture_output=True)
-            staged=subprocess.run(['git','diff','--cached','--name-only'],cwd=root,
-                check=True,capture_output=True,text=True).stdout.splitlines()
-            self.assertEqual(staged,['data/live/availability_collection_status.json'])
+            (live/'private_notes.txt').write_text('Not a public source artifact')
+            checkout,changes=inspect_changes(root,'daily')
+            self.assertEqual(len(checkout),40)
+            self.assertEqual([change.path for change in changes],
+                             ['data/live/availability_collection_status.json'])
+
 
 
 if __name__=='__main__':
