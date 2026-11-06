@@ -1054,7 +1054,7 @@
   "published_unassigned_regular_slots": 0,
   "regular_season_games_per_team": 82,
   "regular_season_total": 82,
-  "retrieved_at": "2026-11-06T17:54:23.986448+00:00",
+  "retrieved_at": "2026-11-06T19:00:06.301463+00:00",
   "revision": "230acab5a27ad5cc33f5ef886ff484e1623d1f3a602b7800ba96d1e584c1b073",
   "schema_version": 1,
   "scope": "Published NYK regular-season fixture inventory only. Other NBA teams appear as Knicks opponents. It never verifies live event timing, final results, player participation or current availability.",
