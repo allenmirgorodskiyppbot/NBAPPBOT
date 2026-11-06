@@ -1,11 +1,11 @@
 {
-  "attempted_at": "2026-11-06T03:59:28.640185+00:00",
+  "attempted_at": "2026-11-06T15:56:53.086332+00:00",
   "phase": "checked",
   "schema_version": 1,
   "scope": "Collector health only; successful collection does not establish complete current player availability.",
   "sources": {
     "official_pdf": {
-      "attempted_at": "2026-11-06T03:59:28.640185+00:00",
+      "attempted_at": "2026-11-06T15:56:53.086332+00:00",
       "error_type": "ReadTimeout",
       "http_status": null,
       "index_url": "https://official.nba.com/nba-injury-report-2026-27-season/",
@@ -17,32 +17,32 @@
     "structured_extracts": {
       "coverage": [
         {
-          "distinct_records": 30048,
-          "game_dates_represented_through": "2026-11-06",
-          "report_clock_unknown": 1098,
-          "report_data_through_date": "2026-11-05",
-          "source_content_sha256": "76b15fd1a49a082fa809913bfd8b43eed96e1a1b5bf672949f1b5e26000b757a",
+          "distinct_records": 31169,
+          "game_dates_represented_through": "2026-11-07",
+          "report_clock_unknown": 1201,
+          "report_data_through_date": "2026-11-06",
+          "source_content_sha256": "6e33bd45532201062a1ff5d5ba37a968ca3902ffbda4579bed2185d3d9d43f6d",
           "source_kind": "official_extract",
-          "source_published_at": "2026-11-05T15:13:29+00:00",
-          "source_rows": 30048,
+          "source_published_at": "2026-11-06T14:49:29+00:00",
+          "source_rows": 31169,
           "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_injury_report/injury_report_2027.parquet",
           "status": "collected"
         },
         {
-          "distinct_records": 3110,
+          "distinct_records": 3023,
           "game_dates_represented_through": null,
-          "report_clock_unknown": 3110,
+          "report_clock_unknown": 3023,
           "report_data_through_date": "2026-11-05",
           "source_content_sha256": "39238c5c6dce51fbf110e902e982b1cb2b7adfd36fa0ab12d7596766e2701de2",
           "source_kind": "espn_injury_snapshot",
           "source_published_at": "2026-11-05T20:32:21+00:00",
-          "source_rows": 3110,
+          "source_rows": 3023,
           "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_injuries/injuries_2027.parquet",
           "status": "collected"
         }
       ],
       "note": "Structured source evidence; collection success does not establish complete current official availability.",
-      "records": 33158,
+      "records": 34192,
       "status": "updated"
     }
   }
