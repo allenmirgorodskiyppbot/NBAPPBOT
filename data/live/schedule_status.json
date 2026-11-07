@@ -1,10 +1,10 @@
 {
-  "attempted_at": "2026-11-07T04:10:43.845424+00:00",
+  "attempted_at": "2026-11-07T05:02:32.792818+00:00",
   "attempts": [
     {
       "error_type": "HTTPStatusError",
       "http_status": 403,
-      "source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261106"
+      "source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261107"
     },
     {
       "error_type": "ReadTimeout",
@@ -12,8 +12,8 @@
       "source": "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
     }
   ],
-  "date": "2026-11-06",
-  "next_retry_at": "2026-11-07T04:20:43.845424+00:00",
+  "date": "2026-11-07",
+  "next_retry_at": "2026-11-07T05:12:32.792818+00:00",
   "next_retry_is_estimate": true,
   "note": "No source was verified. Any prior event relay is retained with its original timestamp.",
   "retry_interval_seconds": 600,
