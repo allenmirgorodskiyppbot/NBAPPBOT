@@ -1,13 +1,13 @@
 {
-  "attempted_at": "2026-11-07T03:56:51.207599+00:00",
-  "manifest_sha256": "f3bc2e202eedff5dea52028d2c6eedbc067434f02d61fa94cfb71ed3c5737225",
-  "observations": 171384,
+  "attempted_at": "2026-11-07T15:46:30.220315+00:00",
+  "manifest_sha256": "1ad61a60c5b08340ae276835287be1c1c92a83eaf963f86e720a6c521ba6cc95",
+  "observations": 172236,
   "parts": 21,
-  "players": 489,
+  "players": 493,
   "rejected_games": 107,
-  "requested_participants": 490,
+  "requested_participants": 494,
   "scope": "Career-history collection only; not current-game readiness.",
-  "source_data_through_date": "2026-11-05",
-  "status": "unchanged",
+  "source_data_through_date": "2026-11-06",
+  "status": "updated",
   "unresolved_targets": []
 }
