@@ -1,0 +1,399 @@
+{
+  "source_ref": "bc8a593317512379648f01c36e0620858c390729",
+  "root_cause": "An incorrect IND @ DEN matchup header conflicts with Indiana being the home team in the NBA calendar and ESPN box. Whole-day validation correctly failed; unaffected team coverage is now checked separately.",
+  "source_diagnostic": {
+    "source_metadata": [
+      {
+        "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
+        "source_content_sha256": "b99cef88e2b5024b55d453b2e40ed7b865bb29c5c499c4186d7031e3e88fb587",
+        "source_published_at": "2026-11-07T15:15:49+00:00"
+      },
+      {
+        "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
+        "source_content_sha256": "da8e3f1b9d0c1648c290f9187a40176042d0c459f389c212944b0978444164ff",
+        "source_published_at": "2026-11-08T14:08:25+00:00"
+      }
+    ],
+    "error": {
+      "type": "ValueError",
+      "message": "NBA result participant, ID or home/away header conflicts with the calendar."
+    },
+    "calendar_count": 7,
+    "results_count": 14,
+    "snapshot_count": 7,
+    "snapshot_games": [
+      {
+        "id": "nba:2026-11-07:DEN:IND",
+        "home_team": "IND",
+        "away_team": "DEN",
+        "home_score": 102,
+        "away_score": 114
+      },
+      {
+        "id": "nba:2026-11-07:ATL:BKN",
+        "home_team": "ATL",
+        "away_team": "BKN",
+        "home_score": 124,
+        "away_score": 121
+      },
+      {
+        "id": "nba:2026-11-07:CLE:NYK",
+        "home_team": "CLE",
+        "away_team": "NYK",
+        "home_score": 97,
+        "away_score": 109
+      },
+      {
+        "id": "nba:2026-11-07:OKC:WAS",
+        "home_team": "OKC",
+        "away_team": "WAS",
+        "home_score": 114,
+        "away_score": 75
+      },
+      {
+        "id": "nba:2026-11-07:GSW:ORL",
+        "home_team": "GSW",
+        "away_team": "ORL",
+        "home_score": 126,
+        "away_score": 119
+      },
+      {
+        "id": "nba:2026-11-07:HOU:PHX",
+        "home_team": "PHX",
+        "away_team": "HOU",
+        "home_score": 102,
+        "away_score": 99
+      },
+      {
+        "id": "nba:2026-11-07:POR:SAS",
+        "home_team": "POR",
+        "away_team": "SAS",
+        "home_score": 103,
+        "away_score": 125
+      }
+    ]
+  },
+  "historical_verification": {
+    "date": "2026-11-07",
+    "global_inventory_verified": false,
+    "certified_teams": [
+      "ATL",
+      "BKN",
+      "BOS",
+      "CHA",
+      "CHI",
+      "CLE",
+      "DAL",
+      "DET",
+      "GSW",
+      "HOU",
+      "LAC",
+      "LAL",
+      "MEM",
+      "MIA",
+      "MIL",
+      "MIN",
+      "NOP",
+      "NYK",
+      "OKC",
+      "ORL",
+      "PHI",
+      "PHX",
+      "POR",
+      "SAC",
+      "SAS",
+      "TOR",
+      "UTA",
+      "WAS"
+    ],
+    "excluded_teams": [
+      "DEN",
+      "IND"
+    ],
+    "conflicting_games": [
+      "nba:2026-11-07:DEN:IND"
+    ],
+    "original_statistics_and_publication_clocks_unchanged": true
+  },
+  "actual_master_pipeline": {
+    "scope": "Actual public inputs and actual cached historical master on a disposable clone. Not the live Akash store, not live timing or availability verification.",
+    "checked_at": "2026-11-08T17:16:39.931073+00:00",
+    "source_files": [
+      {
+        "name": "existing_dataset_scope.json",
+        "url": "https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/cac3c31edff85569b02f20c1b498d9d4e96d1ddc/data/live/existing_dataset_scope.json",
+        "sha256": "465ab0f1f6b66dad87e4d4dc5f85f7685c461a3cefdeeff5be018cfb9f6ebc18"
+      },
+      {
+        "name": "season_schedule.json",
+        "url": "https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/cac3c31edff85569b02f20c1b498d9d4e96d1ddc/data/live/season_schedule.json",
+        "sha256": "dcfb5cc3882244b8cea653c0cb3aa4613f080b378969d19e86ffae66672db8ac"
+      },
+      {
+        "name": "2026-11-05.json",
+        "url": "https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/cac3c31edff85569b02f20c1b498d9d4e96d1ddc/data/live/2026-11-05.json",
+        "sha256": "08235c7f6ac4d23a64aa008a164e9d5fa9c1e9d6c55279b7442febcd29a0d5d7"
+      },
+      {
+        "name": "2026-11-06.json",
+        "url": "https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/cac3c31edff85569b02f20c1b498d9d4e96d1ddc/data/live/2026-11-06.json",
+        "sha256": "cc1cf8233865ed34a7c146b312ae393d47933bde65170825b555c282e48f8ee1"
+      }
+    ],
+    "original_master_sha256": "8c85613789322281ad1378d5df3e67a700f0899c3ddde6e63db4fe1e2f8ca644",
+    "original_master_unchanged": true,
+    "next_game": {
+      "id": "nba:2026-11-10:MIL:NYK",
+      "season": "2026-27",
+      "date": "2026-11-10",
+      "home_team": "NYK",
+      "away_team": "MIL",
+      "start_time": "2026-11-11T00:30:00+00:00",
+      "status": "scheduled",
+      "source": "https://www.nba.com/team/1610612752/schedule",
+      "source_asof": "2026-10-29",
+      "source_kind": "saved_publication",
+      "checked_at": "2026-10-30T02:50:42.257269+00:00",
+      "payload_json": "{\"away_team\":\"MIL\",\"date\":\"2026-11-10\",\"fixture_provenance\":{\"source\":\"https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet\",\"source_content_sha256\":\"b99cef88e2b5024b55d453b2e40ed7b865bb29c5c499c4186d7031e3e88fb587\",\"source_published_at\":\"2026-11-07T15:15:49+00:00\"},\"home_team\":\"NYK\",\"id\":\"nba:2026-11-10:MIL:NYK\",\"original_calendar_payload\":{\"away_team\":\"MIL\",\"date\":\"2026-11-10\",\"home_team\":\"NYK\",\"id\":\"nba:2026-11-10:MIL:NYK\",\"notes\":\"\",\"season\":\"2026-27\",\"season_type\":\"Regular Season\",\"source\":\"https://www.nba.com/team/1610612752/schedule\",\"source_asof\":\"2026-10-29\",\"source_row\":186,\"start_time\":\"2026-11-11T00:30:00+00:00\",\"status\":\"scheduled\"},\"preserved_tipoff_provenance\":{\"checked_at\":\"2026-10-30T02:50:42.257269+00:00\",\"source\":\"https://www.nba.com/team/1610612752/schedule\",\"source_asof\":\"2026-10-29\",\"start_time\":\"2026-11-11T00:30:00+00:00\"},\"provider_game_id\":\"0022600211\",\"season\":\"2026-27\",\"season_type\":\"Regular Season\",\"source\":\"https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet\",\"source_asof\":\"2026-11-07\",\"start_time\":null,\"status\":\"time_tbd\"}"
+    },
+    "supported_count": 4,
+    "picks": [
+      {
+        "player": "Karl-Anthony Towns",
+        "player_id": "name:karlanthonytowns",
+        "team": "NYK",
+        "opponent": "MIL",
+        "stat": "pra",
+        "targets": {
+          "more_at_or_below": 30.5,
+          "less_at_or_above": 42.5,
+          "buffer": 5.49,
+          "method": "At least 0.5, 15% of the mean, or 25% of the observed p10–p90 spread; mean and median must agree, rounded outward to half points. Heuristic research rule, not a proven edge."
+        },
+        "reason": "Same-team mean of 20 games through 2026-11-07; recent workload 31.4 minutes (context only). MIL: 1 comparable games; no matchup adjustment. Mixed-season sample.",
+        "availability": {
+          "blocked": false,
+          "note": null,
+          "reports": [],
+          "official_designation": {
+            "known": false,
+            "player": "Karl-Anthony Towns",
+            "game_date": "2026-11-10",
+            "status": null,
+            "blocked": false,
+            "confirmed_starter": null,
+            "expected_minutes": null,
+            "minutes_restriction": null,
+            "reason": "No fresh official game-specific designation with an exact report time is saved."
+          },
+          "official_designation_known": false,
+          "confirmed_starter": null,
+          "expected_minutes": null,
+          "minutes_restriction": null
+        },
+        "research_only": true,
+        "statistics_verified": true,
+        "timing_verified": false,
+        "live_verified": false,
+        "caution": null,
+        "projection": {
+          "n": 20,
+          "reference_projection": 36.6,
+          "baseline_median": 36.5,
+          "last_date": "2026-11-07",
+          "seasons": [
+            "2025-26",
+            "2026-27"
+          ],
+          "method": "same-team-mean20-v1"
+        }
+      },
+      {
+        "player": "Jalen Brunson",
+        "player_id": "name:jalenbrunson",
+        "team": "NYK",
+        "opponent": "MIL",
+        "stat": "fga",
+        "targets": {
+          "more_at_or_below": 15.5,
+          "less_at_or_above": 23.5,
+          "buffer": 2.992,
+          "method": "At least 0.5, 15% of the mean, or 25% of the observed p10–p90 spread; mean and median must agree, rounded outward to half points. Heuristic research rule, not a proven edge."
+        },
+        "reason": "Same-team mean of 20 games through 2026-11-07; recent workload 33.1 minutes (context only). MIL: 1 comparable games; no matchup adjustment. Mixed-season sample.",
+        "availability": {
+          "blocked": false,
+          "note": null,
+          "reports": [],
+          "official_designation": {
+            "known": false,
+            "player": "Jalen Brunson",
+            "game_date": "2026-11-10",
+            "status": null,
+            "blocked": false,
+            "confirmed_starter": null,
+            "expected_minutes": null,
+            "minutes_restriction": null,
+            "reason": "No fresh official game-specific designation with an exact report time is saved."
+          },
+          "official_designation_known": false,
+          "confirmed_starter": null,
+          "expected_minutes": null,
+          "minutes_restriction": null
+        },
+        "research_only": true,
+        "statistics_verified": true,
+        "timing_verified": false,
+        "live_verified": false,
+        "caution": null,
+        "projection": {
+          "n": 20,
+          "reference_projection": 19.95,
+          "baseline_median": 19,
+          "last_date": "2026-11-07",
+          "seasons": [
+            "2025-26",
+            "2026-27"
+          ],
+          "method": "same-team-mean20-v1"
+        }
+      },
+      {
+        "player": "OG Anunoby",
+        "player_id": "name:oganunoby",
+        "team": "NYK",
+        "opponent": "MIL",
+        "stat": "fga",
+        "targets": {
+          "more_at_or_below": 8.5,
+          "less_at_or_above": 13.5,
+          "buffer": 1.8,
+          "method": "At least 0.5, 15% of the mean, or 25% of the observed p10–p90 spread; mean and median must agree, rounded outward to half points. Heuristic research rule, not a proven edge."
+        },
+        "reason": "Same-team mean of 20 games through 2026-11-07; recent workload 32.1 minutes (context only). MIL: 1 comparable games; no matchup adjustment. Mixed-season sample.",
+        "availability": {
+          "blocked": false,
+          "note": null,
+          "reports": [],
+          "official_designation": {
+            "known": false,
+            "player": "OG Anunoby",
+            "game_date": "2026-11-10",
+            "status": null,
+            "blocked": false,
+            "confirmed_starter": null,
+            "expected_minutes": null,
+            "minutes_restriction": null,
+            "reason": "No fresh official game-specific designation with an exact report time is saved."
+          },
+          "official_designation_known": false,
+          "confirmed_starter": null,
+          "expected_minutes": null,
+          "minutes_restriction": null
+        },
+        "research_only": true,
+        "statistics_verified": true,
+        "timing_verified": false,
+        "live_verified": false,
+        "caution": null,
+        "projection": {
+          "n": 20,
+          "reference_projection": 11.6,
+          "baseline_median": 11,
+          "last_date": "2026-11-07",
+          "seasons": [
+            "2025-26",
+            "2026-27"
+          ],
+          "method": "same-team-mean20-v1"
+        }
+      },
+      {
+        "player": "Myles Turner",
+        "player_id": "name:mylesturner",
+        "team": "MIL",
+        "opponent": "NYK",
+        "stat": "pra",
+        "targets": {
+          "more_at_or_below": 11.5,
+          "less_at_or_above": 21.5,
+          "buffer": 3.9,
+          "method": "At least 0.5, 15% of the mean, or 25% of the observed p10–p90 spread; mean and median must agree, rounded outward to half points. Heuristic research rule, not a proven edge."
+        },
+        "reason": "Same-team mean of 20 games through 2026-11-06; recent workload 27.6 minutes (context only). NYK: 1 comparable games; no matchup adjustment. Mixed-season sample.",
+        "availability": {
+          "blocked": false,
+          "note": null,
+          "reports": [],
+          "official_designation": {
+            "known": false,
+            "player": "Myles Turner",
+            "game_date": "2026-11-10",
+            "status": null,
+            "blocked": false,
+            "confirmed_starter": null,
+            "expected_minutes": null,
+            "minutes_restriction": null,
+            "reason": "No fresh official game-specific designation with an exact report time is saved."
+          },
+          "official_designation_known": false,
+          "confirmed_starter": null,
+          "expected_minutes": null,
+          "minutes_restriction": null
+        },
+        "research_only": true,
+        "statistics_verified": true,
+        "timing_verified": false,
+        "live_verified": false,
+        "caution": null,
+        "projection": {
+          "n": 20,
+          "reference_projection": 15.5,
+          "baseline_median": 17,
+          "last_date": "2026-11-06",
+          "seasons": [
+            "2025-26",
+            "2026-27"
+          ],
+          "method": "same-team-mean20-v1"
+        }
+      }
+    ],
+    "statistics_verified": true,
+    "timing_verified": false,
+    "live_verified": false,
+    "elapsed_seconds": 9.367
+  },
+  "cached_request_timing": {
+    "scope": "Actual cached master clone read-only second request; no network/import/OCR/model/Telegram delivery.",
+    "seconds": 3.654,
+    "game": "nba:2026-11-10:MIL:NYK",
+    "picks": 4,
+    "teams": [
+      "MIL",
+      "NYK"
+    ],
+    "statistics_verified": true,
+    "live_verified": false
+  },
+  "focused_tests": {
+    "passed": 43,
+    "seconds": 7.714
+  },
+  "nightly_tests": {
+    "passed": 40,
+    "seconds": 4.896
+  },
+  "live_akash_deployment_verified": false,
+  "project_preferences_saved": "AGENTS.md; no cross-chat account memory update is asserted.",
+  "full_regression_tests": {
+    "source_ref": "bc8a593317512379648f01c36e0620858c390729",
+    "run": 42504231477,
+    "job": 128803291481,
+    "passed": 1719,
+    "failed": 0,
+    "seconds": 187.758,
+    "conclusion": "success",
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42504231477"
+  }
+}

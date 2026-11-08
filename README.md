@@ -6,15 +6,23 @@ and can compare those with user-supplied PrizePicks lines. The chat model
 runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
-## November 8 uploaded research and response update
+## November 8 team lookup and inventory repair
 
-Tested application `SOURCE_REF`: `391ed33e7529a9bb465546d43fb8dc978f79f26a`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42498397119)
-passed all **1,687 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `bc8a593317512379648f01c36e0620858c390729`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42504231477)
+passed all **1,719 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
 The [master/schedule/reminder validation report](data/reports/2026-11-07/master_schedule_reminder_validation.json) records the Nov7 live schedule recovery, four-comparison master-data controls and ninety-minute reminder integration tests.
+
+The [team lookup and inventory validation report](data/reports/2026-11-08/team_inventory_validation.json) records the actual Nov. 7 source conflict, a complete lookup/import/projection check on a disposable copy of the real master, and the cached request timing.
+
+`/picks` automatically selects the next saved Knicks matchup and loads those two teams from the master. It reads recent roster records and returns saved research without waiting for a network refresh. Regular workers and `/refresh` own updates. The owner's standing review preferences are saved in [AGENTS.md](AGENTS.md).
+
+Historical game coverage is now verified separately for each team. An incorrect Indiana–Denver home/away header on Nov. 7 no longer blocks valid Knicks coverage or Milwaukee's verified rest day. The original conflicting row and whole-day unverified status remain intact. Team certificates retain exact game IDs, three public source records, checksums and publication clocks. The refresh queue includes uncovered intervening dates for both matchup teams while retaining its bounded batches and retry intervals.
+
+When current completeness is still unverified, supported saved-master targets remain visible with their sample dates and an explicit coverage warning. These historical comparisons do not become qualified current picks. Known-out players, missing current player metrics, invalid events and unsupported samples remain excluded.
 
 The [uploaded research validation report](data/reports/2026-11-08/uploaded_research_validation.json) records the timing-only regression, research exclusions and local projection benchmark. Controlled replay observations are synthetic and do not assert current NBA data or betting performance.
 
@@ -801,4 +809,5 @@ execution environments and is not installed in the deployed chatbot.
 Runtime Python packages, including web-framework transitive dependencies, are pinned
 to the same tested versions. Download cleanup tests cover both ASGI disconnect
 events and send failures using valid protocol messages.
+
 
