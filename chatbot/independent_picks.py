@@ -243,8 +243,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     return result
 
 
-def format_independent_picks(report, compact=False):
-    limit = 950 if compact else 1800
+def format_independent_picks(report, compact=False, *, max_chars=None):
+    limit = (950 if compact else 1800) if max_chars is None else max_chars
+    if type(limit) is not int or not 800 <= limit <= 3500:
+        raise ValueError('The projection reply budget must be between 800 and 3500 characters.')
     game = report.get('game')
     if not game:
         return 'Independent picks: ' + str(report.get('note') or 'No supported upcoming game is available.')

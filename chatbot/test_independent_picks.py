@@ -211,6 +211,20 @@ class IndependentPickTests(unittest.TestCase):
             self.assertIn('Less if line',text)
             self.assertIn('no entry recorded',text)
 
+    def test_combined_reply_budget_keeps_four_complete_master_targets(self):
+        self.four_players()
+        report=build_independent_picks(self.store, DATE, now=NOW)
+        for pick in report['picks']:
+            pick['caution']='Verify current playing clearance and minutes before comparing these targets.'
+        text=format_independent_picks(report,compact=True,max_chars=1400)
+        self.assertLessEqual(len(text),1400)
+        for number in range(1,5):
+            self.assertIn(str(number)+'. ',text)
+        self.assertEqual(text.count('More if line'),4)
+        self.assertEqual(text.count('Less if line'),4)
+        self.assertIn('not quoted PrizePicks offers',text)
+        self.assertTrue(text.endswith('no entry recorded.'))
+
     def test_invalid_date_count_do_not_change_records(self):
         before=self.table_counts()
         with self.assertRaises(ValueError):build_independent_picks(self.store,'2026-99-99',now=NOW)

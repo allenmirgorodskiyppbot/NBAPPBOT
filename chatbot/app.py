@@ -676,7 +676,7 @@ app = FastAPI(title='Knicks Research Chat', lifespan=lifespan,
 
 class Message(BaseModel):
     role: Literal['user', 'assistant']
-    content: str = Field(min_length=1, max_length=4000)
+    content: str = Field(min_length=1, max_length=6500)
 
 
 class ChatRequest(BaseModel):

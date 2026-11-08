@@ -211,7 +211,7 @@ def render_digest(store, game, now, schedule_checked, refresh_ok, *, board_owner
     try:
         from independent_picks import build_independent_picks, format_independent_picks
         projection_report = build_independent_picks(store, date=tip.date().isoformat(), count=4, team='NYK', now=now)
-        projection_text = format_independent_picks(projection_report, compact=True)
+        projection_text = format_independent_picks(projection_report, compact=True, max_chars=1400)
     except Exception:
         # A research error must not suppress the one scheduled injury briefing.
         projection_text = 'Independent projections are temporarily unavailable. /picks can retry; no picks were invented.'

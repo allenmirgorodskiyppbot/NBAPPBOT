@@ -676,6 +676,52 @@ def enrich_shortlist(store, report, now=None, *, count=4, constraints=None):
                       if adjusted_offers else [])}
 
 
+def build_master_targets(store, report, now=None, *, count=4, constraints=None):
+    """Calculate independent targets for this board's one exact saved game.
+
+    Uploaded thresholds and offered sides never enter the independent builder.
+    Resolving an invalid board must not silently select the next Knicks game.
+    """
+    now = _now(now)
+    _, coverage = select_lineup([], count, constraints=constraints)
+    original = list(report.get('original_legs') or
+                    [item.get('leg', {}) for item in report.get('legs', [])])
+
+    def held(note):
+        return {'mode': 'independent_projections', 'generated_at': now.isoformat(),
+                'requested_count': count, 'requires_prizepicks_comparison': True,
+                'source_kind': 'saved statistics and schedule', 'picks': [], 'held': [],
+                'evaluated_candidates': [], 'game': None, 'game_date': None, 'note': note,
+                'research_only': True, 'uploaded_offers_used': False,
+                'source_board_id': report.get('board_id'), **coverage,
+                'limits': ['Calculated targets are research thresholds, not current PrizePicks offers.',
+                           'Current game, statistics and availability checks still apply. No entry is recorded.']}
+
+    if not original:
+        return held('No readable uploaded offer identifies a saved game for independent targets.')
+    events = {}
+    for leg in original:
+        context, issue = _event(store, leg, now)
+        team = canonical_team(leg.get('team'))
+        if issue or team not in TEAM_WORDS or not context.get('game_id') or not context.get('date'):
+            return held('Independent targets require the exact saved pregame matchup from the uploads. '
+                        + str(issue or 'The uploaded team or event is unresolved.'))
+        events.setdefault(context['game_id'], (context['date'], team))
+    if len(events) != 1:
+        return held('Uploads reference more than one game; independent targets need one exact matchup.')
+    event_id, (date, team) = next(iter(events.items()))
+    from independent_picks import build_independent_picks
+    result = build_independent_picks(store, date=date, count=count, team=team, now=now,
+                                     constraints=constraints)
+    game = result.get('game') or {}
+    if game.get('id') != event_id or game.get('date') != date:
+        return held('Independent targets could not be matched to the exact uploaded game. '
+                    + str(result.get('note') or 'No matching current event was returned.'))
+    return {**result, 'resolved_game_id': event_id, 'source_board_id': report.get('board_id'),
+            'uploaded_offers_used': False,
+            'target_scope': 'Independent master-data calculation for the exact uploaded matchup.'}
+
+
 def format_shortlist(data):
     """Keep the decision, its reason, and next request in one Telegram message."""
     picks = data.get('shortlist', [])

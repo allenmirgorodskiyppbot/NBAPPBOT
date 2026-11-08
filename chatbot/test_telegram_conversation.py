@@ -157,6 +157,48 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(enrich.call_args.kwargs['constraints']['pick_count'], expected)
         self.assertEqual(self.financial_counts(), before)
 
+    async def test_upload_reply_contains_offered_picks_and_separate_own_master_targets(self):
+        items = [candidate('Jalen Brunson'), candidate('Josh Hart'),
+                 candidate('Tyrese Maxey', team='PHI'), candidate('Joel Embiid', team='PHI')]
+        board = self.store.create_board([item['leg'] for item in items], source='combined reply fixture')
+        analysis = {**report(*items), 'board_id':board['id']}
+        before = self.financial_counts()
+        with patch('board_shortlist._now', return_value=NOW):
+            text = await self.bot._shortlist_reply(analysis, USER_ID)
+        self.assertIn('From your uploaded lines', text)
+        self.assertIn('My own calculated targets from your master', text)
+        self.assertTrue(text.startswith('Game date: '+DAY+' Eastern.'))
+        first, second = text.split('My own calculated targets from your master', 1)
+        self.assertEqual(first.count('More 19.5 points'), 4)
+        self.assertIn('not quoted PrizePicks offers', second)
+        self.assertEqual(second.count('More if line'), 4)
+        self.assertEqual(second.count('Less if line'), 4)
+        self.assertEqual(self.financial_counts(), before)
+
+    async def test_archive_failure_keeps_both_read_only_results_visible(self):
+        items = [candidate('Jalen Brunson'), candidate('Tyrese Maxey', team='PHI')]
+        board = self.store.create_board([item['leg'] for item in items], source='archive contention fixture')
+        analysis = {**report(*items), 'board_id':board['id']}
+        before = self.financial_counts()
+        with patch('board_shortlist._now', return_value=NOW), \
+             patch('pregame_archive.record_research', side_effect=RuntimeError('synthetic archive interruption')):
+            text = await self.bot._shortlist_reply(analysis, USER_ID)
+        self.assertIn('From your uploaded lines', text)
+        self.assertIn('My own calculated targets from your master', text)
+        self.assertIn('Research history could not be saved', text)
+        self.assertEqual(self.financial_counts(), before)
+
+    async def test_combined_reply_memory_preserves_tail_without_expanding_model_prompt(self):
+        answer = 'Saved analysis. ' * 290 + '\nMy own calculated targets from your master\n4. Joel Embiid rebounds: 10\nMore if line ≤8.5; Less if line ≥12.5.'
+        self.assertGreater(len(answer),4000)
+        self.bot._remember(USER_ID, 99, 'Compare both groups.')
+        self.bot._remember(USER_ID, 99, 'Compare both groups.', answer)
+        saved = self.bot._conversation(USER_ID)[-1]['content']
+        self.assertTrue(saved.endswith('Less if line ≥12.5.'))
+        import app
+        request = app.ChatRequest(message='Why the last target?', history=self.bot._conversation(USER_ID))
+        self.assertEqual(request.history[-1].content, saved)
+
     async def test_picks_reuses_count_unless_current_request_changes_it(self):
         await self.bot.process_update(update(60, 'I need three picks from both teams.'))
         counts = []
@@ -181,7 +223,7 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
         history = self.bot._conversation(USER_ID)
         self.assertIn('PrizePicks board saved:', history[1]['content'])
         self.assertIn('More 19.5 points', history[-1]['content'])
-        turn = resolve_conversation(None, self.store, 'Why Brunson?', history, now=NOW)
+        turn = resolve_conversation(None, self.store, 'Why Brunson points from my screenshots?', history, now=NOW)
         self.assertTrue(turn['complete_prop'])
         self.assertEqual((turn['slots']['player'], turn['slots']['stat'], turn['slots']['line']),
                          ('Jalen Brunson', 'pts', 19.5))
@@ -201,7 +243,7 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
         history = self.bot._conversation(USER_ID)
         self.assertIn('Read 1 distinct lines', history[-1]['content'])
         self.assertNotIn('SYNTHETIC RAW TEXT', history[-1]['content'])
-        await self.bot.process_update(update(41, 'Why Brunson?'))
+        await self.bot.process_update(update(41, 'Why Brunson points from my screenshots?'))
         text, passed_history = self.received[-1]
         turn = resolve_conversation(None, self.store, text, passed_history, now=NOW)
         self.assertTrue(turn['complete_prop'])

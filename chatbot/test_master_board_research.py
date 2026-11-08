@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from analysis_engine import analyze_board
-from board_shortlist import enrich_shortlist, format_shortlist
+from board_shortlist import enrich_shortlist, format_shortlist, build_master_targets
 import test_board_shortlist as fixtures
 
 NOW = fixtures.NOW
@@ -128,6 +128,87 @@ class MasterBoardResearchTests(unittest.TestCase):
             self.assertFalse(row['approved_for_entry'])
             self.assertEqual(row['mean'], 21.5)
         self.assertIn('actual offers needed', format_shortlist(data))
+
+
+class MasterTargetTests(unittest.TestCase):
+    observations = fixtures.ShortlistTests.observations
+
+    def setUp(self):
+        fixtures.ShortlistTests.setUp(self)
+        patcher = patch('independent_picks.assess_pregame_freshness', return_value={
+            'ready': True, 'reasons': [],
+            'current_player_stat_coverage': ['pts', 'reb', 'ast', 'pra', 'fga']})
+        patcher.start(); self.addCleanup(patcher.stop)
+        for player, team in [('Jalen Brunson', 'NYK'), ('Josh Hart', 'NYK'),
+                             ('Tyrese Maxey', 'PHI'), ('Joel Embiid', 'PHI')]:
+            self.observations(player, team)
+        board = self.store.create_board([candidate()['leg'], candidate('Tyrese Maxey', team='PHI')['leg']])
+        self.report = {'board_id': board['id'], 'original_legs': copy.deepcopy(board['legs'])}
+
+    def test_independent_targets_use_actual_master_math_and_include_players_outside_uploads(self):
+        before = copy.deepcopy(self.report)
+        with self.store.connect() as db:
+            counts = {table: db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0]
+                      for table in ('boards', 'entries', 'player_games', 'games', 'checkpoints')}
+        result = build_master_targets(self.store, self.report, NOW, constraints={'preferred_stat': 'pts'})
+        self.assertEqual(len(result['picks']), 4)
+        self.assertTrue(result['lineup_complete'])
+        self.assertEqual(result['resolved_game_id'], 'nba:2026-10-30:NYK:PHI')
+        self.assertEqual({row['team'] for row in result['picks']}, {'NYK', 'PHI'})
+        self.assertTrue({'Josh Hart', 'Joel Embiid'} <= {row['player'] for row in result['picks']})
+        self.assertFalse(result['uploaded_offers_used'])
+        for row in result['picks']:
+            self.assertEqual(row['stat'], 'pts')
+            self.assertEqual(row['projection']['reference_projection'], 21.5)
+            measured = [game['value'] for game in row['projection']['source_games']]
+            self.assertEqual(sum(measured) / len(measured), 21.5)
+            self.assertEqual(row['targets']['more_at_or_below'], 17.5)
+            self.assertEqual(row['targets']['less_at_or_above'], 25.5)
+            self.assertNotIn('line', row)
+            self.assertNotIn('side', row)
+        altered = copy.deepcopy(self.report)
+        for leg in altered['original_legs']:
+            leg.update(line=99.5, side='less', offer_variant='demon')
+        other = build_master_targets(self.store, altered, NOW, constraints={'preferred_stat': 'pts'})
+        self.assertEqual(other['picks'], result['picks'])
+        self.assertEqual(self.report, before)
+        with self.store.connect() as db:
+            self.assertEqual(counts, {table: db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0]
+                                     for table in counts})
+
+    def test_unknown_mixed_conflicting_and_past_events_never_borrow_another_game(self):
+        from datetime import timedelta
+        bad_id = copy.deepcopy(self.report); bad_id['original_legs'][0]['game_id'] = 'not-a-saved-game'
+        conflict = copy.deepcopy(self.report); conflict['original_legs'][0]['opponent'] = 'BOS'
+        mixed = copy.deepcopy(self.report)
+        mixed['original_legs'].append({**candidate()['leg'], 'date': '2026-11-02'})
+        for label, report, now in [('unknown', bad_id, NOW), ('opponent', conflict, NOW),
+                                   ('mixed', mixed, NOW), ('past', self.report, NOW+timedelta(days=1))]:
+            with self.subTest(label=label), patch('independent_picks.build_independent_picks') as builder:
+                result = build_master_targets(self.store, report, now)
+                self.assertEqual(result['picks'], [])
+                self.assertIsNone(result['game'])
+                self.assertFalse(result['lineup_complete'])
+                builder.assert_not_called()
+
+    def test_unready_current_data_produces_zero_supported_targets_without_relaxing_gates(self):
+        with patch('independent_picks.assess_pregame_freshness', return_value=HELD):
+            result = build_master_targets(self.store, self.report, NOW)
+        self.assertEqual(result['picks'], [])
+        self.assertFalse(result['lineup_complete'])
+        self.assertTrue(result['held'])
+        self.assertTrue(all(row['projection'] is None and row['disposition'] == 'pass'
+                            for row in result['evaluated_candidates']))
+        self.assertEqual(result['resolved_game_id'], 'nba:2026-10-30:NYK:PHI')
+
+    def test_a_builder_returning_a_different_game_is_rejected_instead_of_presented(self):
+        forged = {'game': {'id': 'nba:2026-11-02:BKN:NYK', 'date': '2026-11-02'},
+                  'picks': [{'player': 'Wrong Game Player'}], 'note': 'wrong event'}
+        with patch('independent_picks.build_independent_picks', return_value=forged):
+            result = build_master_targets(self.store, self.report, NOW)
+        self.assertEqual(result['picks'], [])
+        self.assertIsNone(result['game'])
+        self.assertIn('exact uploaded game', result['note'])
 
 
 if __name__ == '__main__':

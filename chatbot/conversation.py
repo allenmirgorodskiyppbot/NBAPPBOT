@@ -75,7 +75,7 @@ def _turn(turn):
         turn = turn.model_dump()
     if not isinstance(turn, dict) or turn.get('role') not in {'user', 'assistant'}:
         return None
-    return {'role': turn['role'], 'content': str(turn.get('content') or '')[:5000]}
+    return {'role': turn['role'], 'content': str(turn.get('content') or '')[:6500]}
 
 
 def _finite(value):
@@ -339,13 +339,20 @@ def _empty_state():
             'game_context': None, 'context_date_applied': False}
 
 
+def _proposal_group(text):
+    """A source reference selects a proposal group, never verifies an offer."""
+    uploaded = bool(re.search(r'\b(?:screenshots?|uploads?|uploaded|images?|photos?)\b', text, re.I))
+    independent = bool(re.search(r'\b(?:master|own|calculated|independent|projections?|targets?)\b', text, re.I))
+    return 'uploaded' if uploaded and not independent else 'independent' if independent and not uploaded else None
+
+
 def _pick_reference(text, cards):
     """Resolve list ordinals, keeping their numbers out of prop thresholds."""
     ordinals = {'first': 0, 'second': 1, 'third': 2, 'fourth': 3,
-                'fifth': 4, 'sixth': 5, 'seventh': 6, 'eighth': 7, 'last': len(cards) - 1}
+                'fifth': 4, 'sixth': 5, 'seventh': 6, 'eighth': 7, 'last': 'last'}
     token = r'(?:' + '|'.join(ordinals) + r'|\d{1,2}(?:st|nd|rd|th))'
-    pattern = (r'\b(' + token + r')\s+(?:picks?|legs?|ones?|selections?|cards?)\b|'
-               r'\b(?:picks?|legs?|selections?)\s*(?:number\s*|#\s*)?(\d{1,2})\b|'
+    pattern = (r'\b(' + token + r')\s+(?:picks?|legs?|ones?|selections?|cards?|projections?|targets?)\b|'
+               r'\b(?:picks?|legs?|selections?|projections?|targets?)\s*(?:number\s*|#\s*)?(\d{1,2})\b|'
                r'#\s*(\d{1,2})\b|\b(' + token + r')\s*[?.!]*$')
     indices, spans = set(), []
     for match in re.finditer(r'\b(' + token + r')\s+(?:or|and)\s+(' + token + r')\b', text, re.I):
@@ -359,9 +366,25 @@ def _pick_reference(text, cards):
         spans.append(match.span())
     if not indices:
         return None, None, spans
-    if len(indices) != 1:
+    groups = {card.get('proposal_group') for card in cards} & {'uploaded','independent'}
+    requested = _proposal_group(text)
+    if requested and groups:
+        buckets = [[index for index,card in enumerate(cards) if card.get('proposal_group') == requested]]
+    elif len(groups) > 1:
+        # Each displayed group starts its own numbering. An unqualified first
+        # pick cannot silently select the first source in the combined reply.
+        buckets = [[index for index,card in enumerate(cards) if card.get('proposal_group') == group]
+                   for group in sorted(groups)]
+    else:
+        buckets = [list(range(len(cards)))]
+    resolved = set()
+    for position in indices:
+        matches = {bucket[-1] if position == 'last' else bucket[position]
+                   for bucket in buckets if bucket and (position == 'last' or 0 <= position < len(bucket))}
+        resolved.update(matches or {-1})
+    if len(resolved) != 1:
         return None, 'ambiguous_pick', spans
-    index = next(iter(indices))
+    index = next(iter(resolved))
     if not 0 <= index < len(cards):
         return None, 'missing_pick', spans
     return index, None, spans
@@ -411,7 +434,7 @@ def _clean_state(state, names, now):
             result['slots']['game_date'] = dt.date.fromisoformat(str(raw['game_date'])).isoformat()
         except (KeyError, TypeError, ValueError):
             pass
-    for card in state.get('recent_picks', [])[:8]:
+    for card in state.get('recent_picks', [])[:12]:
         if isinstance(card, dict) and card.get('player') in names and card.get('stat') in STAT_COMPONENTS:
             clean = {key: card[key] for key in ('player', 'stat')}
             if _finite(card.get('line')) is not None:
@@ -420,6 +443,12 @@ def _clean_state(state, names, now):
                 clean['side'] = card['side']
             if card.get('line_kind') in {'research_target', 'assistant_proposal'}:
                 clean['line_kind'] = card['line_kind']
+            if card.get('proposal_group') in {'uploaded','independent'}:
+                clean['proposal_group'] = card['proposal_group']
+                if card['proposal_group'] == 'independent':
+                    clean['line_kind'] = 'research_target'
+                    clean.pop('line', None)
+                    clean.pop('side', None)
             try:
                 clean['game_date'] = dt.date.fromisoformat(str(card['game_date'])).isoformat()
             except (KeyError, TypeError, ValueError):
@@ -439,14 +468,30 @@ def _clean_state(state, names, now):
 def _assistant_cards(text, names, now):
     """Read proposal identity only; source paragraphs cannot become current offers."""
     cards = []
-    lines = text.splitlines()[:70]
+    lines = text.splitlines()[:120]
     game_date = None
+    dates = set()
     for heading in lines[:5]:
+        dated = re.match(r'^\s*(?:Assumed game date|Game date):\s*(20\d{2}-\d{2}-\d{2})(?:\s|$)', heading, re.I)
+        if dated:
+            try:
+                dates.add(dt.date.fromisoformat(dated[1]).isoformat())
+            except ValueError:
+                pass
         if re.match(r'^\s*(?:My projections|My shortlist)\b', heading, re.I):
             date, error, _ = _date(heading, now)
             if date and not error:
-                game_date = date
+                dates.add(date)
+    if len(dates) == 1:
+        game_date = next(iter(dates))
+    proposal_group = None
     for index, line in enumerate(lines):
+        if line.strip() == 'From your uploaded lines':
+            proposal_group = 'uploaded'
+            continue
+        if line.strip() == 'My own calculated targets from your master':
+            proposal_group = 'independent'
+            continue
         listed = bool(re.match(r'^\s*(?:[-•*]|\d+[.)]|\|)', line))
         heading = re.match(r'^\s*([^—–:\n]{1,100}?)\s*[—–:]\s*'
                            r'(?:More|Less|Over|Under)\s+' + _NUMBER + r'\b', line, re.I)
@@ -472,8 +517,10 @@ def _assistant_cards(text, names, now):
             # projection or either target to a confirmed sportsbook offer.
             next_line = lines[index + 1] if index + 1 < len(lines) else ''
             if re.search(r'\b(?:More|Less) if line\s*[≤≥]', next_line, re.I):
-                cards.append({'player': entities['players'][0], 'stat': stat,
-                              'line_kind': 'research_target'})
+                card = {'player': entities['players'][0], 'stat': stat, 'line_kind': 'research_target'}
+                if proposal_group:
+                    card['proposal_group'] = proposal_group
+                cards.append(card)
             continue
         without_number = re.sub(r'^\s*\d+[.)]\s*', '', line)
         value, error = _line(without_number, [], True)
@@ -481,7 +528,9 @@ def _assistant_cards(text, names, now):
             continue
         card = {'player': entities['players'][0], 'stat': stat, 'line': value, 'side': side,
                 'line_kind': 'assistant_proposal'}
-        if re.search(r'\b(?:if|target|projection)\b|[≤≥]', line, re.I):
+        if proposal_group:
+            card['proposal_group'] = proposal_group
+        if proposal_group == 'independent' or re.search(r'\b(?:if|target|projection)\b|[≤≥]', line, re.I):
             card['line_kind'] = 'research_target'
             card.pop('line', None)
             card.pop('side', None)
@@ -489,7 +538,7 @@ def _assistant_cards(text, names, now):
     if game_date:
         for card in cards:
             card['game_date'] = game_date
-    return cards[:8]
+    return cards[:12]
 
 
 def _apply_user(text, state, names, now, context_date=None):
@@ -605,6 +654,12 @@ def _apply_user(text, state, names, now, context_date=None):
                or prior_pick_index is not None)):
         candidates = [(index, card) for index, card in enumerate(state['recent_picks'])
                       if card['player'] == players[0] and (not stat or card['stat'] == stat)]
+        requested_group = _proposal_group(text)
+        if requested_group and any(card.get('proposal_group') for card in state['recent_picks']):
+            matching = [item for item in candidates if item[1].get('proposal_group') == requested_group]
+            if candidates and not matching:
+                reference_error = 'missing_pick'
+            candidates = matching
         if len(candidates) == 1:
             pick_index, selected_card = candidates[0]
         elif len(candidates) > 1:
@@ -744,6 +799,10 @@ def _apply_user(text, state, names, now, context_date=None):
         clarification = ('I don’t have that numbered pick in the current list. Which player and market do you mean?'
                          if reference_error == 'missing_pick' else
                          'Which pick do you mean? Give one list number or the player and statistic.')
+        if {'uploaded','independent'} <= {
+                card.get('proposal_group') for card in state['recent_picks']}:
+            clarification = ('Which group do you mean: your uploaded lines or the calculated master targets? '
+                             'Include its list number or player and statistic.')
     elif new_game and not game_date:
         clarification = 'Which game date should I use for the new matchup?'
     elif intent == 'prop' or (intent == 'explanation' and changed_prop):

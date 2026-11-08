@@ -668,7 +668,7 @@ class TelegramBot:
                 # A completed older answer must not resurrect a conversation that
                 # was cleared, or a question already removed by the history limit.
                 db.execute('UPDATE telegram_conversation SET answer=? WHERE chat_id=? AND update_id=?',
-                           (answer[:4000], chat_id, update_id))
+                           (answer[:6500], chat_id, update_id))
             db.execute('DELETE FROM telegram_conversation WHERE chat_id=? AND update_id NOT IN '
                        '(SELECT update_id FROM telegram_conversation WHERE chat_id=? '
                        'ORDER BY update_id DESC LIMIT 12)', (chat_id, chat_id))
@@ -1273,7 +1273,7 @@ class TelegramBot:
 
     async def _shortlist_reply(self, report, chat_id=None):
         if callable(getattr(self.store, 'connect', None)) and 'original_legs' in report:
-            from board_shortlist import enrich_shortlist, format_shortlist
+            from board_shortlist import enrich_shortlist, format_shortlist, build_master_targets
             constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
             # Screenshot research targets at least four distinct-player picks.
             # Preserve larger requests; eligibility still decides what can rank.
@@ -1283,9 +1283,42 @@ class TelegramBot:
             shortlist = await asyncio.to_thread(enrich_shortlist, self.store, report,
                 count=requested, constraints=constraints)
             from pregame_archive import record_research
-            await asyncio.to_thread(record_research, self.store, shortlist,
-                                    owner_key=f'telegram:{chat_id}', kind='board_shortlist', source_report=report)
-            return format_shortlist(shortlist)
+            archive_incomplete = False
+            try:
+                await asyncio.to_thread(record_research, self.store, shortlist,
+                                        owner_key=f'telegram:{chat_id}', kind='board_shortlist', source_report=report)
+            except Exception as error:
+                archive_incomplete = True
+                log.warning('Uploaded research archive incomplete (%s).', type(error).__name__)
+            uploaded_text = 'From your uploaded lines\n\n' + format_shortlist(shortlist)
+            try:
+                from independent_picks import format_independent_picks
+                targets = await asyncio.to_thread(build_master_targets, self.store, report,
+                                                 count=requested, constraints=constraints)
+                target_text = format_independent_picks(targets, compact=True, max_chars=1400)
+                try:
+                    await asyncio.to_thread(record_research, self.store, targets,
+                                            owner_key=f'telegram:{chat_id}', kind='independent')
+                except Exception as error:
+                    archive_incomplete = True
+                    log.warning('Independent research archive incomplete (%s).', type(error).__name__)
+            except Exception as error:
+                log.warning('Uploaded-board master targets incomplete (%s).', type(error).__name__)
+                target_text = 'The separate master targets could not finish. /picks can retry; the uploaded-line analysis above is available.'
+            dates = {str(leg.get('date') or '') for leg in report.get('original_legs', [])}
+            date_heading = ''
+            if len(dates) == 1:
+                day = next(iter(dates))
+                try:
+                    if re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+                        datetime.strptime(day, '%Y-%m-%d')
+                        date_heading = 'Game date: ' + day + ' Eastern.\n\n'
+                except ValueError:
+                    pass
+            answer = date_heading + uploaded_text + '\n\nMy own calculated targets from your master\n\n' + target_text
+            if archive_incomplete:
+                answer += '\n\nResearch history could not be saved; the analysis above is still available.'
+            return answer
         import analysis_engine
         formatter = getattr(analysis_engine, 'format_analysis', None)
         return formatter(report) if formatter else self._compact(report)
