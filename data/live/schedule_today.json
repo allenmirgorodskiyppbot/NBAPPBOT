@@ -8,14 +8,14 @@
             "competitors": [
               {
                 "homeAway": "home",
-                "score": "78",
+                "score": "85",
                 "team": {
                   "abbreviation": "IND"
                 }
               },
               {
                 "homeAway": "away",
-                "score": "90",
+                "score": "99",
                 "team": {
                   "abbreviation": "DEN"
                 }
@@ -30,16 +30,16 @@
               }
             ],
             "status": {
-              "clock": 9.7,
-              "displayClock": "9.7",
-              "period": 3,
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 4,
               "type": {
                 "completed": false,
                 "description": "In Progress",
-                "detail": "9.7 - 3rd Quarter",
+                "detail": "0.0 - 4th Quarter",
                 "id": "2",
                 "name": "STATUS_IN_PROGRESS",
-                "shortDetail": "9.7 - 3rd",
+                "shortDetail": "0.0 - 4th",
                 "state": "in"
               }
             },
@@ -58,16 +58,16 @@
           "year": 2027
         },
         "status": {
-          "clock": 9.7,
-          "displayClock": "9.7",
-          "period": 3,
+          "clock": 0.0,
+          "displayClock": "0.0",
+          "period": 4,
           "type": {
             "completed": false,
             "description": "In Progress",
-            "detail": "9.7 - 3rd Quarter",
+            "detail": "0.0 - 4th Quarter",
             "id": "2",
             "name": "STATUS_IN_PROGRESS",
-            "shortDetail": "9.7 - 3rd",
+            "shortDetail": "0.0 - 4th",
             "state": "in"
           }
         }
@@ -480,9 +480,9 @@
     "nba:2026-11-07:POR:SAS"
   ],
   "schema_version": 1,
-  "scope": "Validated timing fields extracted from the recorded ESPN response; original fetch timestamp and full-response digest retained. No player statistics or availability verified.",
-  "source_checked_at": "2026-11-07T23:55:37.620565+00:00",
-  "source_content_sha256": "ae030a1461a6a4cf8d41138f957a2ffad52fe165fb41ea93accf75e755f91dc4",
-  "source_response_sha256": "f9b0f82e774e91e5d43b28d8974f5afda123c198b89a713c7ca74940b0e88246",
+  "scope": "Validated timing fields from the recorded ESPN response. Original fetch time and full-response digest retained; no player statistics or availability verified.",
+  "source_checked_at": "2026-11-08T00:08:42.172564+00:00",
+  "source_content_sha256": "6133686455744e0ee8f28e65aabe1b3d9ef5d265d76d72cc807e00a78652f829",
+  "source_response_sha256": "5860bad0c201dea446b3c0349f2003024855888173508a44e7a7ce910ed38dde",
   "source_url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261107"
 }
