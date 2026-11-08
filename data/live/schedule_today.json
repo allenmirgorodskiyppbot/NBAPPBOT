@@ -8,14 +8,14 @@
             "competitors": [
               {
                 "homeAway": "home",
-                "score": "85",
+                "score": "97",
                 "team": {
                   "abbreviation": "IND"
                 }
               },
               {
                 "homeAway": "away",
-                "score": "99",
+                "score": "108",
                 "team": {
                   "abbreviation": "DEN"
                 }
@@ -30,16 +30,16 @@
               }
             ],
             "status": {
-              "clock": 0.0,
-              "displayClock": "0.0",
+              "clock": 267.0,
+              "displayClock": "4:27",
               "period": 4,
               "type": {
                 "completed": false,
                 "description": "In Progress",
-                "detail": "0.0 - 4th Quarter",
+                "detail": "4:27 - 4th Quarter",
                 "id": "2",
                 "name": "STATUS_IN_PROGRESS",
-                "shortDetail": "0.0 - 4th",
+                "shortDetail": "4:27 - 4th",
                 "state": "in"
               }
             },
@@ -58,16 +58,16 @@
           "year": 2027
         },
         "status": {
-          "clock": 0.0,
-          "displayClock": "0.0",
+          "clock": 267.0,
+          "displayClock": "4:27",
           "period": 4,
           "type": {
             "completed": false,
             "description": "In Progress",
-            "detail": "0.0 - 4th Quarter",
+            "detail": "4:27 - 4th Quarter",
             "id": "2",
             "name": "STATUS_IN_PROGRESS",
-            "shortDetail": "0.0 - 4th",
+            "shortDetail": "4:27 - 4th",
             "state": "in"
           }
         }
@@ -481,8 +481,8 @@
   ],
   "schema_version": 1,
   "scope": "Validated timing fields from the recorded ESPN response. Original fetch time and full-response digest retained; no player statistics or availability verified.",
-  "source_checked_at": "2026-11-08T00:08:42.172564+00:00",
-  "source_content_sha256": "6133686455744e0ee8f28e65aabe1b3d9ef5d265d76d72cc807e00a78652f829",
-  "source_response_sha256": "5860bad0c201dea446b3c0349f2003024855888173508a44e7a7ce910ed38dde",
+  "source_checked_at": "2026-11-08T00:22:28.007992+00:00",
+  "source_content_sha256": "a3f96096d868e9453d30fe96d0dba55c2a42fc5fa43eb000d8d7b7d9fe2846fd",
+  "source_response_sha256": "7e365e8de03d7905b615df486dd6b789cc3a116bc0affc8babc6d8741455678d",
   "source_url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261107"
 }
