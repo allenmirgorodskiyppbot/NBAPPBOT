@@ -225,7 +225,7 @@
   ],
   "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
   "inventory_verified": true,
-  "inventory_verified_at": "2026-11-08T16:47:16.477473+00:00",
+  "inventory_verified_at": "2026-11-08T17:18:23.088032+00:00",
   "pending_game_ids": [],
   "player_games": [
     {
