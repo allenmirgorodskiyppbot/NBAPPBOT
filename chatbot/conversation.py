@@ -353,7 +353,10 @@ def _pick_reference(text, cards):
     token = r'(?:' + '|'.join(ordinals) + r'|\d{1,2}(?:st|nd|rd|th))'
     pattern = (r'\b(' + token + r')\s+(?:picks?|legs?|ones?|selections?|cards?|projections?|targets?)\b|'
                r'\b(?:picks?|legs?|selections?|projections?|targets?)\s*(?:number\s*|#\s*)?(\d{1,2})\b|'
-               r'#\s*(\d{1,2})\b|\b(' + token + r')\s*[?.!]*$')
+               r'#\s*(\d{1,2})\b|\b(' + token + r')\s*[?.!]*$|'
+               r'\b(' + token + r')\s+(?:from|in|of|on)\s+(?:(?:the|my|your)\s+)?'
+               r'(?=(?:screenshots?|uploads?|uploaded|images?|photos?|master|own|calculated|'
+               r'independent|projections?|targets?)\b)')
     indices, spans = set(), []
     for match in re.finditer(r'\b(' + token + r')\s+(?:or|and)\s+(' + token + r')\b', text, re.I):
         for word in match.groups():
@@ -449,6 +452,10 @@ def _clean_state(state, names, now):
                     clean['line_kind'] = 'research_target'
                     clean.pop('line', None)
                     clean.pop('side', None)
+            if (card.get('research_choice') is True and clean.get('proposal_group') == 'uploaded'
+                    and clean.get('line_kind') == 'assistant_proposal'
+                    and 'line' in clean and clean.get('side') in {'more','less'}):
+                clean['research_choice'] = True
             try:
                 clean['game_date'] = dt.date.fromisoformat(str(card['game_date'])).isoformat()
             except (KeyError, TypeError, ValueError):
@@ -534,6 +541,11 @@ def _assistant_cards(text, names, now):
             card['line_kind'] = 'research_target'
             card.pop('line', None)
             card.pop('side', None)
+        elif (proposal_group == 'uploaded' and index + 1 < len(lines)
+              and lines[index + 1].startswith('RESEARCH PICK:')):
+            # Preserve the application renderer's research mode for follow-up
+            # explanations. This is context, not a live eligibility/offer flag.
+            card['research_choice'] = True
         cards.append(card)
     if game_date:
         for card in cards:
@@ -761,9 +773,13 @@ def _apply_user(text, state, names, now, context_date=None):
         elif line is not None and card.get('line_kind') != 'research_target':
             # This edits dialogue context only. It does not update a saved
             # board or entry, and it cannot turn a target into a current offer.
+            if line != card.get('line') or (slots.get('side') and slots['side'] != card.get('side')):
+                card.pop('research_choice', None)
             card['line'] = line
             if slots.get('side'):
                 card['side'] = slots['side']
+        elif slots.get('side') and slots['side'] != card.get('side'):
+            card.pop('research_choice', None)
     if game_date:
         slots['game_date'] = game_date
     if opponent:

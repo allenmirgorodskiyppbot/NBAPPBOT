@@ -515,6 +515,16 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         result = _direct_reply(answer)
         result['constraints'] = turn.get('constraints', {})
         return result
+    if intent in {'prop', 'explanation', 'preference'}:
+        from uploaded_research_discussion import (matches_uploaded_research_context,
+                                                  build_uploaded_research_discussion)
+        if matches_uploaded_research_context(turn):
+            # A research direction and a strict live qualification are separate
+            # claims. Recompute the displayed rule instead of replacing its
+            # explanation with a different current-season Pass assessment.
+            progress['detail'] = 'Rechecking the uploaded research choice'
+            return await asyncio.to_thread(build_uploaded_research_discussion, master,
+                turn['recent_picks'], turn.get('slots'), None, request.message)
     if intent in {'prop','explanation','preference'} and turn.get('complete_prop'):
         report = await asyncio.to_thread(build_pick_discussion, master, turn['slots'])
         if not report.get('available'):

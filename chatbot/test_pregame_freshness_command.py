@@ -98,7 +98,34 @@ class PregameFreshnessCommandTests(unittest.IsolatedAsyncioTestCase):
         report = freshness_report(self.store, NOW)
         self.assertIn('Schedule check: failed — HTTPStatusError: HTTP 403', report)
         self.assertIn('Nov 04, 3:00 PM Eastern', report)
+        self.assertIn('completed-game coverage verified for both teams; research ready', report)
+        self.assertIn('Live timing: unverified; current-game eligibility is incomplete', report)
+        self.assertNotIn('waiting for verified coverage', report)
         self.assertNotIn('current for both teams', report)
+
+    def test_expired_timing_does_not_hide_current_completed_game_coverage(self):
+        check = self.store.get_checkpoint('nba_schedule_today')
+        check['checked_at'] = (NOW-dt.timedelta(minutes=16)).isoformat()
+        self.store.set_checkpoint('nba_schedule_today', check)
+        before = self.snapshot()
+        report = freshness_report(self.store, NOW)
+        self.assertIn('completed-game coverage verified for both teams; research ready', report)
+        self.assertIn('Live timing: unverified', report)
+        self.assertIn('within 15 minutes', report)
+        self.assertNotIn('Game-stat readiness: current for both teams', report)
+        self.assertEqual(before, self.snapshot())
+
+    def test_missing_statistics_remain_held_even_when_live_timing_also_fails(self):
+        check = self.store.get_checkpoint('nba_schedule_today')
+        check.update(status='failed', error='ReadTimeout')
+        self.store.set_checkpoint('nba_schedule_today', check)
+        with self.store.connect() as db:
+            db.execute("DELETE FROM checkpoints WHERE name='daily_nba:2026-11-03'")
+        report = freshness_report(self.store, NOW)
+        self.assertIn('waiting for verified coverage', report)
+        self.assertIn('Schedule check: failed', report)
+        self.assertNotIn('research ready', report)
+        self.assertNotIn('completed-game coverage verified', report)
 
     def test_schedule_report_does_not_echo_arbitrary_exception_or_url_content(self):
         check = self.store.get_checkpoint('nba_schedule_today')
@@ -157,7 +184,9 @@ class PregameFreshnessCommandTests(unittest.IsolatedAsyncioTestCase):
             'start_time': '2026-11-06T00:30:00+00:00', 'source': 'saved test schedule'})
         report = freshness_report(self.store, NOW)
         self.assertIn('Nov 05', report)
-        self.assertIn('waiting for verified coverage', report)
+        self.assertIn('completed-game inputs verified as of today; future game-day checks remain required', report)
+        self.assertIn('Live timing: unverified for the upcoming game', report)
+        self.assertNotIn('research ready', report)
         self.assertNotIn('current for both teams', report)
 
     def test_missing_collection_metadata_is_reported_as_unknown(self):

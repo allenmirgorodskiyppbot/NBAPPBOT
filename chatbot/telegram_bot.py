@@ -221,7 +221,18 @@ def freshness_report(store, now=None):
         lines.append(f"Next saved game: {game['away_team']} at {game['home_team']} — {stamp(game.get('start_time'))}.")
         reports = [assess_pregame_freshness(store, game['date'], team, now) for team in teams]
         ready = all(report.get('ready') is True for report in reports)
-        lines.append('Game-stat readiness: ' + ('current for both teams.' if ready else 'waiting for verified coverage.'))
+        statistics_ready = all(report.get('statistics_ready') is True for report in reports)
+        if ready:
+            lines.append('Game-stat readiness: current for both teams.')
+        elif statistics_ready:
+            if game['date'] == now.astimezone(eastern).date().isoformat():
+                lines.append('Game-stat readiness: completed-game coverage verified for both teams; research ready.')
+                lines.append('Live timing: unverified; current-game eligibility is incomplete.')
+            else:
+                lines.append('Game-stat readiness: completed-game inputs verified as of today; future game-day checks remain required.')
+                lines.append('Live timing: unverified for the upcoming game.')
+        else:
+            lines.append('Game-stat readiness: waiting for verified coverage.')
         if not ready:
             schedule = next((report.get('schedule_check') for report in reports
                              if isinstance(report.get('schedule_check'), dict)), {})
