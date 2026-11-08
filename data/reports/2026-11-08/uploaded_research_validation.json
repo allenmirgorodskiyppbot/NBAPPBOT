@@ -1,0 +1,236 @@
+{
+  "source_ref": "391ed33e7529a9bb465546d43fb8dc978f79f26a",
+  "scope": "Offline synthetic regression controls; not live NBA verification or a betting performance test.",
+  "reported_before": {
+    "source_ref": "0376a08022425301a1173b411ef5358355e5e3c9",
+    "source": "User supplied Telegram reply; not measured in this script.",
+    "qualified_uploaded": 0,
+    "own_targets": 0,
+    "held_master_comparisons": 4
+  },
+  "controls": {
+    "markets": "User screenshot thresholds and visible sides transcribed into synthetic board.",
+    "observations": "80 invented player-game controls matching the four reported means, medians and above/below counts; not actual player logs.",
+    "dates_schedule": "Controlled saved events and pregame clock; not current externally checked NBA events.",
+    "source_readiness": "Synthetic independent-inventory and current-day publication checkpoints; never evidence of live source freshness.",
+    "availability": "Normal production parsing; known-out case adds explicitly synthetic dated news.",
+    "models_ocr_telegram": "No model generation, fresh OCR, external HTTP, or actual Telegram API calls."
+  },
+  "source_unchanged_during_integration": true,
+  "source_sha256": {
+    "analysis_engine.py": "00f6ac42a730ac0f9918bf61246dded0a68b3b1ab6c9b29015ae273170b30d1a",
+    "board_shortlist.py": "c3be30381f57bb419db3e1f93e1379a2d0ea99bc99b3dc19928f67bec067daba",
+    "contextual_projection.py": "42124ceb3ce36977d4978375938ea939de174a3713a3234991a30f824f3ee74e",
+    "independent_picks.py": "e9e53b1769ec11c2b60fdf88a77ceef069f00c868dacd35a91241adbfb7153c5",
+    "pregame_freshness.py": "86ee0ca4a30afa44d0a485aa2dc4b87241169a335de79eb82b6c7be36f41ae85",
+    "telegram_bot.py": "cd41135263111b7bff2e39091d7297aabb10817176860a1e3f4e248cf1aecc25",
+    "gameday_digest.py": "f288efdd99139a5ad651475252540b7728e31d8e189762b95f17fa7ab399dab4",
+    "conversation.py": "e8f0e3b95f152932f403e7305dab139d8f4ef78ed202adeb40b8794c09f2a80c",
+    "chat_flow.py": "12f94ebb6d86c3668bd9b1ee00a857c7dd36d67f4b6c6d4d57570ee4373f22cd",
+    "uploaded_research_discussion.py": "6e6748eed92584386b4661e96d6730ca672ce2051fc00ff293f3ed6fa131bb5c",
+    "strategy_info.py": "ca741f4d048cec7775d6db72f3a9705568b0efcf64684f0cbdb7ac644f8bfe85"
+  },
+  "integration_cases": [
+    {
+      "name": "user_four_markets_expired_schedule",
+      "elapsed_seconds": 1.6147,
+      "strict_uploaded": 0,
+      "strict_independent": 0,
+      "uploaded_research": 4,
+      "master_targets": 4,
+      "timing_verified": false,
+      "protected_inputs_unchanged": true,
+      "telegram_delivery_tested": false
+    },
+    {
+      "name": "future_target_current_statistics",
+      "elapsed_seconds": 0.9505,
+      "strict_uploaded": 0,
+      "strict_independent": 0,
+      "uploaded_research": 4,
+      "master_targets": 4,
+      "timing_verified": false,
+      "protected_inputs_unchanged": true,
+      "telegram_delivery_tested": false
+    },
+    {
+      "name": "pending_stats_still_blocks",
+      "elapsed_seconds": 0.3732,
+      "strict_uploaded": 0,
+      "strict_independent": 0,
+      "uploaded_research": 0,
+      "master_targets": 0,
+      "timing_verified": false,
+      "protected_inputs_unchanged": true,
+      "telegram_delivery_tested": false
+    },
+    {
+      "name": "known_out_still_blocks",
+      "elapsed_seconds": 0.4733,
+      "strict_uploaded": 0,
+      "strict_independent": 0,
+      "uploaded_research": 3,
+      "master_targets": 3,
+      "timing_verified": false,
+      "protected_inputs_unchanged": true,
+      "telegram_delivery_tested": false
+    },
+    {
+      "name": "started_game_still_blocks",
+      "elapsed_seconds": 0.2347,
+      "strict_uploaded": 0,
+      "strict_independent": 0,
+      "uploaded_research": 0,
+      "master_targets": 0,
+      "timing_verified": null,
+      "protected_inputs_unchanged": true,
+      "telegram_delivery_tested": false
+    },
+    {
+      "name": "insufficient_players_never_padded",
+      "elapsed_seconds": 0.2709,
+      "strict_uploaded": 0,
+      "strict_independent": 0,
+      "uploaded_research": 2,
+      "master_targets": 2,
+      "timing_verified": false,
+      "protected_inputs_unchanged": true,
+      "telegram_delivery_tested": false
+    }
+  ],
+  "followup": {
+    "scope": "SYNTHETIC offline follow-up replay; not actual picks/live source verification.",
+    "controls": "Same synthetic observations, dates and publication/inventory assertions as integration_replay.py.",
+    "source_sha256": {
+      "analysis_engine.py": "00f6ac42a730ac0f9918bf61246dded0a68b3b1ab6c9b29015ae273170b30d1a",
+      "board_shortlist.py": "c3be30381f57bb419db3e1f93e1379a2d0ea99bc99b3dc19928f67bec067daba",
+      "contextual_projection.py": "42124ceb3ce36977d4978375938ea939de174a3713a3234991a30f824f3ee74e",
+      "independent_picks.py": "e9e53b1769ec11c2b60fdf88a77ceef069f00c868dacd35a91241adbfb7153c5",
+      "pregame_freshness.py": "86ee0ca4a30afa44d0a485aa2dc4b87241169a335de79eb82b6c7be36f41ae85",
+      "telegram_bot.py": "cd41135263111b7bff2e39091d7297aabb10817176860a1e3f4e248cf1aecc25",
+      "gameday_digest.py": "f288efdd99139a5ad651475252540b7728e31d8e189762b95f17fa7ab399dab4",
+      "conversation.py": "e8f0e3b95f152932f403e7305dab139d8f4ef78ed202adeb40b8794c09f2a80c",
+      "chat_flow.py": "12f94ebb6d86c3668bd9b1ee00a857c7dd36d67f4b6c6d4d57570ee4373f22cd",
+      "uploaded_research_discussion.py": "6e6748eed92584386b4661e96d6730ca672ce2051fc00ff293f3ed6fa131bb5c",
+      "strategy_info.py": "ca741f4d048cec7775d6db72f3a9705568b0efcf64684f0cbdb7ac644f8bfe85"
+    },
+    "protected_inputs_unchanged": true,
+    "entries_created": 0,
+    "ai_ocr_http_telegram_delivery_used": false,
+    "cases": [
+      {
+        "question": "why first from screenshots?",
+        "selected": {
+          "player": "Karl-Anthony Towns",
+          "stat": "reb",
+          "line": 9.5,
+          "side": "more",
+          "line_kind": "assistant_proposal",
+          "proposal_group": "uploaded",
+          "research_choice": true,
+          "game_date": "2026-11-07"
+        },
+        "next_followup_selected": {
+          "player": "Karl-Anthony Towns",
+          "stat": "reb",
+          "line": 9.5,
+          "side": "more",
+          "line_kind": "assistant_proposal",
+          "proposal_group": "uploaded",
+          "research_choice": true,
+          "game_date": "2026-11-07"
+        },
+        "ai_used": false
+      },
+      {
+        "question": "why fourth from screenshots?",
+        "selected": {
+          "player": "Jalen Brunson",
+          "stat": "oreb",
+          "line": 0.5,
+          "side": "less",
+          "line_kind": "assistant_proposal",
+          "proposal_group": "uploaded",
+          "research_choice": true,
+          "game_date": "2026-11-07"
+        },
+        "next_followup_selected": {
+          "player": "Jalen Brunson",
+          "stat": "oreb",
+          "line": 0.5,
+          "side": "less",
+          "line_kind": "assistant_proposal",
+          "proposal_group": "uploaded",
+          "research_choice": true,
+          "game_date": "2026-11-07"
+        },
+        "ai_used": false
+      }
+    ]
+  },
+  "projection_benchmark": {
+    "purpose": "Historical performance comparison only; not current picks or data readiness.",
+    "source_sha256": "8c85613789322281ad1378d5df3e67a700f0899c3ddde6e63db4fe1e2f8ca644",
+    "readonly_confirmed": true,
+    "player_rows": 171889,
+    "projection_calls": 20,
+    "cutoff": "2026-11-07",
+    "values_and_provenance_identical": true,
+    "unscoped": {
+      "elapsed_seconds": 6.340742,
+      "sql_counts": {
+        "all_sql": 210,
+        "broad_identity_scans": 20,
+        "raw_eligible_game_queries": 20
+      }
+    },
+    "request_scoped": {
+      "elapsed_seconds": 0.674325,
+      "sql_counts": {
+        "all_sql": 159,
+        "broad_identity_scans": 1,
+        "raw_eligible_game_queries": 4
+      }
+    },
+    "speedup": 9.403,
+    "limits": [
+      "Sequential local benchmark, no production inference or network time.",
+      "Unscoped run preceded scoped run; filesystem warmup may affect latency.",
+      "Raw-query reduction is deterministic; all statistical exclusions are rerun per market."
+    ]
+  },
+  "final_focused_tests": {
+    "passed": 65,
+    "failed": 0,
+    "seconds": 10.439
+  },
+  "prior_full_validation": {
+    "source_ref": "f35f78c44d411df1fef45b0ec8806acc52b4d8da",
+    "passed": 1673,
+    "failed": 0,
+    "seconds": 180.915,
+    "ci_run": 42497505843
+  },
+  "live_deployment_verified": false,
+  "limits": [
+    "User must redeploy Akash to activate this source.",
+    "No new current NBA schedule or player-availability verification is asserted.",
+    "OCR/model/network/Telegram delivery latency is excluded from local pipeline timing."
+  ],
+  "runtime_package": {
+    "manifest_includes_uploaded_research_helper": true,
+    "isolated_package_and_explanation_tests_passed": 6,
+    "seconds": 2.649,
+    "bootstrap_sha256": "af9335bd3a7c9cc8307a1695f778cfe53df27fd14e2ba00cb0b5bfe46f9d673c"
+  },
+  "full_regression_tests": {
+    "source_ref": "391ed33e7529a9bb465546d43fb8dc978f79f26a",
+    "run": 42498397119,
+    "job": 128785625436,
+    "conclusion": "success",
+    "passed": 1687,
+    "failed": 0,
+    "seconds": 184.28,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42498397119"
+  }
+}

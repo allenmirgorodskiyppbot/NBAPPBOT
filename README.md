@@ -6,19 +6,25 @@ and can compare those with user-supplied PrizePicks lines. The chat model
 runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
-## November 7 master data and pregame update
+## November 8 uploaded research and response update
 
-Tested application `SOURCE_REF`: `0376a08022425301a1173b411ef5358355e5e3c9`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42429731188)
-passed all **1,623 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `391ed33e7529a9bb465546d43fb8dc978f79f26a`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42498397119)
+passed all **1,687 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
 The [master/schedule/reminder validation report](data/reports/2026-11-07/master_schedule_reminder_validation.json) records the Nov7 live schedule recovery, four-comparison master-data controls and ninety-minute reminder integration tests.
 
+The [uploaded research validation report](data/reports/2026-11-08/uploaded_research_validation.json) records the timing-only regression, research exclusions and local projection benchmark. Controlled replay observations are synthetic and do not assert current NBA data or betting performance.
+
+Natural follow-ups such as “why the fourth from my screenshots?” preserve the uploaded research side and recompute the same 20-game rule, including recent-form cautions. Changing the player, line, side, statistical phase or game date does not reuse the old selection as proof. `/freshness` distinguishes verified completed-game inputs from an unverified live clock.
+
 Every uploaded-board reply now contains **From your uploaded lines** and **My own calculated targets from your master**. The second section calculates independent targets for that exact matchup without copying uploaded thresholds or quoting a bookmaker. Both groups remain available for follow-ups; ambiguous numbering asks which group, and calculated targets never become confirmed offers.
 
-Screenshot analysis uses the saved matchup and each player's same-team master records. The default screenshot target is at least four distinct players; larger saved requests remain supported. If eligibility checks hold, the reply still shows measured means, medians, line-crossing counts and source dates as held research. It never pads a lineup with unreadable offers or relabels held research as eligible picks. Other stored players can appear as independent research ideas; actual offers are still needed for a comparison.
+Screenshot analysis uses the saved matchup and each player's same-team master records. It requests at least four distinct players and both teams when supported; larger saved requests remain supported. With verified completed-game inputs, a failed or expired live timing check no longer hides all research choices or independent targets. Uploaded choices display explicit More/Less, historical support, recent form and source dates. Narrow support and recent contradictions are labeled, and timing remains unverified. Missing statistical coverage, unreadable sides, known-out players and started games remain excluded; unsupported slots are never padded. Strict shortlist eligibility remains separate from these research choices.
+
+An upload receives a durable reading acknowledgment; `/status` reports its stage and elapsed time. Projection reads reuse request-local source data without carrying a cache across requests. The 90-minute reminder can include labeled research from verified completed-game statistics while live timing remains unverified.
 
 Failed/partial schedule checks retry after one minute, while source HTTP cooldowns remain enforced. A missing unrelated game no longer blocks a fresh independently matched Knicks game. Fallbacks retain their real source timestamps; GitHub scheduling does not guarantee relay freshness.
 
@@ -37,8 +43,7 @@ disclosed research buffer. Small differences, opposing evidence, unavailable
 current data or inadequate samples produce **Pass**. Recent playing time,
 opponent history, rest and tentative defenders provide context; they do not add
 unsupported numerical bonuses to the mean. `/strategy` explains this policy in
-the bot. The bot can return fewer than four picks and still enforces the required
-team/player constraints for a complete lineup.
+the bot. Separately labeled uploaded research leans can use the observed 20-game side counts when the strict buffer is not met; ties use the last five observed games, then the mean and median. Recent contradictions are disclosed. The bot can return fewer than four supported choices and still enforces the required team/player constraints.
 
 The earlier simulated 20-game rule scored **53.6%**, compared with **53.7% for
 Always Less**. Those tests used invented reference lines and allowed shorter
@@ -796,3 +801,4 @@ execution environments and is not installed in the deployed chatbot.
 Runtime Python packages, including web-framework transitive dependencies, are pinned
 to the same tested versions. Download cleanup tests cover both ASGI disconnect
 events and send failures using valid protocol messages.
+
