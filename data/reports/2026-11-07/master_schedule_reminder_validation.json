@@ -1,10 +1,11 @@
 {
-  "tested_source_ref": "d975d775c49a5bf68fff45d4adb44aefb5e30f51",
+  "tested_source_ref": "0376a08022425301a1173b411ef5358355e5e3c9",
   "requested_behavior": {
     "screenshot_target_minimum": 4,
     "reminder_minutes_before_tipoff": 90,
     "master_team_and_player_game_links": true,
-    "independent_alternatives": true
+    "independent_alternatives": true,
+    "both_sets_automatic_in_each_upload_reply": true
   },
   "local_focused_tests": {
     "passed": 178,
@@ -12,14 +13,14 @@
     "seconds": 63.006
   },
   "ci": {
-    "run_id": 42428274084,
-    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42428274084",
     "conclusion": "success",
+    "run_id": 42429731188,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42429731188",
     "status": "completed",
-    "job_id": 128571215744,
-    "passed": 1604,
+    "passed": 1623,
     "failed": 0,
-    "seconds": 167.14
+    "seconds": 171.293,
+    "job_id": 128575740978
   },
   "fixes": [
     "Failed and partial current schedule checks retry after60seconds, with unchanged source timestamps and existing HTTPcooldowns.",
@@ -148,7 +149,9 @@
         "actual_telegram_delivery_tested": false,
         "protected_master_rows_unchanged": true
       }
-    ]
+    ],
+    "source_ref": "d975d775c49a5bf68fff45d4adb44aefb5e30f51",
+    "final_release_note": "This prior-version integration covered the master/schedule/reminder pipeline; the final release adds automatic combined upload replies and source-aware followups, separately covered by the final focused and CI regressions."
   },
   "live_observations": {
     "user_reported_import_through": "2026-11-06",
@@ -169,11 +172,11 @@
     "live_code_activation_verified": false,
     "live_telegram_reminder_delivery_tested": false,
     "latest_manual_relay": {
-      "commit": "6b6a9d55c4a2f3512a9c876025363da40d632002",
-      "source_checked_at": "2026-11-08T00:08:42.172564+00:00",
+      "commit": "4042e5c6d4949e53e4f747bb19ac257fccfa69b0",
+      "source_checked_at": "2026-11-08T00:22:28.007992+00:00",
       "source_http_status": 200,
       "game_count": 7,
-      "scope": "Another actual ESPN fetch, not a renewal of the older body."
+      "scope": "New public ESPN response, not a renewal of an older document."
     },
     "github_collector_at_0007UTC": "ESPN HTTP403 and NBA ReadTimeout; no automatic source freshness claimed.",
     "user_subsequent_board_reply": "Analysis completed and showed Andre Drummond eight same-team observations plus Donovan Mitchell margins2.2/0.95 below buffers5.875/4.975; master reads work and strategy rules still hold those offers."
@@ -185,9 +188,65 @@
     "A four-pick target is not a promise that four eligible lines or a complete winning lineup exist."
   ],
   "activation": {
-    "SOURCE_REF": "d975d775c49a5bf68fff45d4adb44aefb5e30f51",
+    "SOURCE_REF": "0376a08022425301a1173b411ef5358355e5e3c9",
     "KNICKS_DIGEST_MINUTES_BEFORE": "90",
     "preserve_existing_storage_and_private_settings": true,
     "note": "Existing environment value60continues to override the new90default until changed. An already queued daily notice stays deduplicated."
+  },
+  "previous_tested_source_ref": "d975d775c49a5bf68fff45d4adb44aefb5e30f51",
+  "previous_ci": {
+    "run_id": 42428274084,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42428274084",
+    "conclusion": "success",
+    "status": "completed",
+    "job_id": 128571215744,
+    "passed": 1604,
+    "failed": 0,
+    "seconds": 167.14
+  },
+  "two_section_upload_reply": {
+    "automatic_in_same_reply": true,
+    "uploaded_section": "From your uploaded lines",
+    "own_section": "My own calculated targets from your master",
+    "own_targets_use_upload_thresholds": false,
+    "exact_uploaded_game_required": true,
+    "unknown_mixed_started_or_mismatched_game_rejected": true,
+    "projection_budget_chars": 1400,
+    "keeps_four_complete_targets_when_supported": true,
+    "archive_failure_does_not_discard_read_only_results": true,
+    "follow_up_groups_kept_distinct": true,
+    "ambiguous_numbering_requires_group_clarification": true,
+    "calculated_targets_remain_unpriced_research": true,
+    "date_preserved_across_eastern_midnight": true,
+    "bounded_history_chars": 6500,
+    "bounded_parsed_lines": 120,
+    "bounded_reference_cards": 12,
+    "model_prompt_budget_unchanged": true
+  },
+  "final_new_focused_tests": {
+    "passed": 141,
+    "failed": 0,
+    "seconds": 30.831
+  },
+  "previous_two_section_ci": {
+    "source_ref": "89f39cd10b6afabb480b4604d7e541a927736f3b",
+    "run_id": 42429365374,
+    "tests_run": 1623,
+    "passed": 1622,
+    "failed": 1,
+    "seconds": 184.881,
+    "failure": "The archive route test asserted the old exact single-section reply. Production behavior was the new correct two-section reply.",
+    "repair": "Test now checks both labeled sections, separate board and independent archives, preserved Pass/unconfirmed-offer facts, and no entries.",
+    "targeted_repair_tests_passed": 58,
+    "targeted_repair_seconds": 15.058,
+    "production_code_changed_for_repair": false
+  },
+  "final_production_sha256": {
+    "chatbot/app.py": "0ed671cb9604478dbb13c9f67d24816f54cb262eed19de9faed2b58cb5601e7a",
+    "chatbot/telegram_bot.py": "2c6852938eb3c6fd21b8be2f2057c69b81a3a80f7a6d70cad66f20167bd53ed3",
+    "chatbot/board_shortlist.py": "0f4698d6514199969cd8cc14fd2bf8daa67b22b3e1c5de4ca622bbb45ece4f68",
+    "chatbot/gameday_digest.py": "e51ad9a3ed599fe0fd81fb5f4b9a77bcdeda6d449588ad1b6e3a1e88139ad38f",
+    "chatbot/independent_picks.py": "03fb92979d6c95a24bfd574c6ad278ec2bddf2f6528680ca1e5633b8e99e3b38",
+    "chatbot/conversation.py": "68d11b10e2eef55fc48cdbe3104753380aae5d887a2322c9965fc63b8da09ff9"
   }
 }

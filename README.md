@@ -8,13 +8,15 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 7 master data and pregame update
 
-Tested application `SOURCE_REF`: `d975d775c49a5bf68fff45d4adb44aefb5e30f51`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42428274084)
-passed all **1,604 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `0376a08022425301a1173b411ef5358355e5e3c9`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42429731188)
+passed all **1,623 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
 The [master/schedule/reminder validation report](data/reports/2026-11-07/master_schedule_reminder_validation.json) records the Nov7 live schedule recovery, four-comparison master-data controls and ninety-minute reminder integration tests.
+
+Every uploaded-board reply now contains **From your uploaded lines** and **My own calculated targets from your master**. The second section calculates independent targets for that exact matchup without copying uploaded thresholds or quoting a bookmaker. Both groups remain available for follow-ups; ambiguous numbering asks which group, and calculated targets never become confirmed offers.
 
 Screenshot analysis uses the saved matchup and each player's same-team master records. The default screenshot target is at least four distinct players; larger saved requests remain supported. If eligibility checks hold, the reply still shows measured means, medians, line-crossing counts and source dates as held research. It never pads a lineup with unreadable offers or relabels held research as eligible picks. Other stored players can appear as independent research ideas; actual offers are still needed for a comparison.
 
