@@ -299,13 +299,17 @@ class MasterUpgradeRouteTests(unittest.IsolatedAsyncioTestCase):
              patch('board_shortlist.enrich_shortlist', return_value=shortlist), \
              patch('board_shortlist.format_shortlist', return_value='No supported picks'):
             reply = await self.bot._shortlist_reply(source, 100)
-        self.assertEqual(reply, 'No supported picks')
+        self.assertIn('From your uploaded lines\n\nNo supported picks', reply)
+        self.assertIn('My own calculated targets from your master', reply)
         with self.store.connect() as db:
-            run = db.execute('SELECT id FROM research_runs').fetchone()
+            run = db.execute("SELECT id FROM research_runs WHERE kind='board_shortlist'").fetchone()
+            independent = db.execute("SELECT id FROM research_runs WHERE kind='independent'").fetchone()
+        self.assertIsNotNone(independent)
         archived = get_research(self.store, run['id'], owner_key='telegram:100')
         self.assertEqual(archived['candidates'][0]['disposition'], 'pass')
         self.assertIn('schedule', archived['candidates'][0]['reason'])
         self.assertTrue(archived['payload']['board_snapshot']['legs'][0]['screenshot_unconfirmed'])
+        self.assertEqual(self.store.list_entries(), [])
 
     async def test_unauthorized_telegram_upload_never_downloads_or_merges(self):
         message = self.document()
