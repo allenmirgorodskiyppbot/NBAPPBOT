@@ -6,10 +6,14 @@ betting edge is claimed. The model can decline to offer an aggressive candidate.
 from __future__ import annotations
 
 import datetime as dt
+import asyncio
+from contextlib import contextmanager
+from contextvars import ContextVar
 import json
 import math
 import re
 import statistics
+import threading
 from zoneinfo import ZoneInfo
 
 from feeds import canonical_game, canonical_player, canonical_team, TEAM_WORDS
@@ -20,6 +24,96 @@ from game_phase import regular_phase_exclusion
 
 MIN_COMPARABLE_OBSERVATIONS = 20
 BENCHMARK_METHOD = 'same-team-mean20-v1'
+_PROJECTION_READS = ContextVar('projection_request_reads', default=None)
+
+
+def _read_owner():
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        task = None
+    return threading.get_ident(), task
+
+
+def _read_cache():
+    cache = _PROJECTION_READS.get()
+    return cache if cache is not None and cache['owner'] == _read_owner() else None
+
+
+@contextmanager
+def projection_read_scope():
+    """Reuse raw reads during one synchronous analysis, never across requests.
+
+    This can decorate a synchronous builder with ``@projection_read_scope()``.
+    Nested calls share the caller's reads. Child tasks/threads get their own
+    scope rather than inheriting a mutable cache from another request.
+    """
+    existing = _read_cache()
+    if existing is not None:
+        yield
+        return
+    cache = {'owner': _read_owner(), 'stores': {}, 'names': {}, 'aliases': {}, 'rows': {}}
+    token = _PROJECTION_READS.set(cache)
+    try:
+        yield
+    finally:
+        _PROJECTION_READS.reset(token)
+
+
+def _raw_comparable_rows(store, player, player_id, team, cutoff):
+    """Fetch identities and raw games; market-specific validation stays below."""
+    from career_identity import resolve_career_identity
+    cache = _read_cache()
+    store_key = id(store)
+    if cache is not None:
+        # Keep references alive so an object ID cannot be reused in this scope.
+        cache['stores'][store_key] = store
+    row_key = (store_key, str(player), player_id, team, cutoff)
+    if cache is not None and row_key in cache['rows']:
+        return cache['rows'][row_key]
+    alias_key = (store_key, str(player))
+    if cache is not None and alias_key in cache['aliases']:
+        documented = cache['aliases'][alias_key]
+    else:
+        documented = resolve_career_identity(store, player)
+        if cache is not None:
+            cache['aliases'][alias_key] = documented
+    approved_names = {normalized_name(name) for name in documented['aliases']}
+    with store.connect() as db:
+        names_key = (store_key, cutoff)
+        if cache is not None and names_key in cache['names']:
+            indexed_names = cache['names'][names_key]
+        else:
+            indexed_names = {}
+            for row in db.execute('SELECT DISTINCT player,player_id FROM player_games WHERE date<?', (cutoff,)):
+                indexed_names.setdefault(normalized_name(row['player']), []).append(dict(row))
+            if cache is not None:
+                cache['names'][names_key] = indexed_names
+        names = [row for name in approved_names for row in indexed_names.get(name, [])]
+        if not names:
+            rows = []
+        else:
+            identities = {row['player_id'] for row in names if row['player_id']}
+            identities.update(value for value in (player_id, canonical_player(player)) if value)
+            exact_names = {row['player'] for row in names}
+            filters = ['p.player_id IN (' + ','.join('?' for _ in identities) + ')',
+                       'p.player IN (' + ','.join('?' for _ in exact_names) + ')',
+                       'p.date<?', 'g.date=p.date', "g.status='final'",
+                       "LOWER(p.appearance_state)='played'", "p.season_type='Regular Season'"]
+            args = [*sorted(identities), *sorted(exact_names), cutoff]
+            if team:
+                filters.append('p.team=?')
+                args.append(team)
+            rows = [dict(row) for row in db.execute(
+                'WITH eligible AS (SELECT p.*,g.home_team,g.away_team FROM player_games p '
+                'JOIN games g ON g.id=p.game_id WHERE ' + ' AND '.join(filters) + '), '
+                'recent_games AS (SELECT game_id,MAX(date) AS game_date FROM eligible GROUP BY game_id '
+                'ORDER BY game_date DESC,game_id DESC LIMIT 100) '
+                'SELECT e.* FROM eligible e JOIN recent_games r ON r.game_id=e.game_id '
+                'ORDER BY e.date DESC,e.game_id DESC,e.updated_at DESC,e.player_id', args)]
+    if cache is not None:
+        cache['rows'][row_key] = rows
+    return rows
 
 
 def _evidence(store,kind,entity):
@@ -58,33 +152,7 @@ def _comparable_observations(store, player, player_id, team, cutoff, components)
     """
     quality = {'duplicate_rows': 0, 'conflicting_games': 0, 'incomplete_games': 0,
                'invalid_event_rows': 0, 'invalid_season_rows': 0}
-    from career_identity import resolve_career_identity
-    documented = resolve_career_identity(store, player)
-    approved_names = {normalized_name(name) for name in documented['aliases']}
-    with store.connect() as db:
-        names = [dict(row) for row in db.execute(
-            'SELECT DISTINCT player,player_id FROM player_games WHERE date<?', (cutoff,))
-            if normalized_name(row['player']) in approved_names]
-        if not names:
-            return [], quality
-        identities = {row['player_id'] for row in names if row['player_id']}
-        identities.update(value for value in (player_id, canonical_player(player)) if value)
-        exact_names = {row['player'] for row in names}
-        filters = ['p.player_id IN (' + ','.join('?' for _ in identities) + ')',
-                   'p.player IN (' + ','.join('?' for _ in exact_names) + ')',
-                   'p.date<?', 'g.date=p.date', "g.status='final'",
-                   "LOWER(p.appearance_state)='played'", "p.season_type='Regular Season'"]
-        args = [*sorted(identities), *sorted(exact_names), cutoff]
-        if team:
-            filters.append('p.team=?')
-            args.append(team)
-        rows = [dict(row) for row in db.execute(
-            'WITH eligible AS (SELECT p.*,g.home_team,g.away_team FROM player_games p '
-            'JOIN games g ON g.id=p.game_id WHERE ' + ' AND '.join(filters) + '), '
-            'recent_games AS (SELECT game_id,MAX(date) AS game_date FROM eligible GROUP BY game_id '
-            'ORDER BY game_date DESC,game_id DESC LIMIT 100) '
-            'SELECT e.* FROM eligible e JOIN recent_games r ON r.game_id=e.game_id '
-            'ORDER BY e.date DESC,e.game_id DESC,e.updated_at DESC,e.player_id', args)]
+    rows = _raw_comparable_rows(store, player, player_id, team, cutoff)
     groups = {}
     for original in rows:
         row = dict(original)

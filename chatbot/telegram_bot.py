@@ -476,6 +476,8 @@ class TelegramBot:
         self._photo_semaphore = asyncio.Semaphore(1)
         self._album_batches = {}
         self._album_tasks = set()
+        self._photo_progress = {}
+        self._photo_recent = []
         self._delivery_lock = asyncio.Lock()
         self._known_deliveries = {}
         self.token = token if token is not None else os.getenv('TELEGRAM_BOT_TOKEN', '')
@@ -742,7 +744,35 @@ class TelegramBot:
                 'last_error': self._get_state('last_delivery_error') or self._get_state('last_error') or None,
                 'last_poll_error': self._get_state('last_error') or None,
                 'last_delivery_error': self._get_state('last_delivery_error') or None,
-                'offset': int(self._get_state('offset', '0')), 'database': dict(self._database_health)}
+                'offset': int(self._get_state('offset', '0')), 'database': dict(self._database_health),
+                'uploads': self._photo_progress_status()}
+
+    def _photo_progress_status(self):
+        """Bounded operational metadata only; never expose upload/chat contents."""
+        current = time.monotonic()
+        active = [dict(item) for item in tuple(self._photo_progress.values())]
+        jobs = sorted(active, key=lambda item: item['clock'], reverse=True)
+        jobs.extend(reversed(self._photo_recent))
+        return {'active_count': len(active), 'jobs': [
+            {key: value for key, value in item.items() if key != 'clock'} |
+            {'elapsed_seconds': round(max(0, current-item['clock']) if item['state'] == 'running'
+                                      else item['elapsed_seconds'], 1)}
+            for item in jobs[:8]]}
+
+    def _photo_stage(self, chat_id, phase, *, image_number=None):
+        job = self._photo_progress.get(chat_id)
+        if job is None:
+            return
+        labels = {'reading': 'Reading screenshots', 'matching': 'Matching saved players and game',
+                  'uploaded_research': 'Comparing uploaded lines',
+                  'master_targets': 'Calculating own master targets'}
+        job['phase'] = phase
+        job['stage'] = labels[phase]
+        if image_number is not None:
+            job['image_number'] = image_number
+        if phase == 'reading':
+            job['stage'] += f" {job.get('image_number', 1)}/{job['image_count']}"
+        log.info('Screenshot job phase=%s elapsed=%.1fs', phase, time.monotonic()-job['clock'])
 
     def _authorized(self, message):
         sender = message.get('from') or {}
@@ -1271,9 +1301,11 @@ class TelegramBot:
             constraints['pick_count'] = count
         return constraints
 
-    async def _shortlist_reply(self, report, chat_id=None):
+    async def _shortlist_reply(self, report, chat_id=None, *, upload_progress=False):
         if callable(getattr(self.store, 'connect', None)) and 'original_legs' in report:
             from board_shortlist import enrich_shortlist, format_shortlist, build_master_targets
+            if upload_progress:
+                self._photo_stage(chat_id, 'uploaded_research')
             constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
             # Screenshot research targets at least four distinct-player picks.
             # Preserve larger requests; eligibility still decides what can rank.
@@ -1293,6 +1325,8 @@ class TelegramBot:
             uploaded_text = 'From your uploaded lines\n\n' + format_shortlist(shortlist)
             try:
                 from independent_picks import format_independent_picks
+                if upload_progress:
+                    self._photo_stage(chat_id, 'master_targets')
                 targets = await asyncio.to_thread(build_master_targets, self.store, report,
                                                  count=requested, constraints=constraints)
                 target_text = format_independent_picks(targets, compact=True, max_chars=1400)
@@ -1331,7 +1365,8 @@ class TelegramBot:
             constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
             if original_text is not None:
                 request = parse_picks_request(original_text, default_count=constraints.get('pick_count', 4)) or request
-            report = await asyncio.to_thread(build_independent_picks, self.store, **request, constraints=constraints)
+            report = await asyncio.to_thread(build_independent_picks, self.store, **request,
+                                             constraints=constraints, allow_unverified_timing=True)
             from pregame_archive import record_research
             await asyncio.to_thread(record_research, self.store, report,
                                     owner_key=f'telegram:{chat_id}', kind='independent')
@@ -1385,14 +1420,27 @@ class TelegramBot:
         lock = self._photo_locks.setdefault(chat_id, asyncio.Lock())
         async with lock:
             typing = asyncio.create_task(self._typing(chat_id))
+            job = {'state': 'running', 'phase': 'reading', 'stage': 'Reading screenshots',
+                   'image_count': len(items), 'image_number': 1,
+                   'started_at': utcnow(), 'clock': time.monotonic()}
+            self._photo_progress[chat_id] = job
+            outcome = 'completed'
             try:
+                self._photo_stage(chat_id, 'reading', image_number=1)
+                group = items[0][0].get('media_group_id')
+                ack_key = 'photo-reading:' + (str(group) if group else str(items[0][1]))
+                await self._retry_db(self._queue, chat_id,
+                    f"Reading your {len(items)} screenshot(s). I’ll compare readable lines with the master, "
+                    'then calculate my own targets. /status shows the current stage while I work.',
+                    event_key=ack_key)
                 now = datetime.now(timezone.utc)
                 dates, newly_read = set(), 0
                 problems = []
                 captions = {date for message, _ in items for date in
                             re.findall(r'\b\d{4}-\d{2}-\d{2}\b', str(message.get('caption', '')))}
                 inherited = next(iter(captions)) if len(captions) == 1 else None
-                for message, update_id in sorted(items, key=lambda item: item[1]):
+                for image_number, (message, update_id) in enumerate(sorted(items, key=lambda item: item[1]), 1):
+                    self._photo_stage(chat_id, 'reading', image_number=image_number)
                     caption = str(message.get('caption', '')).strip()
                     if caption.startswith('/importstats'):
                         problems.append('Statistics screenshots are not imported. Send a CSV/JSON file with /importstats.')
@@ -1416,6 +1464,7 @@ class TelegramBot:
                     except (ValueError, RuntimeError, OSError):
                         problems.append('One image could not be read; resend a PNG/JPEG crop under 8 MB.')
                         continue
+                    self._photo_stage(chat_id, 'matching')
                     legs, unresolved = await asyncio.to_thread(resolve_cards, self.store, extraction, date, roster)
                     await asyncio.to_thread(save_extraction, self.store, chat_id, update_id, date, basis,
                                             extraction, legs, unresolved, now)
@@ -1423,12 +1472,14 @@ class TelegramBot:
                     dates.add(date)
                     problems.extend(unresolved)
                 if not newly_read:
+                    outcome = 'failed'
                     details = '\n'.join('• '+str(value)[:160] for value in list(dict.fromkeys(problems))[:3])
                     return ('I couldn’t read a complete, supported card confidently enough to choose a pick.\n'
                             + (details+'\n' if details else '') +
                             'Send a closer crop with the player, full statistic label, line and More/Less buttons visible, '
                             'preferably as an image file. I kept unclear cards out; no entry was recorded.')
                 messages = []
+                self._photo_stage(chat_id, 'matching')
                 await self._refresh_board_news()
                 for date in sorted(dates):
                     bundle = await asyncio.to_thread(combined_board, self.store, chat_id, date, now,
@@ -1442,7 +1493,7 @@ class TelegramBot:
                     report = await asyncio.to_thread(analysis_engine.analyze_board, self.store, board['id'])
                     header = f"Read {bundle['market_count']} distinct lines across {bundle['upload_count']} recent screenshot(s)."
                     header += ('\nAssumed game date: ' if bundle.get('date_assumed') else '\nGame date: ') + date + ' Eastern; matched saved schedule.'
-                    detail = await self._shortlist_reply(report, chat_id)
+                    detail = await self._shortlist_reply(report, chat_id, upload_progress=True)
                     skipped = list(dict.fromkeys(bundle.get('unresolved', []) + problems))
                     if skipped:
                         detail += '\nUnread/unsupported cards kept out: ' + '; '.join(skipped[:2])[:270]
@@ -1450,8 +1501,23 @@ class TelegramBot:
                             detail += f' (+{len(skipped)-2} more).'
                     detail += '\nOnly readable options were compared; check the displayed image-read lines. /newboard starts a fresh set.'
                     messages.append(header+'\n\n'+detail)
+                if not messages:
+                    outcome = 'failed'
                 return '\n\n'.join(messages)[:7000] or 'No supported board could be assembled. Send fewer complete cards.'
+            except asyncio.CancelledError:
+                outcome = 'canceled'
+                raise
+            except Exception:
+                outcome = 'failed'
+                raise
             finally:
+                job.update(state=outcome, finished_at=utcnow(),
+                           elapsed_seconds=round(max(0, time.monotonic()-job['clock']), 1))
+                self._photo_progress.pop(chat_id, None)
+                self._photo_recent.append(dict(job))
+                del self._photo_recent[:-8]
+                log.info('Screenshot job state=%s phase=%s elapsed=%.1fs',
+                         outcome, job['phase'], job['elapsed_seconds'])
                 typing.cancel()
                 await asyncio.gather(typing, return_exceptions=True)
 

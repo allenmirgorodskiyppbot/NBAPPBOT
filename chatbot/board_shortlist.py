@@ -13,7 +13,7 @@ from collections import defaultdict
 from zoneinfo import ZoneInfo
 
 from feeds import TEAM_WORDS, canonical_player, canonical_team
-from contextual_projection import baseline_offer_decision
+from contextual_projection import baseline_offer_decision, projection_read_scope
 from news_digest import _aware, _clean, _metadata, is_promotion
 from season_calendar import calendar_context, current_season
 from lineup_selection import select_lineup
@@ -378,12 +378,84 @@ def _master_comparison(store, item, context, hold_reason, now, team_cache):
             'sample_seasons': sorted({str(row['season']) for row in rows if row.get('season')}),
             'source': 'saved master player games',
             'source_games': [{'game_id': row['game_id'], 'date': row['date'],
-                'source': row.get('source'), 'value': row['value'], 'team': row['team']} for row in rows],
+                'source': row.get('source'), 'value': row['value'], 'team': row['team'],
+                'season': row.get('season')} for row in rows],
             'historical_benchmark': benchmark, 'hold_reason': hold_reason,
             'research_only': True, 'eligible_for_ranking': False, 'approved_for_entry': False}
 
 
-def _research_from_master(store, held_items, now, count, required_teams=(), *, team_cache=None):
+def _research_choice(value):
+    """Choose a readable historical lean without changing live eligibility."""
+    offered = set(value.get('offered_sides') or ()) & {'more', 'less'}
+    if (not offered or value.get('research_blocked') or value['n'] < 20
+            or value.get('statistics_ready') is not True):
+        return
+    above, below, ties = value['above'], value['below'], value['ties']
+    if above is None or below is None or above + below == 0:
+        return
+    # Engine source rows normally arrive newest first. Sort explicitly because
+    # a caller's row order must not silently change the recent-form caution.
+    ordered = sorted(value['source_games'], key=lambda row: row['date'], reverse=True)
+    recent = ordered[:5]
+    recent_values = [row['value'] for row in recent]
+    recent_counts = {'more':sum(number > value['line'] for number in recent_values),
+                     'less':sum(number < value['line'] for number in recent_values)}
+    counts = {'more':above, 'less':below}
+    benchmark_side = (value.get('historical_benchmark') or {}).get('side')
+    if benchmark_side in offered:
+        side, basis = benchmark_side, 'Existing mean/median research buffer'
+    elif above != below:
+        side = 'more' if above > below else 'less'
+        basis = 'More observed games on this side in the saved sample'
+    elif recent_counts['more'] != recent_counts['less']:
+        side = 'more' if recent_counts['more'] > recent_counts['less'] else 'less'
+        basis = 'Saved sample split evenly; recent observed games break the tie'
+    elif value['mean'] != value['line']:
+        side = 'more' if value['mean'] > value['line'] else 'less'
+        basis = 'Observed counts tied; historical mean breaks the tie'
+    elif value['median'] != value['line']:
+        side = 'more' if value['median'] > value['line'] else 'less'
+        basis = 'Observed counts and mean tied; historical median breaks the tie'
+    else:
+        return
+    # A one-sided special offer does not license the unshown opposing choice,
+    # or a forced side against all the supplied measured evidence.
+    if side not in offered or counts[side] == 0:
+        return
+    recent_n = len(recent_values)
+    current_season = next((row.get('season') for row in ordered if row.get('season')), None)
+    season_values = [row['value'] for row in ordered
+                     if current_season and row.get('season') == current_season]
+    season_count = sum(number > value['line'] if side == 'more' else number < value['line']
+                       for number in season_values)
+    recent_count = recent_counts[side]
+    conflict = bool(recent_n >= 3 and counts[side] > (above + below) / 2
+                    and recent_count < recent_n / 2)
+    cautious = conflict or benchmark_side != side
+    value.update(lean_side=side, selection_basis=basis,
+                 support_label='Mixed historical support' if conflict else
+                               'Narrow research lean' if cautious else 'Research buffer supported',
+                 selected_sample_count=counts[side], recent_n=recent_n, recent_side_count=recent_count,
+                 recent_values=recent_values, recent_dates=[row['date'] for row in recent],
+                 recent_conflict=conflict, current_sample_season=current_season,
+                 current_sample_season_n=len(season_values), current_sample_season_side_count=season_count,
+                 research_caution=('Recent observed games run against the longer-sample lean.' if conflict else
+                                   'This lean does not clear the stricter mean/median buffer.' if cautious else None))
+    value['leg'] = {**value['leg'], 'side': side}
+
+
+def _research_order(value):
+    side = value.get('lean_side')
+    fraction = value.get('selected_sample_count', 0) / max(1, value['n'])
+    recent_fraction = value.get('recent_side_count', 0) / max(1, value.get('recent_n', 0))
+    return (not bool(side), bool(value.get('recent_conflict')),
+            -bool(side and (value.get('historical_benchmark') or {}).get('side') == side),
+            -(fraction + recent_fraction) / 2, -(value['n'] >= 20),
+            -value['n'], value['player'], value['stat'], value['line'] if value['line'] is not None else -1)
+
+
+def _research_from_master(store, held_items, now, count, required_teams=(), *, team_cache=None,
+                          selected=(), constraints=None):
     """Select useful distinct-player comparisons; never call them a lineup."""
     team_cache = {} if team_cache is None else team_cache
     grouped = {}
@@ -392,18 +464,29 @@ def _research_from_master(store, held_items, now, count, required_teams=(), *, t
                _number(leg.get('line')), leg.get('game_id') or context.get('game_id'), _variant(leg))
         if key in grouped:
             grouped[key]['offered_sides'] = sorted(set(grouped[key]['offered_sides']) | {leg.get('side')})
+            grouped[key]['research_blocked'] |= item.get('_research_blocked', False)
             continue
         value = _master_comparison(store, {**item, 'leg': leg}, context, reason, now, team_cache)
         if value:
             value['offered_sides'] = [leg['side']] if leg.get('side') in {'more', 'less'} else []
+            freshness = assess_pregame_freshness(store, str(leg.get('date') or context.get('date'))[:10],
+                leg.get('team'), now, player=leg.get('player'), stat=leg.get('stat'))
+            value.update(statistics_ready=freshness.get('statistics_ready', freshness.get('ready') is True) is True,
+                         timing_verified=freshness.get('timing_verified', freshness.get('ready') is True) is True,
+                         timing_issues=list(freshness.get('timing_issues') or []),
+                         statistics_issues=list(freshness.get('statistics_issues') or []),
+                         research_blocked=item.get('_research_blocked', False))
             grouped[key] = value
-    comparisons = sorted(grouped.values(), key=lambda value: (
-        -(value['n'] >= 20), -bool((value.get('historical_benchmark') or {}).get('side')),
-        -value['n'], value['player'], value['stat'], value['line'] if value['line'] is not None else -1))
-    # This helper enforces distinct names and team coverage only. Its returned
-    # completion metadata is intentionally discarded: these remain held facts.
-    chosen, _ = select_lineup(comparisons, count, required_teams=required_teams)
-    return chosen
+    for value in grouped.values():
+        _research_choice(value)
+    comparisons = sorted(grouped.values(), key=_research_order)
+    # Account for already-qualified selections when filling the remaining
+    # slots. In particular, one remaining slot after three NYK selections must
+    # prefer a readable CLE research choice over another NYK player.
+    chosen, _ = select_lineup([*selected, *comparisons], len(selected) + count,
+        required_teams=required_teams, constraints=constraints)
+    comparison_ids = {id(item) for item in comparisons}
+    return [item for item in chosen if id(item) in comparison_ids]
 
 
 def _held_master_watchlist(store, held, now, count, team_cache):
@@ -532,6 +615,7 @@ def _watchlist(store, original_legs, news, now, held=None):
     return result
 
 
+@projection_read_scope()
 def enrich_shortlist(store, report, now=None, *, count=4, constraints=None):
     """Apply presentation/risk gates to engine output without changing saved data."""
     now = _now(now)
@@ -607,7 +691,11 @@ def enrich_shortlist(store, report, now=None, *, count=4, constraints=None):
                             'side': leg.get('side'), 'line': leg.get('line'),
                             'offer_variant': leg['offer_variant'], 'reason': _clean(reason, 250)})
             if not event_issue:
-                held_items.append((item, leg, context, reason))
+                blocked_research = bool((availability or {}).get('blocked') or
+                    len(variants[_offer_key(item.get('leg', {}))]) > 1 or
+                    len(thresholds[_key(item.get('leg', {}))]) > 1 or
+                    leg.get('side') not in {'more','less'} or _number(leg.get('line')) is None)
+                held_items.append(({**item, '_research_blocked':blocked_research}, leg, context, reason))
             continue
         standardized = _number(projection.get('standardized_margin'))
         margin = float(projection['selected_side_margin'])
@@ -661,14 +749,23 @@ def enrich_shortlist(store, report, now=None, *, count=4, constraints=None):
     remaining = max(0, count - len(selected))
     research = (_research_from_master(store, [item for item in held_items
         if canonical_player(item[1].get('player', '')) not in selected_names], now, remaining,
-        required_teams, team_cache=team_cache) if remaining else [])
+        required_teams, team_cache=team_cache, selected=selected, constraints=constraints) if remaining else [])
+    research_picks = [item for item in research if item.get('lean_side')]
+    _, combined_coverage = select_lineup([*selected, *research_picks], count,
+        required_teams=required_teams, constraints=constraints)
+    research_choice_coverage = {key: combined_coverage[key] for key in
+        ('requested_count', 'required_teams', 'selected_teams', 'missing_teams', 'two_team_coverage')}
+    research_choice_coverage.update(selected_count=len(selected) + len(research_picks),
+        complete=combined_coverage['lineup_complete'], research_only=True, approved_for_entry=False)
     master_watchlist = _held_master_watchlist(store, watchlist_held, now, count, team_cache)
     return {'board_id': report.get('board_id'), 'report_id': report.get('id'),
             'generated_at': now.isoformat(), 'source_report_generated_at': report.get('generated_at'),
             'research_only': True, 'shortlist': selected, 'skipped': unique_skipped,
             **coverage,
             'watchlist': watchlist, 'watchlist_held': watchlist_held,
-            'research_candidates': research, 'master_watchlist': master_watchlist,
+            'research_candidates': research, 'research_picks':research_picks,
+            'research_choice_coverage': research_choice_coverage,
+            'master_watchlist': master_watchlist,
             'has_adjusted_offers': adjusted_offers,
             'notes': ['Experimental comparisons, not validated win probabilities.',
                       'Current availability and offer/payout terms still need checking; no entry was placed.'] +
@@ -712,7 +809,7 @@ def build_master_targets(store, report, now=None, *, count=4, constraints=None):
     event_id, (date, team) = next(iter(events.items()))
     from independent_picks import build_independent_picks
     result = build_independent_picks(store, date=date, count=count, team=team, now=now,
-                                     constraints=constraints)
+                                     constraints=constraints, allow_unverified_timing=True)
     game = result.get('game') or {}
     if game.get('id') != event_id or game.get('date') != date:
         return held('Independent targets could not be matched to the exact uploaded game. '
@@ -726,12 +823,14 @@ def format_shortlist(data):
     """Keep the decision, its reason, and next request in one Telegram message."""
     picks = data.get('shortlist', [])
     research = data.get('research_candidates', [])
+    research_picks = [item for item in research if item.get('lean_side')]
     heading = ('Partial shortlist — lineup incomplete' if picks and data.get('lineup_complete') is False
                else 'My shortlist' if picks else
+               f'{len(research_picks)} research picks from your readable lines' if research_picks else
                f'Saved stats loaded — {len(research)} held research comparisons' if research else
                'No pick from these lines yet')
     lines = [heading]
-    if data.get('constraint_note'):
+    if data.get('constraint_note') and not research_picks:
         lines.append(_clean(data['constraint_note'], 280))
     for number, item in enumerate(picks, 1):
         leg = item['leg']
@@ -741,7 +840,36 @@ def format_shortlist(data):
         if item.get('caution'):
             block += '\nWatch: ' + _clean(item['caution'], 200)
         lines.append(block)
-    if research:
+    if research_picks:
+        if any(not item.get('timing_verified') for item in research_picks):
+            lines.append('Research only: saved game statistics are current; live game timing is unverified. '
+                         'These do not count as a qualified lineup.')
+        else:
+            lines.append('Research picks from saved statistics; these do not all clear the stricter shortlist rules.')
+        for number, item in enumerate(research_picks, len(picks) + 1):
+            market = MARKET_NAMES.get(item['stat'], item['stat'])
+            side = item['lean_side']
+            scope = ', '.join(item.get('sample_seasons') or [])
+            block = (f"{number}. {_clean(item['player'], 70)} — {side.title()} {item['line']:g} {market} "
+                     f"({item['team']}; {_offer_label(_variant(item['leg']))})"
+                     f"\nRESEARCH PICK: {item['support_label']}. "
+                     f"{item['selected_sample_count']}/{item['n']} on this side; "
+                     f"mean {item['mean']:.2f}, median {item['median']:g}."
+                     f"\nLast {item['recent_n']}: {item['recent_side_count']}/{item['recent_n']} on this side. "
+                     f"Same-team {scope or 'regular-season'} sample through {item['source_data_through_date']}.")
+            if item['above'] == item['below']:
+                block += '\nBasis: ' + item['selection_basis'] + '.'
+            if item.get('research_caution'):
+                block += '\nCaution: ' + item['research_caution']
+            lines.append(block)
+        if len(research_picks) + len(picks) < data.get('requested_count', 4):
+            lines.append('Fewer than the requested number of readable, supported choices are available; '
+                         'unsupported selections were not filled in.')
+        lines.append('Historical counts describe these saved games, not this game’s win probability. '
+                     'Check current availability before entry.')
+        # Non-directional comparisons remain available in the saved analysis;
+        # they must not look like additional choices in this concise reply.
+    elif research:
         lines.append('Research from your master — held, not an approved lineup')
         for number, item in enumerate(research, 1):
             market = MARKET_NAMES.get(item['stat'], item['stat'])

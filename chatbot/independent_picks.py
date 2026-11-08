@@ -14,7 +14,8 @@ from zoneinfo import ZoneInfo
 
 from board_shortlist import MARKET_NAMES, player_availability
 from contextual_projection import (projection_for_leg, MIN_COMPARABLE_OBSERVATIONS,
-                                   benchmark_margin, baseline_offer_decision)
+                                   benchmark_margin, baseline_offer_decision,
+                                   projection_read_scope)
 from feeds import canonical_player, canonical_team
 from career_identity import career_player_key
 from news_digest import _aware, _clean
@@ -101,11 +102,26 @@ def _reason(projection):
     return text
 
 
-def build_independent_picks(store, date=None, count=4, team='NYK', now=None, constraints=None):
+def _statistics_ready(freshness):
+    # Legacy callers can positively establish full readiness, but a failed
+    # combined check is never inferred to mean that statistical inputs passed.
+    return freshness.get('statistics_ready', freshness.get('ready') is True) is True
+
+
+def _usable_freshness(freshness, allow_unverified_timing):
+    return (freshness.get('ready') is True or
+            (allow_unverified_timing and _statistics_ready(freshness)))
+
+
+@projection_read_scope()
+def build_independent_picks(store, date=None, count=4, team='NYK', now=None, constraints=None,
+                            *, allow_unverified_timing=False):
     """Build a read-only conditional research draft without reading any board."""
     now = _now(now)
     if type(count) is not int or not 1 <= count <= 6:
         raise ValueError('Request between one and six distinct players.')
+    if type(allow_unverified_timing) is not bool:
+        raise ValueError('The research timing option must be a boolean.')
     constraints = dict(constraints or {})
     # A preference changes the ordering of independently qualified markets. It
     # must not expand the supported market set or weaken the evidence gates.
@@ -119,6 +135,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
               'source_kind': 'saved statistics and schedule', 'picks': [], 'held': [], 'evaluated_candidates': [],
               'game': game, 'game_date': game['date'] if game else date,
               'two_team_coverage': False, 'note': error, 'research_only': True,
+              'allow_unverified_timing': allow_unverified_timing,
+              'statistics_verified': False, 'timing_verified': False,
+              'live_verified': False, 'live_lineup_complete': False,
+              'research_lineup_complete': False, 'timing_issues': [],
               'limits': ['These are own projections and conditional target lines, not current PrizePicks offers.',
                          'Experimental scenarios; no calibrated win probabilities or combined entry odds.',
                          'Current availability, game time and offer terms require checking. No entry is recorded.']}
@@ -132,6 +152,12 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     team_freshness = {value: assess_pregame_freshness(store, game['date'], value, now)
                       for value in sorted(teams)}
     result['freshness_by_team'] = team_freshness
+    result['statistics_verified'] = all(_statistics_ready(value) for value in team_freshness.values())
+    result['timing_verified'] = all(value.get('timing_verified', value.get('ready') is True) is True
+                                    for value in team_freshness.values())
+    result['live_verified'] = all(value.get('ready') is True for value in team_freshness.values())
+    result['timing_issues'] = list(dict.fromkeys(
+        issue for value in team_freshness.values() for issue in value.get('timing_issues', [])))
     cutoff = min(game['date'], now.astimezone(EASTERN).date().isoformat())
     with store.connect() as db:
         players = [dict(row) for row in db.execute(
@@ -151,7 +177,7 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
         opponent = game['away_team'] if player['team'] == game['home_team'] else game['home_team']
         availability = player_availability(news, player['player'], game['date'], now, store=store)
         freshness = team_freshness[player['team']]
-        if freshness['ready'] and not availability['blocked']:
+        if _usable_freshness(freshness, allow_unverified_timing) and not availability['blocked']:
             freshness = assess_pregame_freshness(store, game['date'], player['team'], now,
                                                  player=player['player'])
         choices, reasons = [], []
@@ -159,6 +185,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
             evaluated = {'player': player['player'], 'player_id': player['player_id'],
                          'team': player['team'], 'opponent': opponent, 'date': game['date'],
                          'stat': stat, 'availability': availability, 'freshness': freshness,
+                         'statistics_verified': _statistics_ready(freshness),
+                         'timing_verified': freshness.get('timing_verified', freshness.get('ready') is True) is True,
+                         'live_verified': freshness.get('ready') is True,
+                         'research_only': True,
                          'projection': None, 'disposition': 'pass', 'reason': None}
             result['evaluated_candidates'].append(evaluated)
             def hold(reason):
@@ -167,8 +197,9 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
             if availability['blocked']:
                 hold(availability['note'])
                 continue
-            if not freshness['ready']:
-                hold('Current game data is not ready: ' + ' '.join(freshness['reasons']))
+            if not _usable_freshness(freshness, allow_unverified_timing):
+                issues = (freshness.get('statistics_issues') if allow_unverified_timing else None)
+                hold('Current game data is not ready: ' + ' '.join(issues or freshness['reasons']))
                 continue
             if stat not in freshness.get('current_player_stat_coverage', []):
                 hold('The requested statistic is missing or conflicting in the player’s latest completed game.')
@@ -214,6 +245,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
                             'team': player['team'], 'opponent': projection['opponent'],
                             'stat': stat, 'projection': projection, 'targets': targets,
                             'reason': reason, 'availability': availability,
+                            'research_only': True, 'statistics_verified': _statistics_ready(freshness),
+                            'timing_verified': evaluated['timing_verified'],
+                            'live_verified': evaluated['live_verified'],
+                            'freshness': freshness,
                             'caution': availability.get('note'), '_rank': rank})
         if choices:
             choices.sort(key=lambda value: (bool(preferred_stat and value['stat'] != preferred_stat),
@@ -227,14 +262,19 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     if preferred_stat:
         result['lineup_constraints']['preferred_stat'] = preferred_stat
     result['picks'] = [{k: v for k, v in row.items() if k != '_rank'} for row in chosen]
+    result['research_lineup_complete'] = result['lineup_complete']
+    result['live_lineup_complete'] = (result['lineup_complete'] and
+                                    all(row['live_verified'] for row in chosen))
     selected_keys = {(canonical_player(row['player']), row['stat']) for row in chosen}
     for evaluated in result['evaluated_candidates']:
         if (canonical_player(evaluated['player']), evaluated['stat']) in selected_keys:
             evaluated['disposition'] = 'selected'
     result['note'] = (f"{len(chosen)} of {count} requested player projections are supported." if len(chosen) < count else
                       'Compare these independent targets with the actual offers before selecting sides.')
-    if not chosen and any(not value['ready'] for value in team_freshness.values()):
+    if not chosen and any(not _statistics_ready(value) for value in team_freshness.values()):
         result['note'] += ' Current game-stat coverage is missing or stale; /freshness shows the required updates.'
+    elif chosen and not result['live_verified']:
+        result['verification_note'] = 'Live game timing is unverified. These targets use verified completed-game statistics; check timing and availability.'
     if not result['lineup_complete']:
         result['note'] += ' ' + result['constraint_note']
     result['source_data_through_date'] = min((row['projection']['last_date'] for row in chosen), default=None)
@@ -257,6 +297,8 @@ def format_independent_picks(report, compact=False, *, max_chars=None):
              'My target lines, not quoted PrizePicks offers.']
     if report.get('lineup_complete') is False:
         lines[1] += '\n' + _clean(report.get('constraint_note'), 240)
+    if report.get('picks') and report.get('live_verified') is False:
+        lines[1] += '\nLive timing unverified; research based on verified completed-game stats.'
     for i, item in enumerate(report.get('picks', []), 1):
         value = item['projection']['reference_projection']
         targets = item['targets']

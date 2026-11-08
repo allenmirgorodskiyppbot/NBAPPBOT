@@ -129,6 +129,9 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
     Full-day independent inventory or a complete published team calendar must
     establish that no intervening team game is missing. Rest days are allowed;
     stale/unknown publication checks and unknown player participation are held.
+    ``statistics_ready`` describes the completed-game inputs checked as of now;
+    it does not verify an upcoming event's timing or approve a current selection.
+    ``ready`` retains all existing target-day and live-schedule requirements.
     """
     if now.tzinfo is None:
         now = now.replace(tzinfo=dt.timezone.utc)
@@ -137,21 +140,35 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
     target = _date(game_date)
     team = canonical_team(team)
     result = {'ready': False, 'reasons': [], 'game_date': str(game_date), 'team': team,
+              'statistics_ready': False, 'timing_verified': False,
+              'statistics_issues': [], 'timing_issues': [],
               'required_game_date': required.isoformat(), 'latest_team_final_date': None,
               'player_data_through_date': None, 'daily_refresh': {},
               'current_player_stat_coverage': [],
               'historical_only': target != today, 'checked_at': now.isoformat(),
               'coverage_scope': 'Game observations and current pregame schedule only; injuries, tracking and tentative defenders have separate source dates.'}
     reasons = result['reasons']
+    statistics_issues = result['statistics_issues']
+    timing_issues = result['timing_issues']
     if target != today:
-        reasons.append('A current game-day refresh is required; future or past dates remain historical research.')
+        target_issue = 'A current game-day refresh is required; future or past dates remain historical research.'
+        reasons.append(target_issue)
+        timing_issues.append(target_issue)
+        if target is None or target < today:
+            statistics_issues.append(target_issue)
     if not team:
-        reasons.append('The player’s current team is unresolved.')
+        issue = 'The player’s current team is unresolved.'
+        statistics_issues.append(issue)
+        timing_issues.append(issue)
+        result['reasons'] = list(dict.fromkeys([*reasons, *statistics_issues]))
         return result
     if target == today:
         result['schedule_check'], schedule_issue = _current_schedule_check(store, target.isoformat(), team, now)
         if schedule_issue:
             reasons.append(schedule_issue)
+            timing_issues.append(schedule_issue)
+        else:
+            result['timing_verified'] = result['schedule_check'].get('game_verified') is True
     daily = store.get_checkpoint('daily_nba:' + required.isoformat(), {}) or {}
     result['daily_refresh'] = {key: daily.get(key) for key in (
         'date', 'complete', 'last_checked_at', 'last_refresh_status', 'last_refresh_error',
@@ -176,7 +193,7 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
     if latest:
         result['latest_team_final_date'] = latest['date']
     else:
-        reasons.append('The latest completed team game cannot be established from saved records.')
+        statistics_issues.append('The latest completed team game cannot be established from saved records.')
     start = _date(latest['date']) if latest else required
     for window in calendar.get('unassigned_windows', []):
         lower, upper = _date(window.get('start')), _date(window.get('end'))
@@ -188,12 +205,12 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
                       game.get('status') not in _CANCELLED and
                       by_id.get(game['id'], game).get('status') != 'final']
     if pending_events:
-        reasons.append('A past scheduled team game lacks final imported data: ' +
+        statistics_issues.append('A past scheduled team game lacks final imported data: ' +
                        ', '.join(sorted({game['date'] for game in pending_events})) + '.')
     checked_target = _successful_today(daily, required.isoformat(), today, now)
     verified_inventory = bool(checked_target and _verified_inventory_today(daily, today, now))
     if not covered and not verified_inventory:
-        reasons.append('Complete recent team-game inventory is unverified; a published statistics subset cannot establish missing games.')
+        statistics_issues.append('Complete recent team-game inventory is unverified; a published statistics subset cannot establish missing games.')
     # A known empty day in a complete team calendar may lack a statistics file.
     # Its latest required final-game publication still needs a successful check
     # today. An empty games table by itself never establishes an off day.
@@ -203,7 +220,7 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
                                  '404' in str(daily.get('last_refresh_error') or ''))
     calendar_offday = covered and not expected_yesterday and target_absent
     if not checked_target and not calendar_offday:
-        reasons.append('The previous day’s game publication has no successful current-day refresh check.')
+        statistics_issues.append('The previous day’s game publication has no successful current-day refresh check.')
     if calendar_offday:
         result['off_day_basis'] = 'Complete saved published team calendar; live schedule changes are not independently verified.'
     if checked_target:
@@ -211,14 +228,14 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
         if not isinstance(team_ids, list) or any(
                 game_id not in by_id or by_id[game_id].get('status') != 'final' or
                 by_id[game_id].get('date') != required.isoformat() for game_id in team_ids):
-            reasons.append('The published team-game inventory contains a completed game missing from imported records.')
+            statistics_issues.append('The published team-game inventory contains a completed game missing from imported records.')
     if not covered and latest:
         # A verified empty yesterday cannot hide an unobserved game on an
         # intervening day. Establish every day since the last known team final.
         span = (required - start).days + 1
         missing = []
         if span > 60:
-            reasons.append('The recent team-game inventory gap exceeds the verified daily window.')
+            statistics_issues.append('The recent team-game inventory gap exceeds the verified daily window.')
         else:
             for offset in range(span):
                 day = (start + dt.timedelta(days=offset)).isoformat()
@@ -231,10 +248,10 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
                 if not isinstance(ids, list) or any(game_id not in by_id or
                         by_id[game_id].get('status') != 'final' or by_id[game_id].get('date') != day
                         for game_id in ids):
-                    reasons.append('An intervening published team game is missing from imported final records: ' + day + '.')
+                    statistics_issues.append('An intervening published team game is missing from imported final records: ' + day + '.')
             if missing:
                 result['missing_inventory_dates'] = missing
-                reasons.append('Current independent team-game inventory is missing for: ' + ', '.join(missing) + '.')
+                statistics_issues.append('Current independent team-game inventory is missing for: ' + ', '.join(missing) + '.')
     latest_record = {}
     if latest:
         latest_record = store.get_checkpoint('daily_nba:' + latest['date'], {}) or {}
@@ -243,12 +260,12 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
         if (not _successful_today(latest_record, latest['date'], today, now) or
                 latest['id'] not in latest_record.get('final_game_ids', []) or
                 latest['id'] not in latest_record.get('team_final_game_ids', {}).get(team, [])):
-            reasons.append('The latest completed team game lacks a successful current-day publication check and confirmed import coverage.')
+            statistics_issues.append('The latest completed team game lacks a successful current-day publication check and confirmed import coverage.')
     pending = []
     for field in ('pending_dates', 'older_pending_dates'):
         values = worker.get(field, [])
         if not isinstance(values, list) or any(not isinstance(value, str) or not _date(value) for value in values):
-            reasons.append('Refresh pending-date status is malformed; game coverage cannot be verified.')
+            statistics_issues.append('Refresh pending-date status is malformed; game coverage cannot be verified.')
         else:
             pending.extend(values)
     for value in set(pending):
@@ -258,7 +275,7 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
         calendar_empty = covered and not any(game.get('date') == value and game.get('status') not in _CANCELLED
                                              for game in scheduled)
         if not calendar_empty:
-            reasons.append('A relevant game date is still pending import: ' + value + '.')
+            statistics_issues.append('A relevant game date is still pending import: ' + value + '.')
     if player and latest:
         latest_games = [game for game in finals if game['date'] == latest['date']]
         observed = []
@@ -274,12 +291,12 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
                     opponent != team and canonical_team(row['opponent']) in {'', opponent}]
                 states = {str(row.get('appearance_state') or '').lower() for row in rows}
                 if not rows or not states <= {'played', 'dnp'} or len(states) != 1:
-                    reasons.append('The player’s participation in the latest completed team game is missing, unknown or conflicting.')
+                    statistics_issues.append('The player’s participation in the latest completed team game is missing, unknown or conflicting.')
                     continue
                 if 'played' in states:
                     minutes = {_number(row.get('minutes')) for row in rows} - {None}
                     if len(minutes) != 1 or next(iter(minutes), 0) <= 0:
-                        reasons.append('The player’s latest played observation lacks consistent verified minutes.')
+                        statistics_issues.append('The player’s latest played observation lacks consistent verified minutes.')
                         continue
                     supported = set()
                     for market, components in STAT_COMPONENTS.items():
@@ -294,7 +311,10 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
             result['player_data_through_date'] = latest['date']
             result['current_player_stat_coverage'] = sorted(current_stats)
             if stat is not None and stat not in current_stats:
-                reasons.append('The requested statistic is missing or conflicting in the player’s latest completed game.')
-    result['reasons'] = list(dict.fromkeys(reasons))
+                statistics_issues.append('The requested statistic is missing or conflicting in the player’s latest completed game.')
+    result['statistics_issues'] = list(dict.fromkeys(statistics_issues))
+    result['timing_issues'] = list(dict.fromkeys(timing_issues))
+    result['statistics_ready'] = bool(target and target >= today and not result['statistics_issues'])
+    result['reasons'] = list(dict.fromkeys([*reasons, *statistics_issues]))
     result['ready'] = not result['reasons']
     return result

@@ -166,9 +166,10 @@ class ScreenshotTelegramTests(StoreFixture, unittest.IsolatedAsyncioTestCase):
         self.bot._shortlist_reply = AsyncMock(return_value='My shortlist\nSynthetic test response.')
         self.bot.research_refresh_callback = AsyncMock()
 
-    def output(self):
+    def output(self, *, include_ack=False):
         with self.store.connect() as db:
-            return [dict(r) for r in db.execute('SELECT * FROM telegram_outbox ORDER BY id')]
+            return [dict(r) for r in db.execute('SELECT * FROM telegram_outbox ORDER BY id')
+                    if include_ack or not r['event_key'].startswith('photo-reading:')]
 
     async def test_album_one_reply_combines_cards_and_inherits_caption(self):
         def reader(payload, roster):
@@ -178,6 +179,10 @@ class ScreenshotTelegramTests(StoreFixture, unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(self.bot.process_update(photo(10, 'album', DAY)),
                                  self.bot.process_update(photo(11, 'album')))
         output = self.output()
+        acknowledgments = [row for row in self.output(include_ack=True)
+                           if row['event_key'].startswith('photo-reading:')]
+        self.assertEqual(len(acknowledgments), 1)
+        self.assertIn('Reading your 2 screenshot(s)', acknowledgments[0]['text'])
         self.assertEqual(len(output), 1)
         self.assertIn('2 distinct lines', output[0]['text'])
         self.assertNotIn('Assumed game date', output[0]['text'])
@@ -187,6 +192,7 @@ class ScreenshotTelegramTests(StoreFixture, unittest.IsolatedAsyncioTestCase):
         self.bot.research_refresh_callback.assert_awaited_once()
         self.assertFalse(await self.bot.process_update(photo(10, 'album', DAY)))
         self.assertEqual(len(self.output()), 1)
+        self.assertEqual(len(self.output(include_ack=True)), 2)
 
     async def test_parallel_separate_uploads_serialize_cumulative_board_writes(self):
         def reader(payload, roster):
@@ -197,6 +203,8 @@ class ScreenshotTelegramTests(StoreFixture, unittest.IsolatedAsyncioTestCase):
                                  self.bot.process_update(photo(13, caption=DAY)))
         self.assertEqual(max(len(b['legs']) for b in self.store.boards()), 4)
         self.assertEqual(len(self.output()), 2)
+        self.assertEqual(sum(row['event_key'].startswith('photo-reading:')
+                             for row in self.output(include_ack=True)), 2)
 
     async def test_bad_image_is_concise_and_does_not_stop_readable_album_cards(self):
         def reader(payload, roster):

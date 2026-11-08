@@ -14,7 +14,8 @@ from zoneinfo import ZoneInfo
 
 from feeds import canonical_player, canonical_team, TEAM_WORDS
 from contextual_projection import (MIN_COMPARABLE_OBSERVATIONS, BENCHMARK_METHOD,
-                                   _comparable_observations, baseline_offer_decision)
+                                   _comparable_observations, baseline_offer_decision,
+                                   projection_read_scope)
 from master import STAT_COMPONENTS
 from pregame_freshness import assess_pregame_freshness
 
@@ -213,6 +214,7 @@ def _suggest_entries(candidates):
     return suggestions, note
 
 
+@projection_read_scope()
 def analyze_board(store, board_id, as_of=None):
     """Analyze a saved board without mutating it or creating a placed entry."""
     board = store.get_board(board_id)
