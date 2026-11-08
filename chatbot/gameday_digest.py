@@ -23,6 +23,7 @@ UTC = dt.timezone.utc
 SCHEDULE_KEY = 'knicks_digest_schedule_v1'
 STATUS_KEY = 'knicks_digest_status'
 FULL_DIGEST_CATCHUP_SECONDS = 15 * 60
+DEFAULT_LEAD_MINUTES = 90
 
 
 def alert_mode():
@@ -127,7 +128,69 @@ def relevant_reports(store, opponent, now):
     return result
 
 
-def render_digest(store, game, now, schedule_checked, refresh_ok):
+def _recent_uploaded_board(store, game, now, owner_chat_id):
+    """Use one owner's recent same-matchup screenshot board; never alter it."""
+    if type(owner_chat_id) is not int or owner_chat_id <= 0:
+        return None
+    from screenshot_intake import SESSION_MINUTES
+    teams = {game['home_team'], game['away_team']}
+    prefix = 'screenshot:' + str(owner_chat_id) + ':'
+    for board in store.boards(20):
+        created = _aware(board.get('created_at'))
+        if (not str(board.get('source') or '').startswith(prefix) or not created
+                or not 0 <= (now-created).total_seconds() <= SESSION_MINUTES * 60):
+            continue
+        legs = board.get('legs')
+        if not isinstance(legs, list) or not legs:
+            continue
+        if all(isinstance(leg, dict) and leg.get('date') == game['date']
+               and leg.get('team') in teams and leg.get('game_id') == game['id']
+               for leg in legs):
+            return board
+    return None
+
+
+def _uploaded_pick_scan(store, game, now, owner_chat_id):
+    """Recompute at most four uploaded comparisons; no sportsbook actions."""
+    board = _recent_uploaded_board(store, game, now, owner_chat_id)
+    if not board:
+        return ('Send current full PrizePicks screenshots for this matchup and I will compare four readable '
+                'options with your master. /picks also checks independent targets. No entry is placed.')
+    from analysis_engine import analyze_board
+    from board_shortlist import enrich_shortlist, MARKET_NAMES
+    report = analyze_board(store, board['id'], as_of=now)
+    shortlist = enrich_shortlist(store, report, now=now, count=4)
+    from pregame_archive import record_research
+    try:
+        record_research(store, shortlist, owner_key=f'telegram:{owner_chat_id}',
+                        kind='board_shortlist', source_report=report, now=now)
+    except Exception as error:
+        store.feed_failure('gameday_board_archive', type(error).__name__+
+                           '; current comparisons remain visible but this archive could not be saved.')
+    selected = shortlist.get('shortlist', [])[:4]
+    research = shortlist.get('research_candidates', [])[:max(0, 4-len(selected))]
+    lines = ['Current uploaded lines — four-pick check']
+    for number, item in enumerate(selected, 1):
+        leg = item['leg']
+        projection = item.get('projection') or {}
+        line = (f"{number}. {_clean(leg['player'], 45)}: {leg['side'].title()} {float(leg['line']):g} "
+                f"{MARKET_NAMES.get(leg['stat'], leg['stat'])}")
+        if projection.get('n') and projection.get('reference_projection') is not None:
+            line += (f"; mean {float(projection['reference_projection']):.2f}, "
+                     f"{int(projection['n'])} saved games through {projection.get('last_date', 'unknown')}.")
+        lines.append(line)
+    for number, item in enumerate(research, len(selected)+1):
+        lines.append(f"{number}. Research held: {_clean(item['player'], 45)} {item['line']:g} "
+            f"{MARKET_NAMES.get(item['stat'], item['stat'])}; mean {item['mean']:.2f}, "
+            f"median {item['median']:g}, {item['n']} saved games through {item['source_data_through_date']}.")
+    lines.append(f"{len(selected)}/4 eligible. Research holds are not picks. "
+                 'Check current availability, exact offers and terms; /analyze '+board['id'])
+    if not selected and not research:
+        lines.append('The saved board has no supported comparison yet. Send clearer current full-card screenshots.')
+    return '\n'.join(lines)
+
+
+def render_digest(store, game, now, schedule_checked, refresh_ok, *, board_owner_chat_id=None):
     from assignment_refresh import refresh_assignments
     try:
         refresh_assignments(store, now)
@@ -138,6 +201,9 @@ def render_digest(store, game, now, schedule_checked, refresh_ok):
     lines = [f"Knicks game-day projections / injury update — {tip.strftime('%b %d')}",
              f"NYK vs {opponent} · tipoff {tip.strftime('%I:%M %p').lstrip('0')} Eastern",
              f"Reports checked: {now.astimezone(EASTERN).strftime('%I:%M %p').lstrip('0')} Eastern"]
+    if game.get('catch_up_notice'):
+        lines.append('Catch-up update: the reminder time passed while the bot was offline. '
+                     'The research below was recomputed for this check; previous picks were not reused.')
     if game.get('using_saved_calendar'):
         lines.append('Using the saved published season calendar; live schedule recheck failed or is unavailable. Tipoff changes may be missed.')
     lines.append('PrizePicks reminder: compare these model targets with the actual offers afterward. '
@@ -150,6 +216,11 @@ def render_digest(store, game, now, schedule_checked, refresh_ok):
         # A research error must not suppress the one scheduled injury briefing.
         projection_text = 'Independent projections are temporarily unavailable. /picks can retry; no picks were invented.'
     lines.append(projection_text)
+    try:
+        lines.append(_uploaded_pick_scan(store, game, now, board_owner_chat_id))
+    except Exception:
+        lines.append('The uploaded-line check could not finish. Send current full PrizePicks screenshots '
+                     'for this matchup or use /picks to retry; no entry was placed.')
     feeds = store.status()['feeds']
     news_feeds = [f for f in feeds if f['name'].startswith('rss_') or f['name'] in {'espn_news', 'injuries_configured'}]
     fresh = [f for f in news_feeds if not f.get('error') and _aware(f.get('last_success'))
@@ -202,6 +273,8 @@ def render_timing_notice(game, now, schedule_checked, *, error=None, late=False)
                      + ' The saved published calendar supplies this reminder time; tipoff changes or cancellations may be missed.')
     lines.append('Picks held in this notice. No previous picks or stale projections were attached. '
                  'Use /picks for a new check; research stays on hold until its current-game checks pass.')
+    lines.append('Send current full PrizePicks screenshots for this matchup and I will check four readable '
+                 'options against your master. /picks checks independent targets too; no entry is placed.')
     if saved:
         lines.append('Calendar publication last checked: ' + str(schedule_checked))
     else:
@@ -219,7 +292,11 @@ class GamedayDigest:
         parsed = urlsplit(self.url)
         if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError('KNICKS_SCHEDULE_URL must be HTTPS without URL credentials.')
-        self.lead = max(15, min(180, int(os.getenv('KNICKS_DIGEST_MINUTES_BEFORE', '60'))))
+        self.lead = max(15, min(180, int(os.getenv('KNICKS_DIGEST_MINUTES_BEFORE', str(DEFAULT_LEAD_MINUTES)))))
+        owners = getattr(getattr(notify, '__self__', None), 'allowed_user_ids', set())
+        # Notifications are broadcast. Never attach one user's saved uploads
+        # when more than one owner can receive that message.
+        self._board_owner_chat_id = next(iter(owners)) if len(owners) == 1 else None
         self._lock = asyncio.Lock()
         self._using_saved = False
         self._schedule_scope = 'published_season_calendar'
@@ -317,7 +394,13 @@ class GamedayDigest:
                 from game_schedule_check import refresh_game_schedule
                 event_check = await refresh_game_schedule(self.store,self.worker,now=current)
                 observed = {game['id']:game for game in event_check.get('games', [])}
-                if (event_check.get('status') != 'success' or
+                from pregame_freshness import _current_schedule_check
+                verified_game, timing_issue = _current_schedule_check(self.store, today, 'NYK', current)
+                checked_game = verified_game.get('game') or {}
+                if (timing_issue and checked_game.get('status') in
+                        {'live','final','postponed','canceled','cancelled','suspended','past_schedule_only'}):
+                    return self._status('no_upcoming_tipoff_today')
+                if (timing_issue or not verified_game.get('game_verified') or
                         any(game['id'] not in observed for game in today_saved)):
                     trusted = self._saved_publication(current)
                     if not trusted:
@@ -380,7 +463,13 @@ class GamedayDigest:
                 return self._status('waiting', timing_verified=not self._using_saved,
                                     schedule_error=schedule_error, **next_info)
             catch_up = (current - due).total_seconds() > 60
-            warning_only = self._using_saved or (current - due).total_seconds() > FULL_DIGEST_CATCHUP_SECONDS
+            late_research = (current - due).total_seconds() > FULL_DIGEST_CATCHUP_SECONDS
+            late_inputs_ready = False
+            if late_research and not self._using_saved:
+                from pregame_freshness import assess_pregame_freshness
+                late_inputs_ready = all(assess_pregame_freshness(self.store, today, team, current).get('ready') is True
+                                        for team in (game['home_team'], game['away_team']))
+            warning_only = self._using_saved or (late_research and not late_inputs_ready)
             if warning_only:
                 game = {**game, 'using_saved_calendar': self._using_saved}
                 message = render_timing_notice(game, current, snapshot['checked_at'],
@@ -408,12 +497,14 @@ class GamedayDigest:
             current = self.now()
             if current >= tip:
                 return self._status('game_started', **next_info)
-            game = {**game, 'using_saved_calendar': self._using_saved}
+            game = {**game, 'using_saved_calendar': self._using_saved, 'catch_up_notice':catch_up}
             message = await asyncio.to_thread(render_digest, self.store, game, current,
-                                              snapshot['checked_at'], refreshed)
+                                              snapshot['checked_at'], refreshed,
+                                              board_owner_chat_id=self._board_owner_chat_id)
             accepted = await self.notify(message, event_key=key, expires_at=tip.timestamp())
             if accepted:
-                self.store.set_checkpoint(key, {'queued_at': current.isoformat(), 'game': game['id'], 'tipoff': tip.isoformat()})
+                self.store.set_checkpoint(key, {'queued_at': current.isoformat(), 'game': game['id'],
+                    'tipoff': tip.isoformat(), 'minutes_before_tipoff':self.lead})
                 return self._status('queued', game=game['id'], tipoff=tip.isoformat(), queued_at=current.isoformat())
             return self._status('telegram_disabled', **next_info)
 
@@ -465,8 +556,9 @@ def reminder_status(store):
         lines.extend([f"Next game: NYK vs {report.get('opponent', '?')} — " + tip.astimezone(EASTERN).strftime('%b %d, %I:%M %p Eastern'),
                       'Digest time: ' + due.astimezone(EASTERN).strftime('%b %d, %I:%M %p Eastern')])
     if report.get('mode') == 'knicks_gameday':
-        lines.append(f"One digest per Knicks game day, {report.get('minutes_before_tipoff', 60)} minutes before tipoff, "
+        lines.append(f"One digest per Knicks game day, {report.get('minutes_before_tipoff', DEFAULT_LEAD_MINUTES)} minutes before tipoff, "
                      'with independent projections and collected injury news when timing is verified; '
                      'otherwise a clearly labeled reminder holds picks. Compare target lines with PrizePicks afterward. '
+                     'Current saved screenshots are checked for four options; send full current cards if prompted. '
                      'News collection continues quietly; /picks and /summary are available whenever you ask.')
     return '\n\n'.join(lines)

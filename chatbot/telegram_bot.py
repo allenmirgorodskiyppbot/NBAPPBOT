@@ -235,6 +235,21 @@ def freshness_report(store, now=None):
                 label = schedule['status'] if schedule['status'] in {'success','failed','partial','checking'} else 'unknown'
                 lines.append('Schedule check: ' + label + (' — ' + safe_error if safe_error else '')
                              + '; checked ' + stamp(schedule.get('checked_at')) + '.')
+                attempts = schedule.get('attempts')
+                if isinstance(attempts, list) and attempts:
+                    sources = []
+                    for attempt in attempts[:3]:
+                        if not isinstance(attempt, dict):
+                            continue
+                        source = str(attempt.get('source') or '')
+                        name = ('ESPN' if source.startswith('https://site.api.espn.com/') else
+                                'NBA' if source.startswith('https://cdn.nba.com/') else
+                                'schedule relay' if source.startswith('https://raw.githubusercontent.com/') else 'other source')
+                        code = str(attempt.get('error') or '')
+                        code = code if re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,50}(?:: HTTP [0-9]{3})?', code) else 'check failed'
+                        sources.append(name + ': ' + code)
+                    if sources:
+                        lines.append('Schedule source checks: ' + '; '.join(sources) + '.')
             reasons = list(dict.fromkeys(str(reason).replace('\n', ' ').strip()[:220]
                            for report in reports for reason in report.get('reasons', []) if reason))
             lines.extend('Needs: ' + reason for reason in reasons[:3])
@@ -1260,8 +1275,13 @@ class TelegramBot:
         if callable(getattr(self.store, 'connect', None)) and 'original_legs' in report:
             from board_shortlist import enrich_shortlist, format_shortlist
             constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
+            # Screenshot research targets at least four distinct-player picks.
+            # Preserve larger requests; eligibility still decides what can rank.
+            requested = constraints.get('pick_count', 4)
+            requested = max(4, requested) if type(requested) is int else 4
+            constraints = {**constraints, 'pick_count':requested}
             shortlist = await asyncio.to_thread(enrich_shortlist, self.store, report,
-                count=constraints.get('pick_count', 3), constraints=constraints)
+                count=requested, constraints=constraints)
             from pregame_archive import record_research
             await asyncio.to_thread(record_research, self.store, shortlist,
                                     owner_key=f'telegram:{chat_id}', kind='board_shortlist', source_report=report)

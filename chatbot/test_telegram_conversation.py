@@ -140,6 +140,23 @@ class TelegramConversationTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(enrich.call_args.kwargs['constraints']['both_teams'])
         self.assertEqual(text.count('More 19.5 points'), 4)
 
+    async def test_screenshot_target_is_four_with_empty_or_old_three_pick_preference(self):
+        from board_shortlist import enrich_shortlist
+        items = [candidate('Jalen Brunson'), candidate('Josh Hart'),
+                 candidate('Tyrese Maxey', team='PHI'), candidate('Joel Embiid', team='PHI')]
+        board = self.store.create_board([item['leg'] for item in items], source='four-pick policy fixture')
+        analysis = {**report(*items), 'board_id':board['id']}
+        before = self.financial_counts()
+        for preferences, expected in (({}, 4), ({'pick_count':3}, 4), ({'pick_count':5}, 5)):
+            with self.subTest(preferences=preferences), \
+                 patch.object(self.bot, '_pick_constraints', return_value=preferences), \
+                 patch('board_shortlist.enrich_shortlist', wraps=enrich_shortlist) as enrich, \
+                 patch('board_shortlist._now', return_value=NOW):
+                await self.bot._shortlist_reply(analysis, USER_ID)
+                self.assertEqual(enrich.call_args.kwargs['count'], expected)
+                self.assertEqual(enrich.call_args.kwargs['constraints']['pick_count'], expected)
+        self.assertEqual(self.financial_counts(), before)
+
     async def test_picks_reuses_count_unless_current_request_changes_it(self):
         await self.bot.process_update(update(60, 'I need three picks from both teams.'))
         counts = []

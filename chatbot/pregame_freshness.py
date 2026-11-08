@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import re
 from zoneinfo import ZoneInfo
 
 from feeds import canonical_team
@@ -52,11 +53,24 @@ def _current_schedule_check(store, day, team, now):
     """Use the independent scoreboard check, never an old published clock."""
     checkpoint = store.get_checkpoint('nba_schedule_today', {})
     checkpoint = checkpoint if isinstance(checkpoint, dict) else {}
-    detail = {key: checkpoint.get(key) for key in ('date', 'status', 'checked_at', 'source', 'error')}
+    detail = {key: checkpoint.get(key) for key in ('date', 'status', 'checked_at', 'source', 'error',
+                                                  'attempted_at', 'relay_url')}
+    # Source URLs are fixed public endpoints, and errors remain bounded codes.
+    # Never expose arbitrary exception messages or URLs from a stored payload.
+    from feeds import ESPN
+    from game_schedule_check import RELAY_URL
+    from nba_cdn import SCOREBOARD_URL
+    public_sources = {ESPN + 'scoreboard?dates=' + day.replace('-', ''), SCOREBOARD_URL, RELAY_URL}
+    attempts = checkpoint.get('attempts')
+    detail['attempts'] = [{'source':item.get('source') if item.get('source') in public_sources else 'unrecognized_source',
+                           'error':item.get('error') if re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,50}(?:: HTTP [0-9]{3})?', str(item.get('error', ''))) else 'SourceCheckFailed'}
+                          for item in (attempts[:3] if isinstance(attempts, list) else []) if isinstance(item, dict)]
     detail['game'] = None
+    detail['game_verified'] = False
     checked = _aware(checkpoint.get('checked_at'))
-    if (checkpoint.get('date') != day or checkpoint.get('status') != 'success' or
-            checkpoint.get('error') or not checkpoint.get('source') or not checked or
+    partial = checkpoint.get('status') == 'partial'
+    if (checkpoint.get('date') != day or checkpoint.get('status') not in {'success', 'partial'} or
+            (not partial and checkpoint.get('error')) or not checkpoint.get('source') or not checked or
             not -300 <= (now - checked).total_seconds() <= 15 * 60):
         return detail, 'A successful independent check of today’s game schedule within 15 minutes is required.'
     games = checkpoint.get('games')
@@ -69,6 +83,15 @@ def _current_schedule_check(store, day, team, now):
     game = matches[0]
     detail['game'] = {key: game.get(key) for key in
                       ('id', 'date', 'home_team', 'away_team', 'status', 'start_time', 'reported_status')}
+    missing = checkpoint.get('missing_game_ids')
+    conflicts = checkpoint.get('conflicting_game_ids')
+    expected = checkpoint.get('expected_game_ids')
+    if partial and (not all(isinstance(value, list) and len(value) <= 1000
+                           and all(isinstance(identity, str) and 0 < len(identity) <= 160 for identity in value)
+                           for value in (missing, conflicts, expected))
+                    or game.get('id') not in expected or game.get('id') in missing
+                    or game.get('id') in conflicts):
+        return detail, 'The current schedule check does not independently verify this team’s game.'
     tipoff = _aware(game.get('start_time'))
     if (game.get('status') != 'scheduled' or
             game.get('reported_status') in {'live', 'final', 'postponed', 'cancelled', 'canceled'}):
@@ -80,6 +103,12 @@ def _current_schedule_check(store, day, team, now):
     with store.connect() as db:
         saved = db.execute('SELECT * FROM season_schedule WHERE id=?', (game.get('id'),)).fetchone()
         observed = db.execute('SELECT * FROM games WHERE id=?', (game.get('id'),)).fetchone()
+        known_team_ids = {row[0] for row in db.execute(
+            'SELECT id FROM season_schedule WHERE date=? AND (home_team=? OR away_team=?) '
+            'UNION SELECT id FROM games WHERE date=? AND (home_team=? OR away_team=?)',
+            (day, team, team, day, team, team))} if partial else set()
+    if partial and (known_team_ids != {game.get('id')} or known_team_ids & (set(missing) | set(conflicts))):
+        return detail, 'The current schedule inventory is missing or conflicts with this team’s saved game.'
     event = dict(saved) if saved else {}
     if observed:
         event.update({key: value for key, value in dict(observed).items() if value is not None})
@@ -89,6 +118,7 @@ def _current_schedule_check(store, day, team, now):
             '' in checked_teams or event_teams != checked_teams or event.get('status') != 'scheduled' or
             _aware(event.get('start_time')) != tipoff):
         return detail, 'The independently checked event conflicts with the saved game; current recommendations are held.'
+    detail['game_verified'] = True
     return detail, None
 
 

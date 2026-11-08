@@ -322,6 +322,115 @@ def _reason(item):
     return base
 
 
+def _master_comparison(store, item, context, hold_reason, now, team_cache):
+    """Describe measured prior games without changing an offer's eligibility."""
+    leg = dict(item.get('leg') or {})
+    team = canonical_team(leg.get('team'))
+    date = str(leg.get('date') or context.get('date') or '')[:10]
+    if (not context.get('game_id') or team not in TEAM_WORDS
+            or canonical_team(context.get('opponent')) not in TEAM_WORDS):
+        return None
+    try:
+        cutoff = min(dt.date.fromisoformat(date), now.astimezone(EASTERN).date()).isoformat()
+    except ValueError:
+        return None
+    identity = (canonical_player(leg.get('player', '')), cutoff)
+    if identity not in team_cache:
+        from career_identity import resolve_career_identity
+        aliases = resolve_career_identity(store, leg['player'])['aliases']
+        with store.connect() as db:
+            rows = list(db.execute('SELECT p.team,p.date FROM player_games p JOIN games g ON g.id=p.game_id '
+                'WHERE p.player IN (' + ','.join('?' for _ in aliases) + ') AND p.date<? '
+                "AND g.date=p.date AND g.status='final' AND p.team IN (g.home_team,g.away_team) "
+                'ORDER BY p.date DESC,p.updated_at DESC LIMIT 20', (*aliases, cutoff))) if aliases else []
+        latest = rows[0]['date'] if rows else None
+        team_cache[identity] = {canonical_team(row['team']) for row in rows if row['date'] == latest}
+    if team_cache[identity] != {team}:
+        return None
+    projection = item.get('projection') or {}
+    observed = projection.get('source_games') or item.get('sample_games') or []
+    # These rows come from the engine's exact-name/ID, final-game joins. Keep
+    # their dates, teams and measured values attached; absent fields stay absent.
+    rows = [row for row in observed[:20] if isinstance(row, dict)]
+    if (not rows or any(canonical_team(row.get('team')) != team
+            or not str(row.get('date') or '') < cutoff or _number(row.get('value')) is None
+            or _number(row['value']) < 0 or not row.get('game_id') for row in rows)):
+        return None
+    if len({row['game_id'] for row in rows}) != len(rows):
+        return None
+    values = [float(row['value']) for row in rows]
+    mean, median = statistics.fmean(values), statistics.median(values)
+    first, last = min(row['date'] for row in rows), max(row['date'] for row in rows)
+    line = _number(leg.get('line'))
+    benchmark = None
+    if line is not None:
+        from contextual_projection import _quantile
+        benchmark = baseline_offer_decision({'available': len(rows) == 20, 'n': len(rows),
+            'reference_projection': mean, 'baseline_median': median,
+            'empirical_scenario_range': {'p10': _quantile(values, .1), 'p90': _quantile(values, .9)}}, line)
+    return {'leg': leg, 'player': leg['player'], 'team': team, 'date': date,
+            'opponent': context['opponent'], 'game_id': context['game_id'], 'stat': leg.get('stat'),
+            'line': line, 'n': len(values), 'mean': mean, 'median': median,
+            'above': sum(value > line for value in values) if line is not None else None,
+            'below': sum(value < line for value in values) if line is not None else None,
+            'ties': sum(value == line for value in values) if line is not None else None,
+            'source_first_date': first, 'source_data_through_date': last,
+            'sample_seasons': sorted({str(row['season']) for row in rows if row.get('season')}),
+            'source': 'saved master player games',
+            'source_games': [{'game_id': row['game_id'], 'date': row['date'],
+                'source': row.get('source'), 'value': row['value'], 'team': row['team']} for row in rows],
+            'historical_benchmark': benchmark, 'hold_reason': hold_reason,
+            'research_only': True, 'eligible_for_ranking': False, 'approved_for_entry': False}
+
+
+def _research_from_master(store, held_items, now, count, required_teams=(), *, team_cache=None):
+    """Select useful distinct-player comparisons; never call them a lineup."""
+    team_cache = {} if team_cache is None else team_cache
+    grouped = {}
+    for item, leg, context, reason in held_items:
+        key = (canonical_player(leg.get('player', '')), leg.get('date'), leg.get('stat'),
+               _number(leg.get('line')), leg.get('game_id') or context.get('game_id'), _variant(leg))
+        if key in grouped:
+            grouped[key]['offered_sides'] = sorted(set(grouped[key]['offered_sides']) | {leg.get('side')})
+            continue
+        value = _master_comparison(store, {**item, 'leg': leg}, context, reason, now, team_cache)
+        if value:
+            value['offered_sides'] = [leg['side']] if leg.get('side') in {'more', 'less'} else []
+            grouped[key] = value
+    comparisons = sorted(grouped.values(), key=lambda value: (
+        -(value['n'] >= 20), -bool((value.get('historical_benchmark') or {}).get('side')),
+        -value['n'], value['player'], value['stat'], value['line'] if value['line'] is not None else -1))
+    # This helper enforces distinct names and team coverage only. Its returned
+    # completion metadata is intentionally discarded: these remain held facts.
+    chosen, _ = select_lineup(comparisons, count, required_teams=required_teams)
+    return chosen
+
+
+def _held_master_watchlist(store, held, now, count, team_cache):
+    """Retrieve actual baselines for other saved players; no offer is invented."""
+    from contextual_projection import projection_for_leg
+    results, seen = [], set()
+    for candidate in held[:12]:
+        key = canonical_player(candidate.get('player', ''))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        leg = {key: candidate[key] for key in ('player', 'team', 'date', 'opponent', 'game_id') if candidate.get(key)}
+        leg['stat'] = 'pts'
+        context, issue = _event(store, leg, now)
+        if issue:
+            continue
+        projection = projection_for_leg(store, leg, now)
+        value = _master_comparison(store, {'leg': leg, 'projection': projection}, context,
+                                   candidate['reason'], now, team_cache)
+        if value:
+            value['offer_required'] = True
+            results.append(value)
+        if len(results) >= min(2, count):
+            break
+    return results
+
+
 def _watchlist(store, original_legs, news, now, held=None):
     """Rank observed workload/volume for other existing same-game players."""
     uploaded = {canonical_player(leg.get('player', '')) for leg in original_legs}
@@ -371,6 +480,7 @@ def _watchlist(store, original_legs, news, now, held=None):
             if not freshness['ready']:
                 if held is not None:
                     held.append({'player': player['player'], 'team': team,
+                                 'date': date, 'opponent': context['opponent'], 'game_id': context['game_id'],
                                  'reason': 'Current game data is not ready: ' + ' '.join(freshness['reasons'])})
                 continue
             markets = []
@@ -422,7 +532,7 @@ def _watchlist(store, original_legs, news, now, held=None):
     return result
 
 
-def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
+def enrich_shortlist(store, report, now=None, *, count=4, constraints=None):
     """Apply presentation/risk gates to engine output without changing saved data."""
     now = _now(now)
     # Validate caller preferences before any optional lookup. Eligibility gates
@@ -441,7 +551,7 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
         if number is not None:
             thresholds[_key(leg)].add(number)
             variants[_offer_key(leg)].add(_variant(leg))
-    skipped, usable, freshness_cache = [], [], {}
+    skipped, usable, freshness_cache, held_items = [], [], {}, []
     for item in report.get('legs', report.get('candidates', [])):
         leg = dict(item.get('leg', {}))
         leg['offer_variant'] = _variant(leg)
@@ -496,6 +606,8 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
             skipped.append({'player': leg.get('player'), 'stat': leg.get('stat'),
                             'side': leg.get('side'), 'line': leg.get('line'),
                             'offer_variant': leg['offer_variant'], 'reason': _clean(reason, 250)})
+            if not event_issue:
+                held_items.append((item, leg, context, reason))
             continue
         standardized = _number(projection.get('standardized_margin'))
         margin = float(projection['selected_side_margin'])
@@ -544,11 +656,19 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
     adjusted_offers = any(_variant(leg) in {'goblin', 'demon'} for leg in original)
     watchlist_held = []
     watchlist = _watchlist(store, original, news, now, held=watchlist_held)
+    team_cache = {}
+    selected_names = {canonical_player(item['leg']['player']) for item in selected}
+    remaining = max(0, count - len(selected))
+    research = (_research_from_master(store, [item for item in held_items
+        if canonical_player(item[1].get('player', '')) not in selected_names], now, remaining,
+        required_teams, team_cache=team_cache) if remaining else [])
+    master_watchlist = _held_master_watchlist(store, watchlist_held, now, count, team_cache)
     return {'board_id': report.get('board_id'), 'report_id': report.get('id'),
             'generated_at': now.isoformat(), 'source_report_generated_at': report.get('generated_at'),
             'research_only': True, 'shortlist': selected, 'skipped': unique_skipped,
             **coverage,
             'watchlist': watchlist, 'watchlist_held': watchlist_held,
+            'research_candidates': research, 'master_watchlist': master_watchlist,
             'has_adjusted_offers': adjusted_offers,
             'notes': ['Experimental comparisons, not validated win probabilities.',
                       'Current availability and offer/payout terms still need checking; no entry was placed.'] +
@@ -559,8 +679,11 @@ def enrich_shortlist(store, report, now=None, *, count=3, constraints=None):
 def format_shortlist(data):
     """Keep the decision, its reason, and next request in one Telegram message."""
     picks = data.get('shortlist', [])
+    research = data.get('research_candidates', [])
     heading = ('Partial shortlist — lineup incomplete' if picks and data.get('lineup_complete') is False
-               else 'My shortlist' if picks else 'No pick from these lines yet')
+               else 'My shortlist' if picks else
+               f'Saved stats loaded — {len(research)} held research comparisons' if research else
+               'No pick from these lines yet')
     lines = [heading]
     if data.get('constraint_note'):
         lines.append(_clean(data['constraint_note'], 280))
@@ -572,9 +695,28 @@ def format_shortlist(data):
         if item.get('caution'):
             block += '\nWatch: ' + _clean(item['caution'], 200)
         lines.append(block)
+    if research:
+        lines.append('Research from your master — held, not an approved lineup')
+        for number, item in enumerate(research, 1):
+            market = MARKET_NAMES.get(item['stat'], item['stat'])
+            block = (f"Research {number}. {_clean(item['player'], 70)} — {item['line']:g} {market} "
+                     f"({_clean(item['team'], 8)}; {_offer_label(_variant(item['leg']))})"
+                     f"\n{item['n']} saved same-team games: mean {item['mean']:.2f}; median {item['median']:g}; "
+                     f"{item['above']}/{item['n']} above, {item['below']}/{item['n']} below, {item['ties']} tied. "
+                     f"Through {item['source_data_through_date']}.")
+            benchmark = item.get('historical_benchmark') or {}
+            if benchmark.get('side'):
+                block += '\nHistory only: ' + benchmark['side'].title() + ' meets the research buffer.'
+                if benchmark['side'] not in item.get('offered_sides', []):
+                    block += ' That side was not readable on this card.'
+            else:
+                block += '\nHistory only: no side clears the research rule.'
+            block += '\nHold: ' + _clean(item['hold_reason'], 110)
+            lines.append(block)
+        lines.append('Saved history is not a win probability; held comparisons do not count as eligible picks.')
     skipped = [item for item in data.get('skipped', [])
                if item['reason'] != 'The experimental reference does not support this side.']
-    for item in skipped[:2 if picks else 3]:
+    for item in ([] if research else skipped[:2 if picks else 4]):
         lines.append(f"Hold: {_clean(item.get('player'), 70)} {MARKET_NAMES.get(item.get('stat'), item.get('stat', ''))} "
                      f"({_offer_label(_variant(item))}) — "
                      + _clean(item['reason'], 180))
@@ -590,6 +732,13 @@ def format_shortlist(data):
                 block += ' ' + _clean(item['caution'], 130)
             lines.append(block)
         lines.append('Send those actual offers before I choose More/Less for them.')
+    master_watch = data.get('master_watchlist', [])
+    if master_watch:
+        lines.append('Other players from your master — actual offers needed')
+        for item in master_watch:
+            lines.append(f"• {_clean(item['player'], 70)} {MARKET_NAMES[item['stat']]} ({item['team']}): "
+                f"{item['n']} saved games, mean {item['mean']:.2f}, median {item['median']:g}, "
+                f"through {item['source_data_through_date']}. Held for current checks; no offered line or side is assumed.")
     lines.append('Experimental research. Verify availability and offer/payout terms. No entry placed.')
     if data.get('has_adjusted_offers'):
         lines.append('Goblin/Demon payouts depend on the actual offer; no universal multiplier is assumed.')
@@ -607,7 +756,8 @@ def format_shortlist(data):
         if not any(line.startswith('• ') for line in lines):
             lines = [line for line in lines if line not in {
                 'Beyond your screenshots — check these lines:',
-                'Send those actual offers before I choose More/Less for them.'}]
+                'Send those actual offers before I choose More/Less for them.',
+                'Other players from your master — actual offers needed'}]
         # A four/six-player request must not lose its last pick or the no-entry
         # footer to a character slice. Shorten prose before dropping any fact.
         for maximum in (180, 120, 80):

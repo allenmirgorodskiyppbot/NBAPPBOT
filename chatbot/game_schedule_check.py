@@ -13,7 +13,7 @@ from news_digest import _aware
 
 EASTERN = ZoneInfo('America/New_York')
 CHECKPOINT = 'nba_schedule_today'
-CHECK_SECONDS = 900
+CHECK_SECONDS = 60
 SUCCESS_CACHE_SECONDS = 840
 RELAY_URL = 'https://raw.githubusercontent.com/allenmirgorodskiyppbot/NBAPPBOT/main/data/live/schedule_today.json'
 
@@ -150,10 +150,18 @@ def _parse_relay(document, day, now):
     return games, checked, source
 
 
-async def _current_events(worker, day, now):
-    """Try independent publishers once, then a timestamp-preserving trusted relay."""
+async def _current_events(worker, day, now, expected_ids=()):
+    """Prefer a complete current inventory; retain the best single-source partial.
+
+    Structurally valid but missing events are not a reason to skip the remaining
+    publishers. Partial inventories are never combined or given a new source
+    check time merely because a later fallback was attempted.
+    """
     from nba_cdn import SCOREBOARD_URL
     attempts = []
+    expected_ids = set(expected_ids)
+    best = None
+    best_score = None
     for source, parser in ((ESPN + 'scoreboard?dates=' + day.replace('-', ''), _parse_today),
                            (SCOREBOARD_URL, _parse_nba_today), (RELAY_URL, None)):
         try:
@@ -161,14 +169,27 @@ async def _current_events(worker, day, now):
                 document = await worker.request(source)
             if parser is None:
                 games, checked, upstream = _parse_relay(document, day, now)
-                return games, checked, upstream, source, attempts
-            return parser(document, day), now, source, None, attempts
+                candidate = games, checked, upstream, source
+            else:
+                games, checked = parser(document, day), now
+                candidate = games, checked, source, None
+            missing = expected_ids - set(games)
+            if not missing:
+                return *candidate, attempts
+            attempts.append({'source': source, 'error': 'IncompleteInventory',
+                             'matched_known_games': len(expected_ids & set(games)),
+                             'missing_game_ids': sorted(missing)})
+            score = (len(expected_ids & set(games)), checked)
+            if best_score is None or score > best_score:
+                best, best_score = candidate, score
         except asyncio.CancelledError:
             raise
         except Exception as error:
             code = getattr(getattr(error, 'response', None), 'status_code', None)
             detail = type(error).__name__ + (f': HTTP {code}' if code else '')
             attempts.append({'source': source, 'error': detail})
+    if best is not None:
+        return *best, attempts
     error = RuntimeError('All current schedule sources are unavailable.')
     error.schedule_attempts = attempts
     raise error
@@ -196,16 +217,17 @@ async def refresh_game_schedule(store, worker, now=None):
         prior = store.get_checkpoint(CHECKPOINT, {}) or {}
         checked = _aware(prior.get('checked_at'))
         cache_seconds = SUCCESS_CACHE_SECONDS if prior.get('status') == 'success' else CHECK_SECONDS
-        if (prior.get('date') == day and checked and 0 <= (now-checked).total_seconds() < cache_seconds
+        cache_at = checked if prior.get('status') == 'success' else (_aware(prior.get('attempted_at')) or checked)
+        if (prior.get('date') == day and cache_at and 0 <= (now-cache_at).total_seconds() < cache_seconds
                 and set(prior.get('expected_game_ids', [])) == set(known)):
             return prior
         source = ESPN + 'scoreboard?dates=' + day.replace('-', '')
-        report = {'date':day, 'status':'failed', 'checked_at':now.isoformat(), 'source':source,
+        report = {'date':day, 'status':'failed', 'checked_at':now.isoformat(), 'attempted_at':now.isoformat(), 'source':source,
                   'expected_game_ids':sorted(known), 'games':prior.get('games', []) if prior.get('date') == day else [],
                   'last_success_at':prior.get('last_success_at'), 'error':None}
         await _database_write(_metadata(store).set_checkpoint, CHECKPOINT, {**report, 'status':'checking'})
         try:
-            events, verified_at, source, relay, attempts = await _current_events(worker, day, now)
+            events, verified_at, source, relay, attempts = await _current_events(worker, day, now, known)
             report.update(checked_at=verified_at.isoformat(), attempted_at=now.isoformat(),
                           source=source, relay_url=relay, attempts=attempts)
             missing = sorted(set(known)-set(events))

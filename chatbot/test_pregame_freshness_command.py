@@ -168,6 +168,26 @@ class PregameFreshnessCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Game-stat readiness: not verified', report)
         self.assertIn('Worker state not recorded', report)
 
+    def test_failed_schedule_lists_safe_per_source_causes(self):
+        from feeds import ESPN
+        from nba_cdn import SCOREBOARD_URL
+        from game_schedule_check import RELAY_URL
+        value = self.store.get_checkpoint('nba_schedule_today')
+        value.update(status='failed', error='RuntimeError', attempts=[
+            {'source':ESPN+'scoreboard?dates=20261104','error':'RuntimeError: HTTP 403'},
+            {'source':SCOREBOARD_URL,'error':'ReadTimeout'},
+            {'source':RELAY_URL,'error':'HTTPStatusError: HTTP 404'}])
+        self.store.set_checkpoint('nba_schedule_today', value)
+        report = freshness_report(self.store, NOW)
+        self.assertIn('ESPN: RuntimeError: HTTP 403', report)
+        self.assertIn('NBA: ReadTimeout', report)
+        self.assertIn('schedule relay: HTTPStatusError: HTTP 404', report)
+        value['attempts'] = [{'source':'https://private.invalid/?token=SECRET', 'error':'SECRET configured-token'}]
+        self.store.set_checkpoint('nba_schedule_today', value)
+        report = freshness_report(self.store, NOW)
+        self.assertNotIn('SECRET', report)
+        self.assertNotIn('private.invalid', report)
+
 
 if __name__ == '__main__':
     unittest.main()
