@@ -6,14 +6,19 @@ and can compare those with user-supplied PrizePicks lines. The chat model
 runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
-## November 5 data and reliability upgrade
+## November 7 master data and pregame update
 
-Tested application `SOURCE_REF`: `06372e67cebdc38938d27f934c78e5c0df69fd13`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42121382918)
-passed all **1,572 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `d975d775c49a5bf68fff45d4adb44aefb5e30f51`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42428274084)
+passed all **1,604 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
+The [master/schedule/reminder validation report](data/reports/2026-11-07/master_schedule_reminder_validation.json) records the Nov7 live schedule recovery, four-comparison master-data controls and ninety-minute reminder integration tests.
+
+Screenshot analysis uses the saved matchup and each player's same-team master records. The default screenshot target is at least four distinct players; larger saved requests remain supported. If eligibility checks hold, the reply still shows measured means, medians, line-crossing counts and source dates as held research. It never pads a lineup with unreadable offers or relabels held research as eligible picks. Other stored players can appear as independent research ideas; actual offers are still needed for a comparison.
+
+Failed/partial schedule checks retry after one minute, while source HTTP cooldowns remain enforced. A missing unrelated game no longer blocks a fresh independently matched Knicks game. Fallbacks retain their real source timestamps; GitHub scheduling does not guarantee relay freshness.
 
 Compact prop replies keep the calculated decision, exact quantities and citations in the application. The model writes only the explanation. Historical averages and hit counts remain context; they cannot replace the actual Hold reason or establish consistent performance. Future-game timing and current data verification remain separate from any prediction.
 
@@ -124,7 +129,7 @@ can be completed only from an existing unique registered NBA/ESPN identity and
 the same validated current-season source; existing provider IDs cannot be replaced.
 
 A trusted saved game calendar can now produce a single **timing-unverified reminder
-one hour before its scheduled tipoff** when live verification fails. The message
+90 minutes before its scheduled tipoff** when live verification fails. The message
 explains the hold; it contains no unverified picks. Verified current timing retains
 the normal research reminder. Restarts, late catch-up, cancellations, tipoff expiry
 and Eastern daylight-saving changes keep explicit behavior and deduplication.
@@ -366,9 +371,13 @@ a player's rest/workload. Calendar records do not establish final scores or
 settle an entry.
 
 The default policy sends **one combined injury/availability/roster digest and
-PrizePicks upload reminder, 60 minutes before a Knicks tipoff**. A 7:30 PM Eastern
-game produces a 6:30 PM reminder. If that day's lines are already saved, the message
-identifies the board and asks for a replacement only if the lines changed.
+PrizePicks upload reminder, 90 minutes before a Knicks tipoff**. A 7:30 PM Eastern
+game produces a 6:00 PM reminder. A recent same-matchup screenshot board is re-analyzed
+for a target of four distinct players, alongside independent projections. Without a
+current board, the bot asks for full current PrizePicks screenshots. Existing deployments
+must set `KNICKS_DIGEST_MINUTES_BEFORE=90`; an explicit old value of 60 still overrides
+the new default. Late startup recomputes fresh research before tipoff when current
+checks pass, while a previously queued daily notice remains deduplicated.
 
 News collection continues quietly on off days. Routine scoring recaps, promo
 articles and individual headline pushes are excluded from the default delivery.

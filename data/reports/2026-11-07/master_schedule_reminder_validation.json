@@ -1,0 +1,193 @@
+{
+  "tested_source_ref": "d975d775c49a5bf68fff45d4adb44aefb5e30f51",
+  "requested_behavior": {
+    "screenshot_target_minimum": 4,
+    "reminder_minutes_before_tipoff": 90,
+    "master_team_and_player_game_links": true,
+    "independent_alternatives": true
+  },
+  "local_focused_tests": {
+    "passed": 178,
+    "failed": 0,
+    "seconds": 63.006
+  },
+  "ci": {
+    "run_id": 42428274084,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42428274084",
+    "conclusion": "success",
+    "status": "completed",
+    "job_id": 128571215744,
+    "passed": 1604,
+    "failed": 0,
+    "seconds": 167.14
+  },
+  "fixes": [
+    "Failed and partial current schedule checks retry after60seconds, with unchanged source timestamps and existing HTTPcooldowns.",
+    "Incomplete primary inventories try bounded alternate sources; snapshots from different providers are not merged.",
+    "A missing unrelated event no longer holds an independently matched current Knicks matchup; all requested-game identity/status/tipoff checks remain.",
+    "Uploaded line research uses actual same-team master observations, validates current team and target-game context, and displays measured means/medians/counts/dates even while live checks hold.",
+    "Screenshot target is at leastfourdistinct players; larger requests are respected. Fewer valid/readable offers stay fewer, and held research is never relabeled as eligible picks.",
+    "Other stored players may appear with measured baselines. No sportsbook offers, side buttons or odds are fabricated.",
+    "Ninety-minute reminder scans a single allowed owner’s current same-game screenshot board, recomputes four comparisons and independent targets, or asks for current screenshots. Fresh late starts catch up beforetipoff; terminal events, duplicate receipts and cross-owner sharing stay blocked."
+  ],
+  "integration_validation": {
+    "scope": "Offline synthetic integration controls; not live NBA readiness or actual picks.",
+    "controls": {
+      "player_observations": "80 synthetic player games:20 per player, same-team regular-season controls",
+      "offered_lines": "Four invented test-only points lines, not the user screenshots or actual PrizePicks offers.",
+      "daily_inventory": "Explicit synthetic current-day verified coverage assertions, not external publication proof.",
+      "availability": "Only named player_availability boundaries are mocked positive; no actual clearance claim.",
+      "schedule": "Captured ESPN event identity and tipoff replayed under a synthetic check clock.",
+      "telegram": "Durable private outbox only; no external API calls or delivered-message claim."
+    },
+    "captured_public_schedule_actual_checked_at": "2026-11-07T23:55:37.620565+00:00",
+    "source_sha256": {
+      "game_schedule_check.py": "26701c19defe8d45898ce95761e8510be8947a37920b29315051f9583c86a73d",
+      "pregame_freshness.py": "658cab87b2c556f9b871a98aeda080e6b9d75f6feb28e37561790af525b7882f",
+      "board_shortlist.py": "7a960566ba7cac1d058942751ab315264069d690148fed0dd7de90b62a0352cc",
+      "gameday_digest.py": "0bbc81b05efac24d9a1ed49856fdc74b63a6b6d4b1d1a4d996772708c9f9fef8"
+    },
+    "cases": [
+      {
+        "mode": "scheduled_ninety_minute",
+        "check_time": "2026-11-07T23:30:00+00:00",
+        "scheduled_send_at": "2026-11-07T23:30:00+00:00",
+        "held_master_comparisons": 4,
+        "eligible_after_replayed_schedule_and_synthetic_coverage": 4,
+        "expected_arithmetic": {
+          "Jalen Brunson": {
+            "n": 20,
+            "mean": 30.5,
+            "median": 30.5,
+            "above": 20,
+            "line": 20.5
+          },
+          "Josh Hart": {
+            "n": 20,
+            "mean": 19.5,
+            "median": 19.5,
+            "above": 20,
+            "line": 12.5
+          },
+          "Donovan Mitchell": {
+            "n": 20,
+            "mean": 27.5,
+            "median": 27.5,
+            "above": 20,
+            "line": 18.5
+          },
+          "Evan Mobley": {
+            "n": 20,
+            "mean": 20.5,
+            "median": 20.5,
+            "above": 20,
+            "line": 13.5
+          }
+        },
+        "team_readiness": {
+          "NYK": true,
+          "CLE": true
+        },
+        "private_owner_board_selected": true,
+        "other_owner_board_ignored": true,
+        "outbox_messages": 1,
+        "outbox_status": "pending",
+        "outbox_expiry": 1794099600.0,
+        "archived_only_under_owner": "telegram:123",
+        "entry_or_ledger_records_created": false,
+        "actual_telegram_delivery_tested": false,
+        "protected_master_rows_unchanged": true
+      },
+      {
+        "mode": "fresh_late_catchup",
+        "check_time": "2026-11-08T00:10:00+00:00",
+        "scheduled_send_at": "2026-11-07T23:30:00+00:00",
+        "held_master_comparisons": 4,
+        "eligible_after_replayed_schedule_and_synthetic_coverage": 4,
+        "expected_arithmetic": {
+          "Jalen Brunson": {
+            "n": 20,
+            "mean": 30.5,
+            "median": 30.5,
+            "above": 20,
+            "line": 20.5
+          },
+          "Josh Hart": {
+            "n": 20,
+            "mean": 19.5,
+            "median": 19.5,
+            "above": 20,
+            "line": 12.5
+          },
+          "Donovan Mitchell": {
+            "n": 20,
+            "mean": 27.5,
+            "median": 27.5,
+            "above": 20,
+            "line": 18.5
+          },
+          "Evan Mobley": {
+            "n": 20,
+            "mean": 20.5,
+            "median": 20.5,
+            "above": 20,
+            "line": 13.5
+          }
+        },
+        "team_readiness": {
+          "NYK": true,
+          "CLE": true
+        },
+        "private_owner_board_selected": true,
+        "other_owner_board_ignored": true,
+        "outbox_messages": 1,
+        "outbox_status": "pending",
+        "outbox_expiry": 1794099600.0,
+        "archived_only_under_owner": "telegram:123",
+        "entry_or_ledger_records_created": false,
+        "actual_telegram_delivery_tested": false,
+        "protected_master_rows_unchanged": true
+      }
+    ]
+  },
+  "live_observations": {
+    "user_reported_import_through": "2026-11-06",
+    "user_reported_pending_dates": [],
+    "first_schedule_status": "failed RuntimeError; only schedule verification listed as needing attention",
+    "public_espn_probe": {
+      "checked_at": "2026-11-07T23:55:37.620565+00:00",
+      "http_status": 200,
+      "game_count": 7,
+      "knicks_game": "NYK at CLE",
+      "tipoff": "2026-11-08T01:00:00+00:00"
+    },
+    "nba_probe_http_status": 403,
+    "original_github_relay_http_status": 404,
+    "manual_relay_commit": "d43a9a0e5479566e1a67ba2d63c8481d169c4439",
+    "relay_document_kind": "validated_timing_extract; parser-equivalent to captured full response, original fetch time and full-response digest preserved",
+    "user_report_after_relay": "Game-stat readiness: current for both teams.",
+    "live_code_activation_verified": false,
+    "live_telegram_reminder_delivery_tested": false,
+    "latest_manual_relay": {
+      "commit": "6b6a9d55c4a2f3512a9c876025363da40d632002",
+      "source_checked_at": "2026-11-08T00:08:42.172564+00:00",
+      "source_http_status": 200,
+      "game_count": 7,
+      "scope": "Another actual ESPN fetch, not a renewal of the older body."
+    },
+    "github_collector_at_0007UTC": "ESPN HTTP403 and NBA ReadTimeout; no automatic source freshness claimed.",
+    "user_subsequent_board_reply": "Analysis completed and showed Andre Drummond eight same-team observations plus Donovan Mitchell margins2.2/0.95 below buffers5.875/4.975; master reads work and strategy rules still hold those offers."
+  },
+  "remaining_limits": [
+    "Actual user screenshots were not attached to this repair turn; unsupported cards remain excluded rather than guessed.",
+    "Live publishers may refuse requests or time out. GitHub scheduled arrival is not guaranteed; stale relay timestamps remain ineligible.",
+    "Eight collected tracking categories have unknown covered-game dates; Overall and Less Than 6Ft remain unavailable per the user-reported status.",
+    "A four-pick target is not a promise that four eligible lines or a complete winning lineup exist."
+  ],
+  "activation": {
+    "SOURCE_REF": "d975d775c49a5bf68fff45d4adb44aefb5e30f51",
+    "KNICKS_DIGEST_MINUTES_BEFORE": "90",
+    "preserve_existing_storage_and_private_settings": true,
+    "note": "Existing environment value60continues to override the new90default until changed. An already queued daily notice stays deduplicated."
+  }
+}
