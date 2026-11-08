@@ -24,6 +24,7 @@ def _daily_check(store, day, now, *, error=None):
     """A recent fetch check never overwrites the original imported coverage."""
     prior=store.get_checkpoint('daily_nba:'+day,{})
     checked={**prior,'date':day,'last_checked_at':now.isoformat(),
+             'team_inventory_checked_at':now.isoformat(),
              'last_refresh_status':'failed' if error else 'success',
              'last_refresh_error':error}
     # A failed first check is an attempt record, not a fabricated empty game day.
@@ -34,9 +35,52 @@ def _daily_check(store, day, now, *, error=None):
 
 
 def _pregame_recheck_days(store, imported, target, now):
-    """Relevant last-game publications fit beside the target in one small batch."""
+    """Queue the recent inventory interval needed by both upcoming teams.
+
+    A team absent from the Knicks-only calendar cannot prove rest from its last
+    observed game alone. Readiness requires independent checks of every date
+    since that game. These remain queued behind the normal three-date batch;
+    this helper never certifies missing inventory or expands a historical gap
+    beyond the same sixty-day bound used by the readiness check.
+    """
     complete={r['date']:r for r in imported if r.get('complete') is True
               and isinstance(r.get('date'),str) and r['date']<=target}
+    try:
+        target_day=dt.date.fromisoformat(target)
+    except (TypeError,ValueError):
+        return []
+    today=now.astimezone(EASTERN).date()
+    year=today.year-(today.month<7)
+    calendar=store.get_checkpoint(f'season_calendar:{year}-{str(year+1)[-2:]}',{}) or {}
+    records={r['date']:r for r in imported if isinstance(r,dict) and isinstance(r.get('date'),str)}
+    from pregame_freshness import _successful_today, _verified_inventory_today
+
+    def publication_current(day):
+        return _successful_today(records.get(day,{}),day,today,now)
+
+    def inventory_current(team,day):
+        record=records.get(day,{})
+        return (publication_current(day) and
+                _verified_inventory_today(record,today,now,team=team))
+
+    def covered_interval(team, first):
+        windows=calendar.get('unassigned_windows',[])
+        if (team not in {canonical_team(value) for value in calendar.get('covered_teams',[])}
+                or calendar.get('complete_for_published_games') is not True
+                or calendar.get('unassigned_coverage_unknown')
+                or not isinstance(windows,list)
+                or calendar.get('unassigned_games') and not windows):
+            return False
+        for window in windows:
+            try:
+                lower=dt.date.fromisoformat(window['start'])
+                upper=dt.date.fromisoformat(window['end'])
+            except (KeyError,TypeError,ValueError):
+                return False
+            if lower>upper or lower<=target_day and upper>=first:
+                return False
+        return True
+
     with store.connect() as db:
         upcoming=[dict(row) for row in db.execute("SELECT * FROM season_schedule WHERE date>=? "
                   "AND (home_team='NYK' OR away_team='NYK')",(now.astimezone(EASTERN).date().isoformat(),))]
@@ -44,7 +88,7 @@ def _pregame_recheck_days(store, imported, target, now):
                   and _aware(row.get('start_time')) and _aware(row['start_time'])>now]
         game=min(upcoming,key=lambda row:_aware(row['start_time']),default=None)
         teams={game['home_team'],game['away_team']} if game else set()
-        relevant=[]
+        relevant=[];intervals=[];known_teams=set()
         for team in sorted(teams):
             dates=[day for day,report in complete.items() if report.get('team_final_game_ids',{}).get(team)]
             # Older imported checkpoints predate explicit inventory metadata.
@@ -52,11 +96,38 @@ def _pregame_recheck_days(store, imported, target, now):
             # complete independent schedule or permission to invent an off day.
             dates.extend(row[0] for row in db.execute('SELECT DISTINCT date FROM games '
                 "WHERE status='final' AND date<=? AND (home_team=? OR away_team=?)",(target,team,team))
-                if row[0] in complete)
-            if dates:relevant.append(max(dates))
-    nonempty=[day for day,report in complete.items() if report.get('final_game_ids') or report.get('games',0)>0]
-    if nonempty:relevant.append(max(nonempty))
-    elif complete:relevant.append(max(complete))
+                if isinstance(row[0],str))
+            valid=[]
+            for day in dates:
+                try:
+                    first=dt.date.fromisoformat(day)
+                except (TypeError,ValueError):
+                    continue
+                if first<=target_day:
+                    valid.append(first)
+            if valid:
+                known_teams.add(team)
+                first=max(valid);relevant.append(first.isoformat())
+                span=(target_day-first).days+1
+                if not covered_interval(team,first) and span<=60:
+                    for offset in range(span):
+                        day=(first+dt.timedelta(days=offset)).isoformat()
+                        if not inventory_current(team,day):
+                            intervals.append(day)
+    if intervals:
+        # While catching up a gap, do not refill the bounded queue with
+        # already-current last-game correction checks. Otherwise four dates
+        # repeatedly compete for three slots and a completed date stays marked
+        # pending forever. Restore ordinary last-game rechecks after catch-up.
+        relevant=[day for day in relevant if not publication_current(day)]
+    relevant.extend(intervals)
+    # Once both matchup teams have known finals, an unrelated league game's
+    # publication must not add a fourth routine date to the three-slot batch.
+    # Retain the legacy fallback while a matchup/latest-team final is unknown.
+    if not teams or not teams<=known_teams:
+        nonempty=[day for day,report in complete.items() if report.get('final_game_ids') or report.get('games',0)>0]
+        if nonempty:relevant.append(max(nonempty))
+        elif complete:relevant.append(max(complete))
     return list(dict.fromkeys(day for day in relevant if day!=target))
 
 
@@ -135,6 +206,13 @@ def import_daily_snapshot(store, document, day, now):
         inventory={'inventory_verified':True,'inventory_verified_at':verified_at.isoformat(),
                    'inventory_verification_source':source.geturl(),'inventory_game_ids':sorted(ids),
                    'inventory_off_day_verified':bool(expected==0)}
+    from published_game_inventory import validate_team_inventory_certificates
+    team_inventory = validate_team_inventory_certificates(
+        document.get('team_inventory_verified'), day, games, now)
+    if team_inventory and not complete:
+        raise ValueError('Team inventory verification requires a complete validated publication.')
+    inventory.update(team_inventory_verified=team_inventory,
+                     team_inventory_checked_at=now.isoformat())
     digest=hashlib.sha256(json.dumps(document,sort_keys=True,default=str).encode()).hexdigest()
     prior=store.get_checkpoint('daily_nba:'+day,{})
     if prior.get('sha256')==digest:
@@ -276,8 +354,11 @@ class NightlyNBARefresh:
             # required checks once, rather than waiting behind that legacy timer.
             # Every real new attempt, including failure, stores last_checked_at;
             # that durable marker restores the normal cooldown across restarts.
-            validation_bootstrap=bool(local>=deadline and any(not _aware(reports.get(day,{}).get('last_checked_at'))
-                                      for day in [target,*recheck_days[:2]]))
+            validation_bootstrap=bool(local>=deadline and any(
+                not _aware(reports.get(day,{}).get('last_checked_at')) or
+                (reports.get(day,{}).get('inventory_verified') is not True and
+                 not _aware(reports.get(day,{}).get('team_inventory_checked_at')))
+                for day in [target,*recheck_days[:2]]))
             if validation_bootstrap:
                 pending=[target,*recheck_days[:2],*pending]
             if pending:

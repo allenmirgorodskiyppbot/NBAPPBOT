@@ -136,6 +136,7 @@ def reconcile_day_inventory(snapshot, inventory, day, scope):
         # An incomplete extract still has useful historical observations; it
         # cannot acquire independent full-day coverage just because it is new.
         return {**snapshot, 'inventory_verified':False,
+                'team_inventory_verified': {},
                 'inventory_verification_error':'Published games do not match the independent day inventory.'}
     return {**snapshot, **metadata}
 
@@ -370,7 +371,12 @@ async def main_async(args):
                     # This never verifies today's live schedule or an off day.
                     inventory=await mirror.historical_inventory(day,result)
                     result=reconcile_day_inventory(result,inventory,day,mirror.scope)
-                    print(day,'published historical inventory corroborated',flush=True)
+                    if inventory.get('inventory_verified') is True:
+                        print(day,'published historical inventory corroborated',flush=True)
+                    else:
+                        print(day,'published historical inventory corroborated for',
+                              len(inventory.get('team_inventory_verified', {})),
+                              'teams; full-day verification remains false',flush=True)
                 except Exception as fallback_error:
                     print(day,'published historical inventory unavailable:',type(fallback_error).__name__,flush=True)
             if result is None:

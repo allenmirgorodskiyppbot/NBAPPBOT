@@ -1369,10 +1369,10 @@ class TelegramBot:
         return formatter(report) if formatter else self._compact(report)
 
     async def _independent_picks_reply(self, request, chat_id, original_text=None):
+        """Read the saved master; regular workers own network/data refreshes."""
         from independent_picks import build_independent_picks, format_independent_picks
         typing = asyncio.create_task(self._typing(chat_id))
         try:
-            await self._refresh_board_news()
             constraints = await asyncio.to_thread(self._pick_constraints, chat_id)
             if original_text is not None:
                 request = parse_picks_request(original_text, default_count=constraints.get('pick_count', 4)) or request

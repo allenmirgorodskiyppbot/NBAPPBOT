@@ -34,11 +34,24 @@ def _successful_today(record, day, today, now):
                 isinstance(record.get('team_final_game_ids'), dict))
 
 
-def _verified_inventory_today(record, today, now):
+def _verified_inventory_today(record, today, now, team=None):
     verified = _aware(record.get('inventory_verified_at'))
-    return bool(record.get('inventory_verified') is True and record.get('inventory_verification_source') and
-                verified and verified.astimezone(EASTERN).date() == today and
-                verified <= now + dt.timedelta(minutes=5))
+    if (record.get('inventory_verified') is True and record.get('inventory_verification_source') and
+            verified and verified.astimezone(EASTERN).date() == today and
+            verified <= now + dt.timedelta(minutes=5)):
+        return True
+    team = canonical_team(team)
+    certificates = record.get('team_inventory_verified')
+    if not team or not isinstance(certificates, dict) or not isinstance(record.get('team_final_game_ids'), dict):
+        return False
+    from published_game_inventory import validate_team_inventory_certificate
+    try:
+        certificate = validate_team_inventory_certificate(certificates.get(team), team, record.get('date'),
+            record['team_final_game_ids'].get(team, []), now)
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return False
+    verified = _aware(certificate['inventory_verified_at'])
+    return bool(verified and verified.astimezone(EASTERN).date() == today)
 
 
 def _number(value):
@@ -208,7 +221,7 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
         statistics_issues.append('A past scheduled team game lacks final imported data: ' +
                        ', '.join(sorted({game['date'] for game in pending_events})) + '.')
     checked_target = _successful_today(daily, required.isoformat(), today, now)
-    verified_inventory = bool(checked_target and _verified_inventory_today(daily, today, now))
+    verified_inventory = bool(checked_target and _verified_inventory_today(daily, today, now, team))
     if not covered and not verified_inventory:
         statistics_issues.append('Complete recent team-game inventory is unverified; a published statistics subset cannot establish missing games.')
     # A known empty day in a complete team calendar may lack a statistics file.
@@ -241,7 +254,7 @@ def assess_pregame_freshness(store, game_date, team, now, *, player=None, stat=N
                 day = (start + dt.timedelta(days=offset)).isoformat()
                 record = store.get_checkpoint('daily_nba:' + day, {}) or {}
                 if not (_successful_today(record, day, today, now) and
-                        _verified_inventory_today(record, today, now)):
+                        _verified_inventory_today(record, today, now, team)):
                     missing.append(day)
                     continue
                 ids = record.get('team_final_game_ids', {}).get(team, [])

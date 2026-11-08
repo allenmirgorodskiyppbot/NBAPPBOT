@@ -151,6 +151,7 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.bot = TelegramBot(self.store, self.answer, token='unit-test', allowed_user_ids=[USER],
                                research_refresh_callback=self.refresh)
         self.bot._typing = AsyncMock()
+        self.addAsyncCleanup(self.bot.shutdown)
 
     def message(self, text):
         return {'text': text, 'from': {'id': USER}, 'chat': {'id': USER, 'type': 'private'}}
@@ -173,7 +174,7 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(before, self.counts())
         self.assertEqual(before['boards'], 0)
         self.answer.assert_not_awaited()
-        self.refresh.assert_awaited_once()
+        self.refresh.assert_not_awaited()
 
     async def test_natural_request_uses_same_builder_and_preserves_followup_context(self):
         with patch('independent_picks._now', return_value=NOW):
@@ -191,7 +192,7 @@ class IndependentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('My target lines', response)
         self.assertIn('Jalen Brunson', response)
         self.answer.assert_not_awaited()
-        self.refresh.assert_awaited_once()
+        self.refresh.assert_not_awaited()
         self.assertEqual(self.counts(), before)
 
     async def test_short_date_after_tipoff_is_held_instead_of_choosing_another_game(self):

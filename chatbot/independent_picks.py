@@ -133,6 +133,7 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     result = {'mode': 'independent_projections', 'generated_at': now.isoformat(),
               'requested_count': count, 'requires_prizepicks_comparison': True,
               'source_kind': 'saved statistics and schedule', 'picks': [], 'held': [], 'evaluated_candidates': [],
+              'master_profiles': [], 'master_lookup': {},
               'game': game, 'game_date': game['date'] if game else date,
               'two_team_coverage': False, 'note': error, 'research_only': True,
               'allow_unverified_timing': allow_unverified_timing,
@@ -159,15 +160,19 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     result['timing_issues'] = list(dict.fromkeys(
         issue for value in team_freshness.values() for issue in value.get('timing_issues', [])))
     cutoff = min(game['date'], now.astimezone(EASTERN).date().isoformat())
+    earliest = (dt.date.fromisoformat(cutoff) - dt.timedelta(days=MAX_SOURCE_LAG_DAYS)).isoformat()
     with store.connect() as db:
         players = [dict(row) for row in db.execute(
             'WITH ranked AS (SELECT player_id,player,team,date,ROW_NUMBER() OVER '
             '(PARTITION BY player_id ORDER BY date DESC,updated_at DESC) AS place '
-            'FROM player_games WHERE date<=?) '
+            'FROM player_games WHERE date>=? AND date<=?) '
             'SELECT * FROM ranked WHERE place=1 AND team IN (?,?) ORDER BY player_id',
-            (cutoff, *sorted(teams)))]
+            (earliest, cutoff, *sorted(teams)))]
+    result['master_lookup'] = {'game_id': game['id'], 'teams': sorted(teams),
+        'players_loaded': {value: len([p for p in players if p['team'] == value]) for value in sorted(teams)},
+        'source': 'Saved master player records, filtered to the next matchup teams; no external lookup required.'}
     news = store.recent_news(200)
-    candidates = []
+    candidates, profile_candidates = [], []
     seen = set()
     for player in players[:80]:
         identity = career_player_key(player['player'], store)
@@ -177,10 +182,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
         opponent = game['away_team'] if player['team'] == game['home_team'] else game['home_team']
         availability = player_availability(news, player['player'], game['date'], now, store=store)
         freshness = team_freshness[player['team']]
-        if _usable_freshness(freshness, allow_unverified_timing) and not availability['blocked']:
+        if (_usable_freshness(freshness, allow_unverified_timing) or allow_unverified_timing) and not availability['blocked']:
             freshness = assess_pregame_freshness(store, game['date'], player['team'], now,
                                                  player=player['player'])
-        choices, reasons = [], []
+        choices, profile_choices, reasons = [], [], []
         for stat in MARKETS:
             evaluated = {'player': player['player'], 'player_id': player['player_id'],
                          'team': player['team'], 'opponent': opponent, 'date': game['date'],
@@ -197,7 +202,10 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
             if availability['blocked']:
                 hold(availability['note'])
                 continue
-            if not _usable_freshness(freshness, allow_unverified_timing):
+            usable = _usable_freshness(freshness, allow_unverified_timing)
+            saved_profile = (allow_unverified_timing and not usable and
+                             stat in freshness.get('current_player_stat_coverage', []))
+            if not usable and not saved_profile:
                 issues = (freshness.get('statistics_issues') if allow_unverified_timing else None)
                 hold('Current game data is not ready: ' + ' '.join(issues or freshness['reasons']))
                 continue
@@ -240,8 +248,9 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
             if availability.get('note'):
                 rank -= 4
             reason = _reason(projection)
-            evaluated.update({'disposition': 'candidate', 'reason': reason, 'targets': targets})
-            choices.append({'player': player['player'], 'player_id': player['player_id'],
+            evaluated.update({'disposition': 'candidate' if usable else 'master_profile',
+                              'reason': reason, 'targets': targets})
+            choice = {'player': player['player'], 'player_id': player['player_id'],
                             'team': player['team'], 'opponent': projection['opponent'],
                             'stat': stat, 'projection': projection, 'targets': targets,
                             'reason': reason, 'availability': availability,
@@ -249,12 +258,24 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
                             'timing_verified': evaluated['timing_verified'],
                             'live_verified': evaluated['live_verified'],
                             'freshness': freshness,
-                            'caution': availability.get('note'), '_rank': rank})
+                            'caution': availability.get('note'), '_rank': rank}
+            if usable:
+                choices.append(choice)
+            else:
+                issues = freshness.get('statistics_issues') or freshness.get('reasons') or []
+                choice.update(coverage_unverified=True, eligible_for_ranking=False, approved_for_entry=False)
+                evaluated.update(eligible_for_ranking=False, approved_for_entry=False)
+                profile_choices.append(choice)
+                reasons.append('Current game data is not ready: ' + ' '.join(issues))
         if choices:
             choices.sort(key=lambda value: (bool(preferred_stat and value['stat'] != preferred_stat),
                                             -value['_rank'], MARKETS.index(value['stat'])))
             candidates.append(choices[0])
         else:
+            if profile_choices:
+                profile_choices.sort(key=lambda value: (bool(preferred_stat and value['stat'] != preferred_stat),
+                                                        -value['_rank'], MARKETS.index(value['stat'])))
+                profile_candidates.append(profile_choices[0])
             result['held'].append({'player': player['player'], 'reason': next(iter(dict.fromkeys(reasons)), 'Insufficient data.')})
     candidates.sort(key=lambda value: (-value['_rank'], value['player']))
     chosen, coverage = select_lineup(candidates, count, required_teams=teams, constraints=constraints)
@@ -262,6 +283,14 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
     if preferred_stat:
         result['lineup_constraints']['preferred_stat'] = preferred_stat
     result['picks'] = [{k: v for k, v in row.items() if k != '_rank'} for row in chosen]
+    profile_candidates.sort(key=lambda value: (-value['_rank'], value['player']))
+    displayed, profile_coverage = select_lineup([*chosen, *profile_candidates], count,
+                                               required_teams=teams, constraints=constraints)
+    profile_ids = {id(value) for value in profile_candidates}
+    result['master_profiles'] = [{k: v for k, v in row.items() if k != '_rank'}
+                                  for row in displayed if id(row) in profile_ids]
+    result['master_profile_coverage'] = {**profile_coverage, 'research_only': True,
+        'eligible_for_ranking': False, 'approved_for_entry': False}
     result['research_lineup_complete'] = result['lineup_complete']
     result['live_lineup_complete'] = (result['lineup_complete'] and
                                     all(row['live_verified'] for row in chosen))
@@ -271,14 +300,20 @@ def build_independent_picks(store, date=None, count=4, team='NYK', now=None, con
             evaluated['disposition'] = 'selected'
     result['note'] = (f"{len(chosen)} of {count} requested player projections are supported." if len(chosen) < count else
                       'Compare these independent targets with the actual offers before selecting sides.')
-    if not chosen and any(not _statistics_ready(value) for value in team_freshness.values()):
+    if result['master_profiles']:
+        result['note'] = ('Loaded saved master research for this matchup. Recent game completeness is unverified; '
+                          'these historical targets are not current qualified picks. /freshness shows the checks still needed.')
+    elif not chosen and any(not _statistics_ready(value) for value in team_freshness.values()):
         result['note'] += ' Current game-stat coverage is missing or stale; /freshness shows the required updates.'
     elif chosen and not result['live_verified']:
         result['verification_note'] = 'Live game timing is unverified. These targets use verified completed-game statistics; check timing and availability.'
-    if not result['lineup_complete']:
+    if not result['lineup_complete'] and not result['master_profiles']:
         result['note'] += ' ' + result['constraint_note']
     result['source_data_through_date'] = min((row['projection']['last_date'] for row in chosen), default=None)
+    result['master_profile_data_through_date'] = min(
+        (row['projection']['last_date'] for row in result['master_profiles']), default=None)
     result['revision'] = hashlib.sha256(json.dumps({'game': game, 'picks': result['picks'],
+                                                  'master_profiles': result['master_profiles'],
                                                   'held': result['held']}, sort_keys=True).encode()).hexdigest()
     return result
 
@@ -292,34 +327,48 @@ def format_independent_picks(report, compact=False, *, max_chars=None):
         return 'Independent picks: ' + str(report.get('note') or 'No supported upcoming game is available.')
     tip = _aware(game.get('start_time'))
     label = tip.astimezone(EASTERN).strftime('%b %d, %-I:%M %p Eastern') if tip else str(game['date'])
-    heading = 'Partial research' if report.get('lineup_complete') is False else 'My projections'
+    profiles = report.get('master_profiles', [])
+    heading = ('Saved-master research' if profiles else
+               'Partial research' if report.get('lineup_complete') is False else 'My projections')
     lines = [f"{heading} — {game['home_team']} vs {game['away_team']} · {label}",
              'My target lines, not quoted PrizePicks offers.']
-    if report.get('lineup_complete') is False:
+    if profiles:
+        lines[1] += '\nRecent game completeness is unverified; these are historical master targets.'
+        if not report.get('master_profile_coverage', {}).get('lineup_complete'):
+            lines[1] += '\n' + _clean(report.get('master_profile_coverage', {}).get('constraint_note'), 200)
+    elif report.get('lineup_complete') is False:
         lines[1] += '\n' + _clean(report.get('constraint_note'), 240)
     if report.get('picks') and report.get('live_verified') is False:
         lines[1] += '\nLive timing unverified; research based on verified completed-game stats.'
-    for i, item in enumerate(report.get('picks', []), 1):
+    if profiles:
+        lines.insert(0, f"Game date: {game['date']} Eastern.")
+    displayed = [*report.get('picks', []), *profiles]
+    for i, item in enumerate(displayed, 1):
         value = item['projection']['reference_projection']
         targets = item['targets']
         more, less = targets['more_at_or_below'], targets['less_at_or_above']
         target = (f'More if line ≤{more:g}; ' if more is not None else '') + f'Less if line ≥{less:g}.'
         block = f"{i}. {_clean(item['player'], 60)} · {MARKET_NAMES[item['stat']]}: {value:g}\n{target}"
+        if item.get('coverage_unverified'):
+            block += f"\n{item['projection']['n']} saved games through {item['projection']['last_date']}; coverage unverified."
         if not compact:
             block += '\nWhy: ' + _clean(item['reason'], 240)
         if item.get('caution'):
             block += '\n' + _clean(item['caution'], 140 if not compact else 70)
         lines.append(block)
-    if not report.get('picks'):
+    if not displayed:
         lines.append('No supported projections yet.')
-    lines.append(_clean(report.get('note'), 240))
-    if not compact and report.get('held'):
+    if profiles:
+        lines.append('/freshness lists the outstanding checks. Historical targets are not current qualified picks.')
+    else:
+        lines.append(_clean(report.get('note'), 240))
+    if not compact and report.get('held') and not profiles:
         first = report['held'][0]
         lines.append('Held: '+_clean(first['player'], 60)+' — '+_clean(first['reason'], 140))
     if report.get('source_data_through_date'):
         lines.append('Saved evidence through '+report['source_data_through_date']+'.')
     lines.append('Check actual lines, availability and payout terms. Experimental research; no entry recorded.')
-    total = len(report.get('picks', []))
+    total = len(displayed)
     shown = total
     def rendered():
         if shown < total:

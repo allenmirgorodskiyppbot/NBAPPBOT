@@ -135,6 +135,175 @@ def historical_inventory(calendar, results, snapshot, day, *, checked_at, calend
         'inventory_date':day,'games':games}
 
 
+def validate_team_inventory_certificate(value, team, day, game_ids, now):
+    """Validate a scoped certificate without promoting it to whole-day proof."""
+    target = dt.date.fromisoformat(day)
+    if (now.tzinfo is None or target >= now.astimezone(EASTERN).date()
+            or team not in TEAM_WORDS or not isinstance(value, dict)
+            or value.get('team') != team or value.get('date') != day
+            or not isinstance(game_ids, list) or any(not isinstance(item, str) for item in game_ids)
+            or len(set(game_ids)) != len(game_ids)):
+        raise ValueError('Historical team inventory identity is invalid.')
+    checked = _instant(value.get('inventory_verified_at'))
+    ids = value.get('inventory_game_ids')
+    off_day = value.get('inventory_off_day_verified')
+    if (checked > now + dt.timedelta(minutes=5) or not isinstance(ids, list)
+            or any(not isinstance(item, str) for item in ids) or len(set(ids)) != len(ids)
+            or sorted(ids) != sorted(game_ids) or type(off_day) is not bool or off_day != (not ids)):
+        raise ValueError('Historical team inventory does not match its imported games.')
+    for identity in ids:
+        match = re.fullmatch(r'nba:' + re.escape(day) + r':([A-Z]{2,3}):([A-Z]{2,3})', identity)
+        if (not match or match[1] not in TEAM_WORDS or match[2] not in TEAM_WORDS
+                or match[1] == match[2] or team not in {match[1], match[2]}
+                or identity != canonical_game(day, match[1], match[2])):
+            raise ValueError('Historical team certificate contains an unrelated or invalid game identity.')
+    year = target.year - (target.month < 7)
+    end = year + 1
+    sources = value.get('inventory_sources')
+    if not isinstance(sources, list) or len(sources) != 3:
+        raise ValueError('Historical team inventory requires its three independent source records.')
+    for meta, tag, filename in zip(sources,
+            ('nba_stats_schedules', 'nba_stats_player_game_logs', 'espn_nba_player_boxscores'),
+            (f'nba_schedule_{end}.parquet', f'player_game_logs_{end}.parquet', f'player_box_{end}.parquet')):
+        _source(meta, tag, filename, checked)
+    expected_source = ROOT + 'nba_stats_player_game_logs/' + f'player_game_logs_{end}.parquet'
+    if (value.get('inventory_verification_source') != expected_source
+            or any(_instant(meta['source_published_at']).date() < target for meta in sources[1:])):
+        raise ValueError('Historical team inventory source does not establish this completed date.')
+    return dict(value)
+
+
+def validate_team_inventory_certificates(value, day, games, now):
+    """Validate relay certificates against the actual imported day population."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict) or len(value) > len(TEAM_WORDS) or not isinstance(games, list):
+        raise ValueError('Historical team inventory certificate map is invalid.')
+    expected = defaultdict(list)
+    seen = set()
+    for game in games:
+        if not isinstance(game, dict):
+            raise ValueError('Historical team inventory game is invalid.')
+        home, away = canonical_team(game.get('home_team')), canonical_team(game.get('away_team'))
+        identity = game.get('id')
+        if (home not in TEAM_WORDS or away not in TEAM_WORDS or home == away
+                or game.get('date') != day or identity != canonical_game(day, home, away) or identity in seen):
+            raise ValueError('Historical team inventory game identity is invalid.')
+        seen.add(identity)
+        for team in (home, away):
+            if team in value and game.get('status') != 'final':
+                raise ValueError('Historical team inventory includes an unfinished team game.')
+            if game.get('status') == 'final':
+                expected[team].append(identity)
+    return {team: validate_team_inventory_certificate(certificate, team, day, expected[team], now)
+            for team, certificate in value.items()}
+
+
+def historical_team_inventory(calendar, results, snapshot, day, *, checked_at,
+                              calendar_source, results_source):
+    """Prove unaffected teams while preserving an unrelated source conflict.
+
+    The complete NBA and ESPN event populations must match first. Every team
+    game is then checked with the original strict three-source validator. A
+    conflicting row blocks its participants and any extra team it mentions;
+    it never gets silently repaired or turned into a whole-day certificate.
+    """
+    target = dt.date.fromisoformat(day)
+    if (checked_at.tzinfo is None or target >= checked_at.astimezone(EASTERN).date()
+            or not isinstance(calendar, list) or not isinstance(results, list)
+            or len(calendar) > 5000 or len(results) > 10000):
+        raise ValueError('Historical scoped inventory requires bounded past-date source populations.')
+    year = target.year - (target.month < 7)
+    end = year + 1
+    from season_schedule_refresh import TEAM_IDS
+    team_by_id = {identity: team for team, identity in TEAM_IDS.items()}
+    cs = _source(calendar_source, 'nba_stats_schedules', f'nba_schedule_{end}.parquet', checked_at)
+    rs = _source(results_source, 'nba_stats_player_game_logs', f'player_game_logs_{end}.parquet', checked_at)
+    dated = [row for row in calendar if str(row.get('game_date')) == day]
+    if not 1 <= len(dated) <= 15:
+        raise ValueError('Scoped inventory requires an explicit nonempty fully assigned calendar date.')
+    expected = {}
+    identities = set()
+    for row in dated:
+        provider = str(row.get('game_id') or '')
+        home, away = canonical_team(row.get('home_team_abbreviation')), canonical_team(row.get('away_team_abbreviation'))
+        identity = canonical_game(day, home, away)
+        if (str(row.get('season')) != str(end) or row.get('season_type') != 'regular-season'
+                or not re.fullmatch('002' + str(year)[-2:] + r'\d{5}', provider)
+                or home not in TEAM_WORDS or away not in TEAM_WORDS or home == away
+                or provider in expected or identity in identities
+                or str(row.get('home_team_id')) == str(row.get('away_team_id'))
+                or not str(row.get('home_team_id') or '').isdigit()
+                or not str(row.get('away_team_id') or '').isdigit()
+                or str(row.get('home_team_id')) != TEAM_IDS.get(home)
+                or str(row.get('away_team_id')) != TEAM_IDS.get(away)):
+            raise ValueError('Scoped calendar contains unknown, duplicate or unsupported event identities.')
+        expected[provider] = {'id': identity, 'home_team': home, 'away_team': away, 'row': row}
+        identities.add(identity)
+    groups = defaultdict(list)
+    mentions = defaultdict(set)
+    for row in results:
+        if str(row.get('game_date')) != day:
+            continue
+        provider = str(row.get('game_id') or '')
+        own = canonical_team(row.get('team_abbreviation'))
+        id_team = team_by_id.get(str(row.get('team_id')))
+        match = re.fullmatch(r'([A-Z]{2,3})\s+(vs\.?|@)\s+([A-Z]{2,3})', str(row.get('matchup') or ''))
+        if (row.get('season_type') != 'regular-season' or own not in TEAM_WORDS or not id_team or not match
+                or canonical_team(match[1]) not in TEAM_WORDS or canonical_team(match[3]) not in TEAM_WORDS):
+            raise ValueError('Scoped NBA results contain unresolved teams or statistical phases.')
+        groups[provider].append(row)
+        mentions[provider].update((own, id_team, canonical_team(match[1]), canonical_team(match[3])))
+    if set(groups) != set(expected):
+        raise ValueError('Scoped NBA result event population differs from the complete calendar.')
+    if (not isinstance(snapshot, dict) or snapshot.get('date') != day or snapshot.get('source') != 'espn'
+            or snapshot.get('upstream_full_game_validated') is not True or snapshot.get('complete') is not True
+            or snapshot.get('pending_game_ids') or snapshot.get('errors')
+            or snapshot.get('expected_games') != len(expected)):
+        raise ValueError('Scoped inventory requires complete independent ESPN boxes.')
+    bs = _source({'source': snapshot.get('source_url'), 'source_published_at': snapshot.get('published_at'),
+        'source_content_sha256': snapshot.get('source_content_sha256')},
+        'espn_nba_player_boxscores', f'player_box_{end}.parquet', checked_at)
+    actual = {game['id']: game for game in snapshot.get('games', [])}
+    if len(actual) != len(snapshot.get('games', [])) or set(actual) != identities:
+        raise ValueError('Scoped ESPN event population differs from the complete calendar.')
+    blocked = set()
+    invalid = []
+    for provider, game in expected.items():
+        box = actual[game['id']]
+        if (box.get('date') != day or box.get('home_team') != game['home_team']
+                or box.get('away_team') != game['away_team'] or box.get('status') != 'final'
+                or _instant(box.get('start_time')).astimezone(EASTERN).date() != target):
+            raise ValueError('Scoped ESPN identity, status or event clock conflicts with the calendar.')
+        participants = {game['home_team'], game['away_team']}
+        unexpected = mentions[provider] - participants
+        blocked.update(unexpected)
+        try:
+            historical_inventory([game['row']], groups[provider],
+                {**snapshot, 'expected_games': 1, 'games': [box]}, day,
+                checked_at=checked_at, calendar_source=cs, results_source=rs)
+        except (ValueError, TypeError, KeyError):
+            blocked.update(participants | mentions[provider])
+            invalid.append(game['id'])
+    certificates = {}
+    for team in sorted(TEAM_WORDS):
+        if team in blocked:
+            continue
+        ids = sorted(game['id'] for game in expected.values()
+                     if team in {game['home_team'], game['away_team']})
+        certificates[team] = {'team': team, 'date': day,
+            'inventory_verified_at': checked_at.isoformat(), 'inventory_verification_source': rs['source'],
+            'inventory_game_ids': ids, 'inventory_off_day_verified': not ids,
+            'inventory_sources': [cs, rs, bs]}
+    certificates = validate_team_inventory_certificates(certificates, day, list(actual.values()), checked_at)
+    if not certificates:
+        raise ValueError('No team has an independently corroborated historical inventory.')
+    return {'inventory_verified': False, 'inventory_date': day,
+        'team_inventory_verified': certificates, 'inventory_conflicting_game_ids': sorted(invalid),
+        'inventory_scope': 'Team-scoped past-date NBA calendar and final results corroborated by complete independent ESPN event inventory; whole-day verification remains false.',
+        'games': list(actual.values())}
+
+
 def _parquet_rows(content):
     import pyarrow.parquet as pq
     table=pq.read_table(io.BytesIO(content))
@@ -171,5 +340,9 @@ async def fetch_historical_inventory(mirror, day, snapshot, *, checked_at=None):
                                           'source_content_sha256':digest})
         values.append(cache[name])
     mirror._published_inventory_assets=cache
-    return historical_inventory(values[0][0],values[1][0],snapshot,day,checked_at=checked_at,
-        calendar_source=values[0][1],results_source=values[1][1])
+    try:
+        return historical_inventory(values[0][0],values[1][0],snapshot,day,checked_at=checked_at,
+            calendar_source=values[0][1],results_source=values[1][1])
+    except ValueError:
+        return historical_team_inventory(values[0][0],values[1][0],snapshot,day,checked_at=checked_at,
+            calendar_source=values[0][1],results_source=values[1][1])
