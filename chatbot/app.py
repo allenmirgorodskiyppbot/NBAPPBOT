@@ -250,8 +250,9 @@ def master_context(master):
                        'Not the full companion ZIP. Public feeds are best effort, not a licensed SLA.')
     nightly=os.getenv('DAILY_NBA_REFRESH','1')=='1'
     result['active_sources'] = {'games': 'nightly_existing_scope' if nightly else os.getenv('NBA_DATA_SOURCE', 'espn'),
-                                'news': os.getenv('NEWS_SOURCE', 'espn')}
-    result['collection_mode'] = ('Existing statistics refresh at 11:30 AM Eastern for the previous day, with hourly publication retries; public news is automatic; PrizePicks lines are uploaded.'
+                                'news': os.getenv('NEWS_SOURCE', 'espn'),
+                                'prizepicks': 'public_site_feed' if os.getenv('PRIZEPICKS_FEED_ENABLED', '1') == '1' else 'manual_uploads'}
+    result['collection_mode'] = ('Existing statistics refresh at 11:30 AM Eastern for the previous day, with hourly publication retries; public news is automatic; PrizePicks feed access is checked separately with /pp_status and uploads remain available.'
                                  if nightly else 'Inspect configured feeds; manual uploads remain available.')
     from efficient_ai import usage_status
     result['runtime_usage'] = usage_status(master)
@@ -501,6 +502,9 @@ async def initialize(application):
             from gameday_digest import GamedayDigest
             state.digest = GamedayDigest(state.master, state.worker, state.telegram.notify)
             start('nba-feeds', state.worker.run)
+            prizepicks_feed = getattr(state, 'prizepicks_feed', None)
+            if prizepicks_feed is not None:
+                start('prizepicks-feed', prizepicks_feed.run)
             start('knicks-gameday-digest', state.digest.run)
             from nightly_data import NightlyNBARefresh
             state.nightly = NightlyNBARefresh(state.master, state.worker,exporter=export_master,data_dir=DATA_DIR)
@@ -635,8 +639,11 @@ async def lifespan(application):
             state.board_news_attempt = time.monotonic()
             async with worker._cycle_lock:
                 await worker.collect_news_sources()
+    from prizepicks_feed import PrizePicksFeed
+    state.prizepicks_feed = PrizePicksFeed(state.master)
     state.telegram = TelegramBot(state.master, telegram_answer, model_status_callback=ai_status,
                                 self_test_callback=self_test, self_test_status_callback=self_test_status,
+                                prizepicks_feed=state.prizepicks_feed,
                                 research_refresh_callback=refresh_board_news,
                                 answer_preferences_callback=telegram_answer, manual_refresh_callback=telegram_refresh_dataset,
                                 manual_refresh_status_callback=telegram_refresh_status)
@@ -658,6 +665,7 @@ async def lifespan(application):
         shutdown_telegram = getattr(state.telegram, 'shutdown', None)
         if callable(shutdown_telegram):
             await shutdown_telegram()
+        await state.prizepicks_feed.aclose()
         tasks = [job['task'] for job in state.jobs.values() if not job['task'].done()]
         for task in tasks:
             task.cancel()

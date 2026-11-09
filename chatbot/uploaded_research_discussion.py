@@ -91,6 +91,9 @@ def _explain_one(store, pick, slots, now):
     for key in ('game_id', 'opponent', 'offer_variant'):
         if pick.get(key):
             leg[key] = pick[key]
+    if (slots.get('opponent') and slots.get('player')
+            and normalized_name(slots['player']) == normalized_name(name)):
+        leg['opponent'] = slots['opponent']
     context, issue = _event(store, leg, now)
     if issue:
         return _held(pick, issue)
@@ -117,6 +120,9 @@ def _explain_one(store, pick, slots, now):
         else:
             reason = 'The recomputed historical sample no longer supports that readable side.'
         return _held(pick, reason)
+    comparison['opponent_context'] = next((dict(row) for row in projection.get('cohorts', [])
+        if row.get('type') == 'opponent_team' and row.get('team') == context.get('opponent')), None)
+    comparison['recent_minutes_reference'] = _number(projection.get('projected_minutes'))
     return {**comparison, 'status': 'research_choice', 'offer_verified': False,
             'availability_caution': availability.get('note'), 'data_readiness': readiness}
 
@@ -158,6 +164,20 @@ def build_uploaded_research_discussion(store, picks, slots=None, now=None, quest
                  f"{relation} this line; mean {item['mean']:.2f}, median {item['median']:g}. "
                  f"Same-team {scope or 'regular-season'} sample through {item['source_data_through_date']}."
                  f"\nLast {item['recent_n']}: {item['recent_side_count']}/{item['recent_n']} on this side.")
+        block += f"\nGame context: {item['team']} vs {item['opponent']} on {item['date']}."
+        cohort = item.get('opponent_context') or {}
+        games = int(cohort.get('n') or 0)
+        if games:
+            block += (f" {games} prior comparable {'game' if games == 1 else 'games'} against "
+                      f"{item['opponent']} in the recent same-team window")
+            if _number(cohort.get('mean')) is not None:
+                block += f"; mean {cohort['mean']:.2f}"
+            block += '. This is a limited opponent sample, not lifetime matchup coverage.'
+        else:
+            block += ' No prior opponent game is available in the recent comparable window.'
+        block += ' No numerical matchup bonus is applied.'
+        if item.get('recent_minutes_reference') is not None:
+            block += f" Stored recent workload reference: {item['recent_minutes_reference']:.1f} minutes."
         if item.get('research_caution'):
             block += '\nCaution: ' + item['research_caution']
         if item.get('availability_caution'):
@@ -167,7 +187,9 @@ def build_uploaded_research_discussion(store, picks, slots=None, now=None, quest
     dates = {item['date'] for item in research}
     header = ([f'Game date: {next(iter(dates))} Eastern.'] if len(dates) == 1 else [])
     if research:
-        header.append('From your uploaded lines')
+        typed = [pick for pick in picks if is_uploaded_research_choice(pick)]
+        from_feed = typed and all(pick.get('source_kind') == 'prizepicks_public_feed' for pick in typed)
+        header.append("From PrizePicks' public feed" if from_feed else 'From your uploaded lines')
     if research and any(not item['timing_verified'] for item in research):
         explanations.append('Current saved statistical coverage is verified; live game timing is unverified. '
                             'That timing hold does not erase the historical reason for the research side.')

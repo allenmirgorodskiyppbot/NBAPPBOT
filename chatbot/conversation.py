@@ -341,7 +341,8 @@ def _empty_state():
 
 def _proposal_group(text):
     """A source reference selects a proposal group, never verifies an offer."""
-    uploaded = bool(re.search(r'\b(?:screenshots?|uploads?|uploaded|images?|photos?)\b', text, re.I))
+    uploaded = bool(re.search(r'\b(?:screenshots?|uploads?|uploaded|images?|photos?|prizepicks|'
+                              r'public\s+feed|provider\s+(?:feed|lines?)|api\s+(?:feed|lines?))\b', text, re.I))
     independent = bool(re.search(r'\b(?:master|own|calculated|independent|projections?|targets?)\b', text, re.I))
     return 'uploaded' if uploaded and not independent else 'independent' if independent and not uploaded else None
 
@@ -356,7 +357,8 @@ def _pick_reference(text, cards):
                r'#\s*(\d{1,2})\b|\b(' + token + r')\s*[?.!]*$|'
                r'\b(' + token + r')\s+(?:from|in|of|on)\s+(?:(?:the|my|your)\s+)?'
                r'(?=(?:screenshots?|uploads?|uploaded|images?|photos?|master|own|calculated|'
-               r'independent|projections?|targets?)\b)')
+               r'independent|projections?|targets?|prizepicks|public\s+feed|'
+               r'provider\s+(?:feed|lines?)|api\s+(?:feed|lines?))\b)')
     indices, spans = set(), []
     for match in re.finditer(r'\b(' + token + r')\s+(?:or|and)\s+(' + token + r')\b', text, re.I):
         for word in match.groups():
@@ -452,6 +454,10 @@ def _clean_state(state, names, now):
                     clean['line_kind'] = 'research_target'
                     clean.pop('line', None)
                     clean.pop('side', None)
+            if (card.get('source_kind') == 'prizepicks_public_feed'
+                    and clean.get('proposal_group') == 'uploaded'
+                    and clean.get('line_kind') == 'assistant_proposal'):
+                clean['source_kind'] = 'prizepicks_public_feed'
             if (card.get('research_choice') is True and clean.get('proposal_group') == 'uploaded'
                     and clean.get('line_kind') == 'assistant_proposal'
                     and 'line' in clean and clean.get('side') in {'more','less'}):
@@ -491,13 +497,19 @@ def _assistant_cards(text, names, now):
                 dates.add(date)
     if len(dates) == 1:
         game_date = next(iter(dates))
-    proposal_group = None
+    proposal_group, proposal_source = None, None
     for index, line in enumerate(lines):
         if line.strip() == 'From your uploaded lines':
             proposal_group = 'uploaded'
+            proposal_source = None
+            continue
+        if line.strip() == "From PrizePicks' public feed":
+            proposal_group = 'uploaded'
+            proposal_source = 'prizepicks_public_feed'
             continue
         if line.strip() == 'My own calculated targets from your master':
             proposal_group = 'independent'
+            proposal_source = None
             continue
         listed = bool(re.match(r'^\s*(?:[-•*]|\d+[.)]|\|)', line))
         heading = re.match(r'^\s*([^—–:\n]{1,100}?)\s*[—–:]\s*'
@@ -537,6 +549,8 @@ def _assistant_cards(text, names, now):
                 'line_kind': 'assistant_proposal'}
         if proposal_group:
             card['proposal_group'] = proposal_group
+        if proposal_source:
+            card['source_kind'] = proposal_source
         if proposal_group == 'independent' or re.search(r'\b(?:if|target|projection)\b|[≤≥]', line, re.I):
             card['line_kind'] = 'research_target'
             card.pop('line', None)
@@ -672,6 +686,19 @@ def _apply_user(text, state, names, now, context_date=None):
             if candidates and not matching:
                 reference_error = 'missing_pick'
             candidates = matching
+        elif line is not None:
+            priced = [item for item in candidates if item[1].get('line_kind') != 'research_target'
+                      and _finite(item[1].get('line')) == line]
+            if priced:
+                candidates = priced
+            elif candidates:
+                # A newly supplied line is a new assessment, not permission to
+                # price an independent target or rewrite an earlier proposal.
+                for index, card in candidates:
+                    if index == state.get('selected_pick_index'):
+                        card.pop('research_choice', None)
+                candidates = []
+                state['selected_pick_index'] = None
         if len(candidates) == 1:
             pick_index, selected_card = candidates[0]
         elif len(candidates) > 1:
@@ -817,7 +844,9 @@ def _apply_user(text, state, names, now, context_date=None):
                          'Which pick do you mean? Give one list number or the player and statistic.')
         if {'uploaded','independent'} <= {
                 card.get('proposal_group') for card in state['recent_picks']}:
-            clarification = ('Which group do you mean: your uploaded lines or the calculated master targets? '
+            offered = ("the PrizePicks feed lines" if any(card.get('source_kind') == 'prizepicks_public_feed'
+                       for card in state['recent_picks']) else 'your uploaded lines')
+            clarification = ('Which group do you mean: ' + offered + ' or the calculated master targets? '
                              'Include its list number or player and statistic.')
     elif new_game and not game_date:
         clarification = 'Which game date should I use for the new matchup?'
