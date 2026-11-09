@@ -174,16 +174,74 @@ class TheOddsAPIFeedTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(status['next_check_at'], (NOW+dt.timedelta(minutes=30)).isoformat())
 
     async def test_only_exact_fixture_and_unique_provider_event_can_spend_credits(self):
-        for events in ([event(home_team='Milwaukee Bucks', away_team='New York Knicks')],
-                       [event(commence_time='2026-11-11T01:30:00Z')],
-                       [event(sport_key='basketball_wnba')], [event(), event(id='other')],
-                       [event(id='../other')]):
+        for events, phase in (([event(home_team='Milwaukee Bucks', away_team='New York Knicks')], 'waiting_for_event'),
+                              ([event(commence_time='2026-11-12T00:30:00Z')], 'waiting_for_event'),
+                              ([event(sport_key='basketball_wnba')], 'waiting_for_event'),
+                              ([event(), event(id='other')], 'event_mismatch'),
+                              ([event(id='../other')], 'unavailable')):
             with self.subTest(events=events):
                 self.store.set_checkpoint(provider.STATUS_CHECKPOINT, {})
                 feed, calls = self.feed(lambda request: httpx.Response(200, json=events))
-                self.assertEqual((await feed.refresh())['phase'], 'unavailable')
+                self.assertEqual((await feed.refresh())['phase'], phase)
                 self.assertEqual(len(calls), 1)
                 self.assertEqual(feed.status()['local_credits_reserved'], 0)
+
+    async def test_provider_estimated_start_can_differ_without_changing_master_tip(self):
+        provider_tip = '2026-11-11T00:40:00+00:00'
+        def handler(request):
+            payload = [event(commence_time=provider_tip)] if request.url.path == provider.EVENTS_PATH else document(commence_time=provider_tip)
+            return httpx.Response(200, json=payload)
+        feed, calls = self.feed(handler)
+        status = await feed.refresh()
+        self.assertEqual(status['phase'], 'ready')
+        self.assertTrue(status['provider_timing_differs'])
+        self.assertEqual(status['matched_provider_start_time'], provider_tip)
+        self.assertEqual(status['saved_start_time'], TIP)
+        offer = feed.offers_for_game()['offers'][0]
+        self.assertEqual(offer['provider_start_time'], provider_tip)
+        self.assertEqual(offer['saved_start_time'], TIP)
+        self.assertEqual(offer['start_time'], provider_tip)
+        self.assertTrue(offer['provider_timing_differs'])
+        self.assertEqual(self.store.games(DATE)[0]['start_time'], TIP)
+        self.assertEqual(len(calls), 2)
+
+    async def test_paid_event_clock_must_equal_selected_provider_clock(self):
+        def handler(request):
+            payload = [event()] if request.url.path == provider.EVENTS_PATH else document(commence_time='2026-11-11T00:40:00Z')
+            return httpx.Response(200, json=payload)
+        feed, calls = self.feed(handler)
+        status = await feed.refresh()
+        self.assertEqual((status['phase'], status['error_code']), ('event_mismatch', 'event_identity_mismatch'))
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(status['local_credits_reserved'], 5)
+        self.assertFalse(feed.offers_for_game()['fresh'])
+
+    async def test_provider_started_or_cancelled_event_is_held_before_spending(self):
+        for values in ({'commence_time': '2026-11-10T01:00:00Z'}, {'status': 'cancelled'}):
+            with self.subTest(values=values):
+                # The saved game must share the source's Eastern date in the
+                # first case, while its own tipoff is still in the future.
+                self.clock[0] = dt.datetime(2026, 11, 11, 0, 20, tzinfo=dt.timezone.utc)
+                source = event(**values)
+                if 'commence_time' in values:
+                    source['commence_time'] = '2026-11-11T00:10:00Z'
+                self.store.set_checkpoint(provider.STATUS_CHECKPOINT, {})
+                feed, calls = self.feed(lambda request: httpx.Response(200, json=[source]))
+                status = await feed.refresh()
+                self.assertEqual(status['phase'], 'event_mismatch')
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(status['local_credits_reserved'], 0)
+
+    async def test_empty_event_listing_waits_normally_and_malformed_listing_is_invalid(self):
+        for data, phase, error in (([], 'waiting_for_event', 'provider_event_not_listed'),
+                                    (['not an event'], 'unavailable', 'invalid_provider_schema')):
+            with self.subTest(data=data):
+                self.store.set_checkpoint(provider.STATUS_CHECKPOINT, {})
+                feed, calls = self.feed(lambda request: httpx.Response(200, json=data))
+                status = await feed.refresh()
+                self.assertEqual((status['phase'], status['error_code']), (phase, error))
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(status['local_credits_reserved'], 0)
 
     async def test_stale_source_market_is_excluded_and_cache_rechecks_source_clock(self):
         data = document()

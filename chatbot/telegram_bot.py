@@ -177,6 +177,23 @@ def _prizepicks_time(value):
         return 'unknown'
 
 
+def _prizepicks_fixture_label(value):
+    """Render normalized fixture fields; raw provider text never reaches chat."""
+    from feeds import TEAM_WORDS, canonical_team
+    if not isinstance(value, dict):
+        return None
+    home, away = canonical_team(value.get('home_team')), canonical_team(value.get('away_team'))
+    if home not in TEAM_WORDS or away not in TEAM_WORDS or home == away:
+        return None
+    clock = _prizepicks_time(value.get('start_time'))
+    if clock == 'unknown':
+        try:
+            clock = datetime.strptime(str(value.get('date')), '%Y-%m-%d').strftime('%b %d, %Y') + '; tipoff unknown'
+        except (TypeError, ValueError):
+            return None
+    return f'{away} at {home} — {clock}'
+
+
 def prizepicks_status_reply(status, *, compact=False):
     """Only operational metadata, never response bodies, cookies or account data."""
     status = status if isinstance(status, dict) else {}
@@ -203,6 +220,8 @@ def prizepicks_status_reply(status, *, compact=False):
         'not_authorized': 'PrizePicks public feed: the data-provider API key was not accepted.',
         'event_unavailable': 'PrizePicks public feed: the saved matchup is not available at the data provider.',
         'stale': 'PrizePicks public feed: saved source lines have expired; current comparisons are held.',
+        'waiting_for_event': 'PrizePicks public feed: connected; waiting for the provider to list the saved game.',
+        'event_mismatch': 'PrizePicks public feed: connected; the returned game could not be matched unambiguously.',
     }
     first = descriptions.get(phase, 'PrizePicks public feed: waiting for a verified server check.')
     first = first.replace('PrizePicks public feed', prefix)
@@ -224,7 +243,8 @@ def prizepicks_status_reply(status, *, compact=False):
         'stale_market', 'invalid_market_clock', 'credit_budget_exhausted', 'provider_credits_exhausted',
         'event_identity_mismatch', 'event_identity_unverified', 'event_identity_ambiguous',
         'invalid_provider_schema', 'duplicate_bookmaker', 'duplicate_market',
-        'duplicate_or_conflicting_selection', 'invalid_provider_event_id', 'stale_market_cache'}
+        'duplicate_or_conflicting_selection', 'invalid_provider_event_id', 'stale_market_cache',
+        'provider_event_not_listed', 'provider_event_started', 'provider_event_inactive'}
     if isinstance(error_code, str) and error_code in safe_codes:
         first += ' Check: ' + error_code + '.'
     if compact:
@@ -246,6 +266,25 @@ def prizepicks_status_reply(status, *, compact=False):
     if status.get('next_check_at'):
         lines.append('Next allowed check: ' + _prizepicks_time(status['next_check_at']) + '.')
     if odds_api:
+        expected = _prizepicks_fixture_label(status.get('expected_game'))
+        if expected:
+            lines.append('Saved game: ' + expected + '.')
+        event_count = status.get('provider_event_count')
+        if type(event_count) is int and 0 <= event_count <= 500:
+            lines.append(f'NBA events returned by provider: {event_count}.')
+        candidates = status.get('provider_knicks_events')
+        if isinstance(candidates, list):
+            displayed = [label for value in candidates[:3] if (label := _prizepicks_fixture_label(value))]
+            lines.extend('Provider Knicks listing: ' + label + '.' for label in displayed)
+            if not displayed and phase == 'waiting_for_event':
+                lines.append('No usable Knicks fixture was returned on this check. PrizePicks offer availability has not been checked yet.')
+        if status.get('provider_timing_differs') is True:
+            provider_clock = _prizepicks_time(status.get('matched_provider_start_time'))
+            saved_clock = _prizepicks_time(status.get('saved_start_time'))
+            if provider_clock != 'unknown' and saved_clock != 'unknown':
+                lines.append(f'Provider tipoff: {provider_clock}; saved calendar: {saved_clock}.')
+        if phase in {'waiting_for_event', 'event_mismatch'}:
+            lines.append('Offer comparisons are held until the matchup is resolved. Master research remains available through /picks.')
         for field, label in (('credits_remaining', 'Provider credits remaining'),
                              ('local_credits_reserved', 'Saved credit reservations this month'),
                              ('monthly_credit_limit', 'Bot monthly credit limit')):
@@ -1557,6 +1596,12 @@ class TelegramBot:
             lines = [f"Game date: {game['date']} Eastern.", provider_heading,
                      f"{len(offers)} cached offer records for {game['home_team']} vs {game['away_team']}. "
                      f"Retrieved {_prizepicks_time(stamp)}."]
+            if status.get('provider') == 'the_odds_api' and status.get('provider_timing_differs') is True:
+                provider_clock = _prizepicks_time(status.get('matched_provider_start_time'))
+                saved_clock = _prizepicks_time(status.get('saved_start_time'))
+                if provider_clock != 'unknown' and saved_clock != 'unknown':
+                    lines.append(f'Provider tipoff: {provider_clock}; saved calendar: {saved_clock}. '
+                                 'The NBA matchup, venue and Eastern game date match; the two timing sources differ.')
             legs = self._prizepicks_comparison_legs(bundle, game)
             if legs:
                 from analysis_engine import analyze_board

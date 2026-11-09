@@ -93,20 +93,81 @@ def _provider_team(name):
     return None
 
 
-def _event_matches(event, game, now):
+def _event_identity_matches(event, game):
+    """The sport, calendar day and home/away clubs identify an NBA fixture.
+
+    A bookmaker's estimated start can differ from the league calendar. It is
+    retained separately instead of changing the master's published tipoff.
+    """
     if not isinstance(event, dict) or event.get('sport_key') != 'basketball_nba':
         return False
-    tip, expected = _timestamp(event.get('commence_time')), _timestamp(game.get('start_time'))
-    return bool(tip and expected and tip == expected and tip > now and
+    tip = _timestamp(event.get('commence_time'))
+    return bool(tip and
                 tip.astimezone(EASTERN).date().isoformat() == game.get('date') and
                 _provider_team(event.get('home_team')) == canonical_team(game.get('home_team')) and
-                _provider_team(event.get('away_team')) == canonical_team(game.get('away_team')) and
-                game.get('status') == 'scheduled')
+                _provider_team(event.get('away_team')) == canonical_team(game.get('away_team')))
 
 
-def parse_offers(document, game, store, now, retrieved_at, *, event_id=None):
+def _event_active(event):
+    if any(event.get(key) is True for key in ('cancelled', 'canceled', 'completed', 'live')):
+        return False
+    value = event.get('status')
+    return value is None or value == '' or isinstance(value, str) and value.strip().casefold() in {
+        'scheduled', 'pre_game', 'pregame', 'upcoming'}
+
+
+def _event_matches(event, game, now):
+    if not _event_identity_matches(event, game):
+        return False
+    tip, expected = _timestamp(event.get('commence_time')), _timestamp(game.get('start_time'))
+    return bool(tip and expected and tip > now and expected > now and
+                expected.astimezone(EASTERN).date().isoformat() == game.get('date') and
+                game.get('status') == 'scheduled' and _event_active(event))
+
+
+def _provider_event_signature(event):
+    tip = _timestamp(event.get('commence_time')) if isinstance(event, dict) else None
+    if not tip:
+        return None
+    return {'id': event.get('id'), 'sport_key': event.get('sport_key'),
+            'home_team': _provider_team(event.get('home_team')),
+            'away_team': _provider_team(event.get('away_team')),
+            'start_time': tip.astimezone(dt.timezone.utc).isoformat(),
+            'date': tip.astimezone(EASTERN).date().isoformat()}
+
+
+def _safe_fixture(value):
+    if not isinstance(value, dict):
+        return None
+    home, away = canonical_team(value.get('home_team')), canonical_team(value.get('away_team'))
+    tip = _timestamp(value.get('start_time'))
+    if (not tip or home == away or home not in TEAM_WORDS or away not in TEAM_WORDS
+            or 'NYK' not in {home, away}
+            or tip.astimezone(EASTERN).date().isoformat() != value.get('date')):
+        return None
+    return {'home_team': home, 'away_team': away, 'date': value['date'],
+            'start_time': tip.astimezone(dt.timezone.utc).isoformat()}
+
+
+def _event_diagnostics(events, game):
+    observations = []
+    for event in events:
+        if not isinstance(event, dict) or event.get('sport_key') != 'basketball_nba':
+            continue
+        signature = _provider_event_signature(event)
+        brief = _safe_fixture(signature)
+        if brief:
+            observations.append(brief)
+    observations.sort(key=lambda value: value['start_time'])
+    return {'expected_game': _safe_fixture(game), 'provider_event_count': len(events),
+            'provider_knicks_events': observations[:3]}
+
+
+def parse_offers(document, game, store, now, retrieved_at, *, event_id=None, provider_event=None):
     """Read only returned PrizePicks standard full-game selections."""
     if not _event_matches(document, game, now) or event_id and document.get('id') != event_id:
+        raise FeedProblem('event_identity_mismatch')
+    if provider_event is not None and _provider_event_signature(document) != _provider_event_signature(provider_event):
         raise FeedProblem('event_identity_mismatch')
     books = document.get('bookmakers')
     if not isinstance(books, list) or len(books) > 100:
@@ -121,6 +182,8 @@ def parse_offers(document, game, store, now, retrieved_at, *, event_id=None):
         raise FeedProblem('invalid_provider_schema')
     roster, rejected, grouped, raw_count, seen_markets = _roster(store, now), Counter(), {}, 0, set()
     teams = {canonical_team(game['home_team']), canonical_team(game['away_team'])}
+    provider_start = _timestamp(document['commence_time']).astimezone(dt.timezone.utc).isoformat()
+    saved_start = _timestamp(game['start_time']).astimezone(dt.timezone.utc).isoformat()
     for market in markets:
         if not isinstance(market, dict):
             raise FeedProblem('invalid_provider_schema')
@@ -168,7 +231,9 @@ def parse_offers(document, game, store, now, retrieved_at, *, event_id=None):
                     'projection_id': 'odds:' + digest, 'provider_event_id': document['id'],
                     'provider_player_id': canonical_player(current['name']), 'player': current['name'],
                     'team': team, 'opponent': next(value for value in teams if value != team),
-                    'date': game['date'], 'game_id': game['id'], 'start_time': game['start_time'],
+                    'date': game['date'], 'game_id': game['id'], 'start_time': provider_start,
+                    'provider_start_time': provider_start, 'saved_start_time': saved_start,
+                    'provider_timing_differs': provider_start != saved_start,
                     'line': line, 'stat': stat, 'stat_type': label, 'stat_display_name': label,
                     'market_key': key, 'projection_type': 'Full game', 'game_scope_verified': True,
                     'offer_variant': 'standard', 'is_promo': None, 'status': 'pre_game',
@@ -231,6 +296,22 @@ class TheOddsAPIFeed:
                    'http_status', 'error_code', 'matched_offers', 'readable_selections',
                    'source_projection_count', 'game_id', 'game_date', 'provider_event_id'}
         result = {key: saved[key] for key in allowed if key in saved}
+        expected = _safe_fixture(saved.get('expected_game'))
+        if expected:
+            result['expected_game'] = expected
+        count = _integer(saved.get('provider_event_count'))
+        if count is not None and count <= 500:
+            result['provider_event_count'] = count
+        observations = saved.get('provider_knicks_events')
+        if isinstance(observations, list):
+            result['provider_knicks_events'] = [brief for value in observations[:3]
+                                               if (brief := _safe_fixture(value))]
+        for key in ('matched_provider_start_time', 'saved_start_time'):
+            stamp = _timestamp(saved.get(key))
+            if stamp:
+                result[key] = stamp.astimezone(dt.timezone.utc).isoformat()
+        if all(result.get(key) for key in ('matched_provider_start_time', 'saved_start_time')):
+            result['provider_timing_differs'] = result['matched_provider_start_time'] != result['saved_start_time']
         phase = 'disabled' if not self.enabled else 'closed' if self._closed else 'not_configured' if not self._api_key else result.get('phase', 'not_checked')
         if phase == 'not_configured':
             result['error_code'] = 'api_key_missing'
@@ -256,10 +337,18 @@ class TheOddsAPIFeed:
             snapshot = {}
         stamp = _timestamp(snapshot.get('retrieved_at'))
         tip = _timestamp(game.get('start_time')) if game else None
+        provider_signature = snapshot.get('provider_event_signature')
+        provider_fixture = _safe_fixture(provider_signature)
+        provider_tip = _timestamp(provider_fixture.get('start_time')) if provider_fixture else None
+        provider_valid = bool(provider_fixture and game and provider_signature.get('sport_key') == 'basketball_nba' and
+                              provider_signature.get('id') == snapshot.get('provider_event_id') and
+                              provider_fixture['home_team'] == canonical_team(game.get('home_team')) and
+                              provider_fixture['away_team'] == canonical_team(game.get('away_team')) and
+                              provider_fixture['date'] == game.get('date') and provider_tip > now)
         fresh = bool(self.enabled and self._api_key and not self._closed and game and tip and tip > now and
                      game.get('status') == 'scheduled' and snapshot.get('game') == _game_signature(game) and
                      status.get('phase') in {'ready', 'no_offers'} and status.get('game_id') == game.get('id') and
-                     stamp and -5 <= (now-stamp).total_seconds() <= CACHE_SECONDS)
+                     stamp and -5 <= (now-stamp).total_seconds() <= CACHE_SECONDS and provider_valid)
         offers = snapshot.get('offers', []) if fresh else []
         before_count = len(offers)
         # A cached market's own clock can expire before the retrieval TTL does.
@@ -347,7 +436,9 @@ class TheOddsAPIFeed:
             self._volatile_status = {'phase': 'unavailable', 'error_code': 'request_timeout',
                 'checked_at': now.isoformat(), 'next_check_at': (now+dt.timedelta(seconds=300)).isoformat(),
                 'http_status': None, 'matched_offers': 0, 'readable_selections': 0,
-                'source_projection_count': 0, 'provider_event_id': None}
+                'source_projection_count': 0, 'provider_event_id': None,
+                'expected_game': None, 'provider_event_count': None, 'provider_knicks_events': [],
+                'matched_provider_start_time': None, 'saved_start_time': None}
             # Do not wait for another database operation after the deadline.
             # The persisted pre-request reservation already accounts for a
             # possibly charged call; the local cooldown prevents retry storms.
@@ -394,10 +485,26 @@ class TheOddsAPIFeed:
                     usage = await self._record_quota(usage)
                     if not isinstance(events, list) or len(events) > 500:
                         raise FeedProblem('invalid_provider_schema')
-                    matches = [event for event in events if _event_matches(event, selected, now)]
-                    if len(matches) != 1:
-                        raise FeedProblem('event_identity_unverified' if not matches else 'event_identity_ambiguous')
-                    event_id = matches[0].get('id')
+                    base.update(_event_diagnostics(events, selected))
+                    if any(
+                            not isinstance(event, dict) or
+                            not all(isinstance(event.get(key), str) and event[key] for key in (
+                                'id', 'sport_key', 'home_team', 'away_team', 'commence_time')) or
+                            not _timestamp(event.get('commence_time')) for event in events):
+                        raise FeedProblem('invalid_provider_schema')
+                    matches = [event for event in events if _event_identity_matches(event, selected)]
+                    if not matches:
+                        raise FeedProblem('provider_event_not_listed')
+                    if len(matches) > 1:
+                        raise FeedProblem('event_identity_ambiguous')
+                    provider_event = matches[0]
+                    if not _event_active(provider_event):
+                        raise FeedProblem('provider_event_inactive')
+                    if _timestamp(provider_event.get('commence_time')) <= _now(self._clock):
+                        raise FeedProblem('provider_event_started')
+                    if not _event_matches(provider_event, selected, _now(self._clock)):
+                        raise FeedProblem('event_identity_mismatch')
+                    event_id = provider_event.get('id')
                     if not isinstance(event_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', event_id):
                         raise FeedProblem('invalid_provider_event_id')
                     if usage.get('credits_remaining') is not None and usage['credits_remaining'] < MAX_CALL_CREDITS:
@@ -413,14 +520,18 @@ class TheOddsAPIFeed:
                     completed_at = _now(self._clock)
                     offers, legs, exclusions, count = await asyncio.to_thread(
                         parse_offers, document, selected, self.store, completed_at,
-                        completed_at.isoformat(), event_id=event_id)
+                        completed_at.isoformat(), event_id=event_id, provider_event=provider_event)
+                provider_signature = _provider_event_signature(provider_event)
                 snapshot = {'game_id': selected['id'], 'game': _game_signature(selected),
+                            'provider_event_signature': provider_signature,
                             'provider_event_id': event_id, 'retrieved_at': completed_at.isoformat(),
                             'source': SOURCE, 'offers': offers, 'legs': legs, 'exclusions': exclusions}
                 await self._save(SNAPSHOT_CHECKPOINT, snapshot)
                 value = {**base, 'phase': 'ready' if offers else 'no_offers', 'http_status': 200,
                          'checked_at': completed_at.isoformat(),
                          'provider_event_id': event_id, 'last_success_at': completed_at.isoformat(),
+                         'matched_provider_start_time': provider_signature['start_time'],
+                         'saved_start_time': _timestamp(selected['start_time']).astimezone(dt.timezone.utc).isoformat(),
                          'matched_offers': len(offers), 'readable_selections': len(legs),
                          'source_projection_count': count,
                          'next_check_at': (completed_at+dt.timedelta(seconds=CACHE_SECONDS)).isoformat()}
@@ -433,6 +544,11 @@ class TheOddsAPIFeed:
                 phase = {'invalid_api_key': 'not_authorized', 'access_refused': 'blocked',
                          'credit_budget_exhausted': 'budget_exhausted',
                          'provider_credits_exhausted': 'quota_exhausted',
+                         'provider_event_not_listed': 'waiting_for_event',
+                         'provider_event_started': 'event_mismatch',
+                         'provider_event_inactive': 'event_mismatch',
+                         'event_identity_ambiguous': 'event_mismatch',
+                         'event_identity_mismatch': 'event_mismatch',
                          'rate_limited': 'rate_limited'}.get(code, 'unavailable')
                 delay = 900 if phase in {'blocked', 'not_authorized'} else 300
                 retry_at = next_month if phase == 'budget_exhausted' else now+dt.timedelta(seconds=3600 if phase == 'quota_exhausted' else delay)
