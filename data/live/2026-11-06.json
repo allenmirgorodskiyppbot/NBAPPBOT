@@ -136,8 +136,8 @@
     },
     {
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "source_content_sha256": "da8e3f1b9d0c1648c290f9187a40176042d0c459f389c212944b0978444164ff",
-      "source_published_at": "2026-11-08T14:08:25Z"
+      "source_content_sha256": "5303da670cf631a181d3c4f69161c561f7a165d7a86eee24cbe9f960691fd760",
+      "source_published_at": "2026-11-09T18:03:24Z"
     },
     {
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
@@ -147,7 +147,7 @@
   ],
   "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
   "inventory_verified": true,
-  "inventory_verified_at": "2026-11-09T17:19:46.096717+00:00",
+  "inventory_verified_at": "2026-11-09T19:02:53.675440+00:00",
   "pending_game_ids": [],
   "player_games": [
     {

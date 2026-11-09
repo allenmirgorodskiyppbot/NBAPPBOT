@@ -90,7 +90,38 @@
       "status": "final"
     }
   ],
-  "inventory_scope": "Games present in the published extract; complete NBA schedule not independently verified.",
+  "inventory_date": "2026-11-08",
+  "inventory_game_ids": [
+    "nba:2026-11-08:BKN:DAL",
+    "nba:2026-11-08:BOS:MIL",
+    "nba:2026-11-08:CHI:PHI",
+    "nba:2026-11-08:DET:LAL",
+    "nba:2026-11-08:LAC:NOP",
+    "nba:2026-11-08:MIA:SAC",
+    "nba:2026-11-08:MIN:UTA"
+  ],
+  "inventory_off_day_verified": false,
+  "inventory_scope": "Nonempty historical NBA calendar date, corroborated by exact two-team NBA final results and independent complete ESPN boxes; no live schedule, off-day or unannounced Cup/TBD certification.",
+  "inventory_sources": [
+    {
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
+      "source_content_sha256": "59814e80abdc5645eb0c4d17128e4a6c8c4e7cfc0ac7991537f1ec7ca4bb1211",
+      "source_published_at": "2026-11-09T15:16:09Z"
+    },
+    {
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
+      "source_content_sha256": "5303da670cf631a181d3c4f69161c561f7a165d7a86eee24cbe9f960691fd760",
+      "source_published_at": "2026-11-09T18:03:24Z"
+    },
+    {
+      "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
+      "source_content_sha256": "19bcded1adf5d5c91580d6fc86506624a9dfb6a615db297917dd6149ee7d45f7",
+      "source_published_at": "2026-11-09T17:18:52+00:00"
+    }
+  ],
+  "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
+  "inventory_verified": true,
+  "inventory_verified_at": "2026-11-09T19:02:53.695589+00:00",
   "pending_game_ids": [],
   "player_games": [
     {

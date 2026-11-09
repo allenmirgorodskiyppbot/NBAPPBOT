@@ -1,11 +1,11 @@
 {
-  "attempted_at": "2026-11-09T17:19:19.000008+00:00",
+  "attempted_at": "2026-11-09T19:02:26.420006+00:00",
   "phase": "checked",
   "schema_version": 1,
   "scope": "Collector health only; successful collection does not establish complete current player availability.",
   "sources": {
     "official_pdf": {
-      "attempted_at": "2026-11-09T17:19:19.000008+00:00",
+      "attempted_at": "2026-11-09T19:02:26.420006+00:00",
       "error_type": "ReadTimeout",
       "http_status": null,
       "index_url": "https://official.nba.com/nba-injury-report-2026-27-season/",
@@ -15,35 +15,11 @@
       "status": "unavailable"
     },
     "structured_extracts": {
-      "coverage": [
-        {
-          "distinct_records": 35766,
-          "game_dates_represented_through": "2026-11-09",
-          "report_clock_unknown": 1323,
-          "report_data_through_date": "2026-11-08",
-          "source_content_sha256": "799d41c99f156bf9d6200aad06c0c0ebfe082cae10e46ff2e03e3a159505d134",
-          "source_kind": "official_extract",
-          "source_published_at": "2026-11-08T14:07:25+00:00",
-          "source_rows": 35766,
-          "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_injury_report/injury_report_2027.parquet",
-          "status": "collected"
-        },
-        {
-          "distinct_records": 2979,
-          "game_dates_represented_through": null,
-          "report_clock_unknown": 2979,
-          "report_data_through_date": "2026-11-08",
-          "source_content_sha256": "603d077cc8c21a1c373cb0a10c817b2656640efe96d668035da9987d6d1e96f2",
-          "source_kind": "espn_injury_snapshot",
-          "source_published_at": "2026-11-08T18:16:33+00:00",
-          "source_rows": 2979,
-          "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_injuries/injuries_2027.parquet",
-          "status": "collected"
-        }
-      ],
-      "note": "Structured source evidence; collection success does not establish complete current official availability.",
-      "records": 38745,
-      "status": "updated"
+      "attempted_at": "2026-11-09T19:02:26.420006+00:00",
+      "error_type": "ValueError",
+      "http_status": null,
+      "note": "Source collection failed; existing evidence was not removed or relabeled.",
+      "status": "unavailable"
     }
   }
 }
