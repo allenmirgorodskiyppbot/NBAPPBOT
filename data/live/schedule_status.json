@@ -1,5 +1,5 @@
 {
-  "attempted_at": "2026-11-09T05:05:51.337404+00:00",
+  "attempted_at": "2026-11-09T06:10:55.177479+00:00",
   "attempts": [
     {
       "error_type": "HTTPStatusError",
@@ -13,7 +13,7 @@
     }
   ],
   "date": "2026-11-09",
-  "next_retry_at": "2026-11-09T05:15:51.337404+00:00",
+  "next_retry_at": "2026-11-09T06:20:55.177479+00:00",
   "next_retry_is_estimate": true,
   "note": "No source was verified. Any prior event relay is retained with its original timestamp.",
   "retry_interval_seconds": 600,
