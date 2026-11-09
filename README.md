@@ -8,9 +8,9 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 9 PrizePicks offers and master explanations
 
-Tested application `SOURCE_REF`: `27206bfb3302911377a738ebb3f72c4e04c748e8`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42662779053)
-passed all **1,810 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `d7fc84343e017a122d0dfe42cb9aee8a1dd0c0db`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42665337698)
+passed all **1,831 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
@@ -35,9 +35,11 @@ The owner selected this independent provider after the direct website request wa
 
 `auto` also selects The Odds API when its key is present; an explicit provider setting fails closed if its key is missing and never silently switches back to the refused website. A PrizePicks account password or session cookie is not required. Keys stay out of source files, saved research, status replies and HTTP request logs.
 
-The connection matches the provider's NBA event to the exact saved Knicks home/away teams, date and tipoff. It requests five main full-game market types: points, rebounds, assists, made threes and PRA. Explicit Over/Under outcomes supply directions. Alternate, quarter/half and unknown markets are excluded. No classification, payout or win probability is inferred from provider placeholder prices. Field-goal-attempt and other master-only targets remain available separately.
+The connection matches one provider NBA event by exact saved Knicks home/away teams and Eastern game date, with both source start times still in the future. The provider's estimated tipoff and the master calendar's tipoff are retained separately and displayed when they differ. The paid offer response must retain the exact provider event ID and clock selected by the free event lookup; cache reads also check both start times. It requests five main full-game market types: points, rebounds, assists, made threes and PRA. Explicit Over/Under outcomes supply directions. Alternate, quarter/half and unknown markets are excluded. No classification, payout or win probability is inferred from provider placeholder prices. Field-goal-attempt and other master-only targets remain available separately.
 
 GET events is documented as free. One selected-event odds read requests five market types for one bookmaker, reserving at most five credits before the request. The persistent local limit is 500 credits per UTC calendar month, with provider remaining-credit checks as an additional limit. Interrupted charged reads keep their reservations. A recent snapshot is reused for 90 seconds, including manual refreshes; source market clocks are checked separately and stale values are excluded. No paid background polling runs on this provider.
+
+An authenticated event response with no matching future fixture now reports **connected; waiting for provider listing**, rather than implying a failed key or an empty PrizePicks board. `/pp_status` shows the expected saved fixture and up to three normalized Knicks events returned by the provider, without raw IDs, bodies, URLs or secrets. An absent listing spends no offer credits. Multiple matching events, started/canceled games, venue/date changes and changed paid-response identities remain held. The [event-matching validation report](data/reports/2026-11-09/odds_api_event_matching_validation.json) distinguishes this repair from the actual observed provider response, whose event details were not available during development.
 
 The [provider validation report](data/reports/2026-11-09/the_odds_api_validation.json) records mocked schema/transport, quota, startup, packaging and follow-up checks. No real provider key was available during development. Live access and this account's coverage remain unverified until the Akash checks succeed. Refused access, invalid keys, exhausted credits and source failures retain labeled master research and screenshot analysis.
 

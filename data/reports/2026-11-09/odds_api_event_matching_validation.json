@@ -1,0 +1,65 @@
+{
+  "checked_date": "2026-11-09",
+  "source_ref": "d7fc84343e017a122d0dfe42cb9aee8a1dd0c0db",
+  "reported_akash_result": {
+    "http_status": 200,
+    "error_code": "event_identity_unverified",
+    "credits_remaining": 500,
+    "local_reserved": 0,
+    "observed_event_payload_available": false
+  },
+  "observed_limits": "HTTP 200 with remaining quota verifies the authenticated event lookup, not PrizePicks offer availability. The actual reason the live provider event was unmatched remains unverified until the new bounded diagnostics run on Akash.",
+  "master_fixture": {
+    "home_team": "NYK",
+    "away_team": "MIL",
+    "date": "2026-11-10",
+    "start_time": "2026-11-11T00:30:00+00:00",
+    "primary_links": [
+      "https://www.nba.com/game/mil-vs-nyk-0022600211",
+      "https://www.msg.com/events-tickets/new-york-knicks-madison-square-garden-november-2026/3B006511E91F8631"
+    ]
+  },
+  "changes": [
+    "Require one NBA fixture with the exact home/away clubs and Eastern date; both source starts must still be future.",
+    "Keep provider and saved tipoffs separate; differences are displayed without rewriting the master or asserting verified live timing.",
+    "Bind the paid response to the exact selected provider event ID, home/away/date and provider clock.",
+    "Invalidate cached offers when either start arrives or saved fixture changes.",
+    "Report an unlisted future fixture as waiting, not a generic failed connection or an empty PrizePicks board.",
+    "Include the expected fixture, returned event count and up to three canonical Knicks event observations; raw source IDs, URLs, bodies and secrets are excluded.",
+    "Reject malformed event arrays as source schema errors while retaining sanitized diagnostics."
+  ],
+  "controls_preserved": [
+    "Fixed documented provider host; no account session or alternate-host bypass",
+    "Five standard source markets, explicit offered sides, master-based statistics and explanations",
+    "No charged background polling; coalescing, durable credit budget, source/cache freshness, 8-second source deadline and key redaction",
+    "Master research and uploaded screenshot analysis remain available on source holds; no entry placed"
+  ],
+  "validation": {
+    "final_event_group": {
+      "passed": 46,
+      "failed": 0,
+      "seconds": 24.533
+    },
+    "independent_new_identity_tests": 12,
+    "status_replay_tests": 5,
+    "prior_combined_group": {
+      "tests": 112,
+      "passed": 111,
+      "errors": 1,
+      "corrected": "Malformed-row validation previously prevented sanitized diagnostics from being retained; final event group covers the corrected order."
+    },
+    "full_ci": {
+      "status": "success",
+      "passed": 1831,
+      "failed": 0,
+      "seconds": 185.573,
+      "run_id": 42665337698,
+      "job_id": 129327372665,
+      "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42665337698",
+      "head_sha": "d7fc84343e017a122d0dfe42cb9aee8a1dd0c0db"
+    },
+    "scope": "Mocked official-format provider transport and controlled master data; no user key was accessed or actual offers fetched.",
+    "live_offer_collection_verified": false,
+    "authenticated_event_lookup_reported_successful": true
+  }
+}
