@@ -196,8 +196,8 @@
   "inventory_sources": [
     {
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
-      "source_content_sha256": "b99cef88e2b5024b55d453b2e40ed7b865bb29c5c499c4186d7031e3e88fb587",
-      "source_published_at": "2026-11-07T15:15:49Z"
+      "source_content_sha256": "59814e80abdc5645eb0c4d17128e4a6c8c4e7cfc0ac7991537f1ec7ca4bb1211",
+      "source_published_at": "2026-11-09T15:16:09Z"
     },
     {
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
@@ -212,7 +212,7 @@
   ],
   "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
   "inventory_verified": true,
-  "inventory_verified_at": "2026-11-09T04:04:31.297396+00:00",
+  "inventory_verified_at": "2026-11-09T16:11:52.402498+00:00",
   "pending_game_ids": [],
   "player_games": [
     {
