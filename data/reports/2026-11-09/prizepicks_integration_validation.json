@@ -1,0 +1,98 @@
+{
+  "source_ref": "66b3c96c10fafaa46735e9a25b9696aef1008b59",
+  "purpose": "Bot-side public PrizePicks offers automatically compared with master research in /picks; exact-line game-specific follow-up explanations use master records.",
+  "live_prizepicks_access_from_akash_verified": false,
+  "local_environment_probe": {
+    "origin_reached": false,
+    "result": "Workspace proxy rejected the CONNECT tunnel with HTTP 403; PrizePicks is absent from this environment's allowed hosts."
+  },
+  "source_configuration": {
+    "public_endpoint": "https://api.prizepicks.com/projections",
+    "enabled_by_default": true,
+    "account_credentials_used": false,
+    "manual_refresh": "/pp_refresh",
+    "saved_status": "/pp_status",
+    "automatic_research": "/picks",
+    "request_budget_seconds": 8,
+    "cache_ttl_seconds": 90,
+    "poll_seconds": 60,
+    "maximum_pages": 16,
+    "maximum_total_response_bytes": 6000000
+  },
+  "end_to_end_contract": {
+    "scope": "offline synthetic contract; no origin/provider/model/Telegram calls",
+    "real_components": [
+      "PrizePicksFeed(httpx.MockTransport)",
+      "MasterStore checkpoints",
+      "TelegramBot /picks",
+      "conversation parser",
+      "master discussion"
+    ],
+    "source_choices": 4,
+    "master_targets": 4,
+    "natural_followup": "exact player+line+stat+opponent+date matched master20game stats",
+    "brunson_controlled_master_mean": 31.5,
+    "opponent_controlled_games": 1,
+    "provider_fake_projection_ignored": true,
+    "http403_keeps_master_working": true,
+    "picks_and_followup_source_http_calls": 0,
+    "master_stats_entries_unchanged": true,
+    "total_mock_source_requests": 2,
+    "passed": true
+  },
+  "source_sha256": {
+    "chatbot/.env.example": "70a9060167da8365a11dd802ade2acc20526dd902f3b08924d47a7b91340e027",
+    "chatbot/app.py": "897e78cd05bc8e17d2ff6ba51b9da310916716ef993a338cf2e502fabe8a3ad4",
+    "chatbot/bootstrap.py": "a510a446ec2d11d406ed48066b8f016e9a3868ea65da765fd68e8041482e22dd",
+    "chatbot/conversation.py": "ef16d8eecbddfdfdafa2b4f6ed0abdd0545c8d80ee9333b513693a6afa0633c8",
+    "chatbot/prizepicks_feed.py": "00da31b71b38080436eead87d3954fef5bfd98f739f7c5ae913615934752b676",
+    "chatbot/telegram_bot.py": "0121a271ae48cc887bbd102c7745ccc6e820f00c1bc21307773f2d2dfc100bb7",
+    "chatbot/uploaded_research_discussion.py": "988b65c6a2e2cef71488dcf2777076968d7de17334bc5188c6d4363744638dee",
+    "chatbot/test_prizepicks_bot.py": "a8cb4a21c4b9c95d759ec3b5f36dc2b6c0b65b0727298430c7518fc885ee8767",
+    "chatbot/test_prizepicks_feed.py": "75af91e12bff4e4ba770fd36a83cd42a8f1e6e35c1ebbd8165f34e03771e882f",
+    "chatbot/test_prizepicks_conversation.py": "899127f37334cf995bd42444ad482f53a34ebfcaeeab8efc3dfcae8664c0ed1c",
+    "chatbot/test_prizepicks_runtime.py": "8851864be9487dac6e2007432534b4f359ef60caf2c125ec5b79928430701423"
+  },
+  "focused_validations": [
+    {
+      "scope": "feed service and clean runtime package",
+      "passed": 23,
+      "failed": 0,
+      "seconds": 7.589
+    },
+    {
+      "scope": "bot collection/combined offers/master behavior",
+      "passed": 11,
+      "failed": 0,
+      "seconds": 7.926
+    },
+    {
+      "scope": "conversation/runtime/explanation source grouping",
+      "passed": 90,
+      "failed": 0,
+      "seconds": 5.235
+    },
+    {
+      "scope": "final frozen source services, bot, follow-ups and package",
+      "passed": 68,
+      "failed": 0,
+      "seconds": 19.008
+    }
+  ],
+  "limits": [
+    "The public website endpoint is unofficial. Successful connectivity from Akash remains a live deployment test.",
+    "Automated provider responses are synthetic HTTPX MockTransport fixtures, not live PrizePicks quotes.",
+    "Unknown sides, partial-game scope, promotion metadata or offer types remain previews; no current offered side or payout is fabricated.",
+    "No betting entry or account action is performed by collection or picks analysis."
+  ],
+  "full_regression_tests": {
+    "source_ref": "66b3c96c10fafaa46735e9a25b9696aef1008b59",
+    "run": 42659149883,
+    "job": 129305665279,
+    "passed": 1762,
+    "failed": 0,
+    "seconds": 162.277,
+    "conclusion": "success",
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42659149883"
+  }
+}

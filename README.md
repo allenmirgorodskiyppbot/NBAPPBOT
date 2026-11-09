@@ -6,15 +6,23 @@ and can compare those with user-supplied PrizePicks lines. The chat model
 runs on Akash through Ollama (`qwen3:4b-instruct-2507-q4_K_M`); no OpenAI API key is required. Data
 refreshes, reminders, calculations and entry grading run independently of AI replies.
 
-## November 8 team lookup and inventory repair
+## November 9 PrizePicks offers and master explanations
 
-Tested application `SOURCE_REF`: `bc8a593317512379648f01c36e0620858c390729`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42504231477)
-passed all **1,719 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `66b3c96c10fafaa46735e9a25b9696aef1008b59`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42659149883)
+passed all **1,762 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
 The [master/schedule/reminder validation report](data/reports/2026-11-07/master_schedule_reminder_validation.json) records the Nov7 live schedule recovery, four-comparison master-data controls and ninety-minute reminder integration tests.
+
+The [PrizePicks integration validation report](data/reports/2026-11-09/prizepicks_integration_validation.json) records the bot-side worker, combined picks, source failure controls, and master-based follow-up tests. Provider responses in automated integration tests are explicitly synthetic; live access from the user's Akash server is verified by its own source checks after deployment.
+
+`/picks` automatically compares fresh usable PrizePicks offers for the exact saved Knicks matchup and includes independent master targets in the same reply. The website feed supplies the quoted lines and offer terms; player averages, sample counts, research choices and explanations are calculated from the master. A follow-up such as “Why Brunson over 25.5 points against MIL this game?” retains the quoted price, statistic, date and opponent, then recomputes the same master evidence. Limited opponent samples remain labeled and do not produce invented matchup bonuses.
+
+A supervised `prizepicks-feed` worker runs in Akash independently of model generation. `/pp_refresh` (or `/pp`) requests a bounded manual source check; `/pp_status` reads saved diagnostics without another request. `/picks` uses the fresh cache and does not wait on a new external request. `PRIZEPICKS_FEED_ENABLED=1` is the default; no PrizePicks account credentials are configured. The fixed public website endpoint is unofficial and may refuse server access or change its schema. The bot reports that result rather than claiming a connection succeeded.
+
+Only explicit usable sides, full-game scope, source status, offer types and promotion fields can enter automatic line comparison. Other fetched prices remain labeled previews. Incomplete pagination, expired caches, changed events, HTTP refusals and rate limits hold provider offers while saved-master research remains available. Payouts are not inferred. No entry is placed by collection or analysis.
 
 The [team lookup and inventory validation report](data/reports/2026-11-08/team_inventory_validation.json) records the actual Nov. 7 source conflict, a complete lookup/import/projection check on a disposable copy of the real master, and the cached request timing.
 
@@ -546,12 +554,13 @@ additional language-model calls, paid provider, or larger server allocation.
 
 ## PrizePicks and the ledger
 
-PrizePicks lines and account information come from the user; there is no direct
-sportsbook account connection. Send readable text, CSV/JSON, or a screenshot.
+PrizePicks lines can be collected from the optional public website feed, while
+account information and placed-entry records remain user-supplied. There is no
+sportsbook account connection. Readable text, CSV/JSON and screenshots remain supported.
 Screenshot intake now reads individual cards with local image preprocessing and
 two corroborating OCR passes. Complete, confidently read full-game cards become a
 research board automatically; unclear cards stay unresolved. The result is a short
-list of up to three distinct players, each with a direction, actual uploaded line,
+list targeting four distinct players when supported, each with a direction, actual offered line,
 reason and relevant availability caution. Both visible More/Less buttons are
 research alternatives, not an assertion that the user selected either one.
 
@@ -809,5 +818,6 @@ execution environments and is not installed in the deployed chatbot.
 Runtime Python packages, including web-framework transitive dependencies, are pinned
 to the same tested versions. Download cleanup tests cover both ASGI disconnect
 events and send failures using valid protocol messages.
+
 
 
