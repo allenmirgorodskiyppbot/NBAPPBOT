@@ -8,9 +8,9 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 9 PrizePicks offers and master explanations
 
-Tested application `SOURCE_REF`: `66b3c96c10fafaa46735e9a25b9696aef1008b59`.
-The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42659149883)
-passed all **1,762 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
+Tested application `SOURCE_REF`: `27206bfb3302911377a738ebb3f72c4e04c748e8`.
+The [release regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42662779053)
+passed all **1,810 tests**. Update the existing Akash deployment to activate this version; keep its persistent volume and private settings.
 The [conversation and calendar validation report](data/reports/2026-11-05/natural_conversation_validation.json) records the actual model trials, workbook and source limits.
 The [live-test repair report](data/reports/2026-11-05/selftest_timeout_validation.json) records the self-test timeout, game-date context and reply-validation fixes.
 The [prop-explanation validation report](data/reports/2026-11-05/prop_explanation_validation.json) records the final source, five actual-model explanation trials, rejected drafts and remaining wording limits.
@@ -18,11 +18,28 @@ The [master/schedule/reminder validation report](data/reports/2026-11-07/master_
 
 The [PrizePicks integration validation report](data/reports/2026-11-09/prizepicks_integration_validation.json) records the bot-side worker, combined picks, source failure controls, and master-based follow-up tests. Provider responses in automated integration tests are explicitly synthetic; live access from the user's Akash server is verified by its own source checks after deployment.
 
-`/picks` automatically compares fresh usable PrizePicks offers for the exact saved Knicks matchup and includes independent master targets in the same reply. The website feed supplies the quoted lines and offer terms; player averages, sample counts, research choices and explanations are calculated from the master. A follow-up such as “Why Brunson over 25.5 points against MIL this game?” retains the quoted price, statistic, date and opponent, then recomputes the same master evidence. Limited opponent samples remain labeled and do not produce invented matchup bonuses.
+`/picks` automatically compares fresh usable PrizePicks offers for the exact saved Knicks matchup and includes independent master targets in the same reply. The selected source supplies quoted lines and explicit available directions; player averages, sample counts, research choices and explanations are calculated from the master. A follow-up such as “Why Brunson over 25.5 points against MIL this game?” retains the quoted price, statistic, date and opponent, then recomputes the same master evidence. Limited opponent samples remain labeled and do not produce invented matchup bonuses.
 
-A supervised `prizepicks-feed` worker runs in Akash independently of model generation. `/pp_refresh` (or `/pp`) requests a bounded manual source check; `/pp_status` reads saved diagnostics without another request. `/picks` uses the fresh cache and does not wait on a new external request. `PRIZEPICKS_FEED_ENABLED=1` is the default; no PrizePicks account credentials are configured. The fixed public website endpoint is unofficial and may refuse server access or change its schema. The bot reports that result rather than claiming a connection succeeded.
+A supervised `prizepicks-feed` worker runs in Akash independently of model generation. `/pp_refresh` (or `/pp`) requests a bounded manual source check; `/pp_status` reads saved diagnostics without another request. With The Odds API selected, `/picks` checks offers on demand and reuses its recent snapshot. The source service makes no credit-consuming background requests. With the original public website source selected, `/picks` remains cache-only and the worker owns collection. `PRIZEPICKS_FEED_ENABLED=1` is the default; no PrizePicks account credentials are configured. The original unofficial website endpoint returned HTTP 403 from the user's Akash server; that refusal is preserved, and is not treated as a working connection.
 
 Only explicit usable sides, full-game scope, source status, offer types and promotion fields can enter automatic line comparison. Other fetched prices remain labeled previews. Incomplete pagination, expired caches, changed events, HTTP refusals and rate limits hold provider offers while saved-master research remains available. Payouts are not inferred. No entry is placed by collection or analysis.
+
+### Connect the free The Odds API option
+
+The owner selected this independent provider after the direct website request was refused. [The Odds API's bookmaker list](https://the-odds-api.com/sports-odds-data/bookmaker-apis.html) includes `prizepicks`; its [Starter plan](https://the-odds-api.com/) advertises 500 monthly credits. Those published capabilities do not prove this particular account has received usable lines: `/pp_refresh` and `/pp_status` must verify the actual key, event and returned markets from Akash.
+
+1. Create a **Starter — FREE** account at The Odds API and keep the emailed key private.
+2. In the existing Akash deployment's **chatbot → Vars & secrets**, add `THE_ODDS_API_KEY` as a **secret**.
+3. Set the normal variable `PRIZEPICKS_FEED_PROVIDER=the_odds_api`, keep `PRIZEPICKS_FEED_ENABLED=1`, and update `SOURCE_REF` to the tested application commit above. Retain the persistent volume and other private settings.
+4. After restart, send `/pp_refresh`, then `/pp_status`, then `/picks` as separate Telegram messages. Confirm the provider, source result, matched offers and confirmed sides; HTTP 200 by itself is insufficient.
+
+`auto` also selects The Odds API when its key is present; an explicit provider setting fails closed if its key is missing and never silently switches back to the refused website. A PrizePicks account password or session cookie is not required. Keys stay out of source files, saved research, status replies and HTTP request logs.
+
+The connection matches the provider's NBA event to the exact saved Knicks home/away teams, date and tipoff. It requests five main full-game market types: points, rebounds, assists, made threes and PRA. Explicit Over/Under outcomes supply directions. Alternate, quarter/half and unknown markets are excluded. No classification, payout or win probability is inferred from provider placeholder prices. Field-goal-attempt and other master-only targets remain available separately.
+
+GET events is documented as free. One selected-event odds read requests five market types for one bookmaker, reserving at most five credits before the request. The persistent local limit is 500 credits per UTC calendar month, with provider remaining-credit checks as an additional limit. Interrupted charged reads keep their reservations. A recent snapshot is reused for 90 seconds, including manual refreshes; source market clocks are checked separately and stale values are excluded. No paid background polling runs on this provider.
+
+The [provider validation report](data/reports/2026-11-09/the_odds_api_validation.json) records mocked schema/transport, quota, startup, packaging and follow-up checks. No real provider key was available during development. Live access and this account's coverage remain unverified until the Akash checks succeed. Refused access, invalid keys, exhausted credits and source failures retain labeled master research and screenshot analysis.
 
 The [team lookup and inventory validation report](data/reports/2026-11-08/team_inventory_validation.json) records the actual Nov. 7 source conflict, a complete lookup/import/projection check on a disposable copy of the real master, and the cached request timing.
 

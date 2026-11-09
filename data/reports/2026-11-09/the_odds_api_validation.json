@@ -1,0 +1,76 @@
+{
+  "checked_date": "2026-11-09",
+  "source_ref": "27206bfb3302911377a738ebb3f72c4e04c748e8",
+  "user_selected_provider": "the_odds_api_starter_free",
+  "provider": "The Odds API",
+  "upstream_bookmaker": "prizepicks",
+  "official_documentation": [
+    "https://the-odds-api.com/",
+    "https://the-odds-api.com/liveapi/guides/v4/",
+    "https://the-odds-api.com/sports-odds-data/bookmaker-apis.html",
+    "https://the-odds-api.com/sports-odds-data/betting-markets.html"
+  ],
+  "connection": {
+    "bot_location": "Akash",
+    "account_secret_environment_name": "THE_ODDS_API_KEY",
+    "provider_variable": "PRIZEPICKS_FEED_PROVIDER=the_odds_api",
+    "live_keyed_access_verified": false,
+    "reason": "User key must be added privately in Akash; no actual key was used during development."
+  },
+  "original_direct_source": {
+    "reported_result": "HTTP 403 access_refused",
+    "reported_bot_check": "2026-11-09T12:04:00-05:00",
+    "source_refusal_preserved": true
+  },
+  "controls": {
+    "fixed_provider_host": "api.the-odds-api.com",
+    "matchup": "Exact upcoming saved Knicks fixture: NBA, home/away, date, tipoff, current roster",
+    "markets": [
+      "player_points",
+      "player_rebounds",
+      "player_assists",
+      "player_threes",
+      "player_points_rebounds_assists"
+    ],
+    "directions": "Only explicit Over/Under source outcomes",
+    "maximum_request_seconds": 8,
+    "cache_seconds": 90,
+    "maximum_market_age_seconds": 300,
+    "free_plan_local_monthly_credit_limit": 500,
+    "maximum_credits_reserved_per_fresh_read": 5,
+    "no_charged_background_polling": true,
+    "source_prices_used_as_forecasts_or_payouts": false,
+    "master_targets_and_uploaded_analysis_preserved_when_source_fails": true,
+    "key_logging_redacted": true,
+    "personal_prizepicks_account_session_used": false,
+    "entries_placed": false
+  },
+  "corrected_reproduced_defects": [
+    "Source updates during an in-flight request are compared with completion time.",
+    "Provider quota exhaustion is distinguished from an invalid key.",
+    "A timed-out source check cannot inherit an earlier HTTP 200."
+  ],
+  "validation": {
+    "scope": "Mocked provider transport and controlled master fixtures; no live provider key, account login or Telegram delivery used.",
+    "focused": {
+      "passed": 90,
+      "failed": 0,
+      "seconds": 37.364
+    },
+    "final_provider_and_independent_contract": {
+      "passed": 25,
+      "failed": 0,
+      "seconds": 16.075
+    },
+    "full_ci": {
+      "status": "success",
+      "passed": 1810,
+      "failed": 0,
+      "seconds": 208.241,
+      "run_id": 42662779053,
+      "job_id": 129318387963,
+      "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/42662779053",
+      "head_sha": "27206bfb3302911377a738ebb3f72c4e04c748e8"
+    }
+  }
+}
