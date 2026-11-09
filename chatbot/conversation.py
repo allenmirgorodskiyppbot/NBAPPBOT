@@ -342,7 +342,7 @@ def _empty_state():
 def _proposal_group(text):
     """A source reference selects a proposal group, never verifies an offer."""
     uploaded = bool(re.search(r'\b(?:screenshots?|uploads?|uploaded|images?|photos?|prizepicks|'
-                              r'public\s+feed|provider\s+(?:feed|lines?)|api\s+(?:feed|lines?))\b', text, re.I))
+                              r'public\s+feed|(?:the\s+)?odds\s+api|provider\s+(?:feed|lines?)|api\s+(?:feed|lines?))\b', text, re.I))
     independent = bool(re.search(r'\b(?:master|own|calculated|independent|projections?|targets?)\b', text, re.I))
     return 'uploaded' if uploaded and not independent else 'independent' if independent and not uploaded else None
 
@@ -357,7 +357,7 @@ def _pick_reference(text, cards):
                r'#\s*(\d{1,2})\b|\b(' + token + r')\s*[?.!]*$|'
                r'\b(' + token + r')\s+(?:from|in|of|on)\s+(?:(?:the|my|your)\s+)?'
                r'(?=(?:screenshots?|uploads?|uploaded|images?|photos?|master|own|calculated|'
-               r'independent|projections?|targets?|prizepicks|public\s+feed|'
+               r'independent|projections?|targets?|prizepicks|public\s+feed|(?:the\s+)?odds\s+api|'
                r'provider\s+(?:feed|lines?)|api\s+(?:feed|lines?))\b)')
     indices, spans = set(), []
     for match in re.finditer(r'\b(' + token + r')\s+(?:or|and)\s+(' + token + r')\b', text, re.I):
@@ -454,10 +454,10 @@ def _clean_state(state, names, now):
                     clean['line_kind'] = 'research_target'
                     clean.pop('line', None)
                     clean.pop('side', None)
-            if (card.get('source_kind') == 'prizepicks_public_feed'
+            if (card.get('source_kind') in {'prizepicks_public_feed', 'prizepicks_the_odds_api'}
                     and clean.get('proposal_group') == 'uploaded'
                     and clean.get('line_kind') == 'assistant_proposal'):
-                clean['source_kind'] = 'prizepicks_public_feed'
+                clean['source_kind'] = card['source_kind']
             if (card.get('research_choice') is True and clean.get('proposal_group') == 'uploaded'
                     and clean.get('line_kind') == 'assistant_proposal'
                     and 'line' in clean and clean.get('side') in {'more','less'}):
@@ -506,6 +506,10 @@ def _assistant_cards(text, names, now):
         if line.strip() == "From PrizePicks' public feed":
             proposal_group = 'uploaded'
             proposal_source = 'prizepicks_public_feed'
+            continue
+        if line.strip() == 'From PrizePicks via The Odds API':
+            proposal_group = 'uploaded'
+            proposal_source = 'prizepicks_the_odds_api'
             continue
         if line.strip() == 'My own calculated targets from your master':
             proposal_group = 'independent'
@@ -844,7 +848,7 @@ def _apply_user(text, state, names, now, context_date=None):
                          'Which pick do you mean? Give one list number or the player and statistic.')
         if {'uploaded','independent'} <= {
                 card.get('proposal_group') for card in state['recent_picks']}:
-            offered = ("the PrizePicks feed lines" if any(card.get('source_kind') == 'prizepicks_public_feed'
+            offered = ("the PrizePicks feed lines" if any(card.get('source_kind') in {'prizepicks_public_feed', 'prizepicks_the_odds_api'}
                        for card in state['recent_picks']) else 'your uploaded lines')
             clarification = ('Which group do you mean: ' + offered + ' or the calculated master targets? '
                              'Include its list number or player and statistic.')

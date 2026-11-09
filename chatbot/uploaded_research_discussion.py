@@ -188,8 +188,13 @@ def build_uploaded_research_discussion(store, picks, slots=None, now=None, quest
     header = ([f'Game date: {next(iter(dates))} Eastern.'] if len(dates) == 1 else [])
     if research:
         typed = [pick for pick in picks if is_uploaded_research_choice(pick)]
-        from_feed = typed and all(pick.get('source_kind') == 'prizepicks_public_feed' for pick in typed)
-        header.append("From PrizePicks' public feed" if from_feed else 'From your uploaded lines')
+        source_kinds = {pick.get('source_kind') for pick in typed}
+        if typed and source_kinds == {'prizepicks_the_odds_api'}:
+            header.append('From PrizePicks via The Odds API')
+        elif typed and source_kinds == {'prizepicks_public_feed'}:
+            header.append("From PrizePicks' public feed")
+        else:
+            header.append('From your uploaded lines')
     if research and any(not item['timing_verified'] for item in research):
         explanations.append('Current saved statistical coverage is verified; live game timing is unverified. '
                             'That timing hold does not erase the historical reason for the research side.')

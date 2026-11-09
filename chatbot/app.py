@@ -249,9 +249,10 @@ def master_context(master):
     result['scope'] = ('Existing workbook players, teams and metric definitions, refreshed from their relevant completed games. '
                        'Not the full companion ZIP. Public feeds are best effort, not a licensed SLA.')
     nightly=os.getenv('DAILY_NBA_REFRESH','1')=='1'
+    from prizepicks_source import prizepicks_source_name
     result['active_sources'] = {'games': 'nightly_existing_scope' if nightly else os.getenv('NBA_DATA_SOURCE', 'espn'),
                                 'news': os.getenv('NEWS_SOURCE', 'espn'),
-                                'prizepicks': 'public_site_feed' if os.getenv('PRIZEPICKS_FEED_ENABLED', '1') == '1' else 'manual_uploads'}
+                                'prizepicks': prizepicks_source_name()}
     result['collection_mode'] = ('Existing statistics refresh at 11:30 AM Eastern for the previous day, with hourly publication retries; public news is automatic; PrizePicks feed access is checked separately with /pp_status and uploads remain available.'
                                  if nightly else 'Inspect configured feeds; manual uploads remain available.')
     from efficient_ai import usage_status
@@ -639,8 +640,8 @@ async def lifespan(application):
             state.board_news_attempt = time.monotonic()
             async with worker._cycle_lock:
                 await worker.collect_news_sources()
-    from prizepicks_feed import PrizePicksFeed
-    state.prizepicks_feed = PrizePicksFeed(state.master)
+    from prizepicks_source import create_prizepicks_feed
+    state.prizepicks_feed = create_prizepicks_feed(state.master)
     state.telegram = TelegramBot(state.master, telegram_answer, model_status_callback=ai_status,
                                 self_test_callback=self_test, self_test_status_callback=self_test_status,
                                 prizepicks_feed=state.prizepicks_feed,

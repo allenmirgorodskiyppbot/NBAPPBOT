@@ -118,7 +118,7 @@ HELP = '''Knicks Research bot
 /selftest status — current check, elapsed time and last self-test report
 /playerlog NAME | points | 5 — stored game logs and averages without waiting for AI
 /picks [Nov 2|today|tomorrow] [2-6] — own projections; date/count optional
-/pp_refresh (or /pp) — check the public PrizePicks feed from this bot's server
+/pp_refresh (or /pp) — refresh the configured PrizePicks source from this bot's server
 /pp_status — saved PrizePicks connection status without another request
 /clear — clear this chat's conversation context and lineup preferences
 /diagnose — check the built-in public NBA feed connections
@@ -139,7 +139,7 @@ HELP = '''Knicks Research bot
 
 Ask for picks or use /picks to get the bot's own projections and conditional target lines before checking PrizePicks. You can also send just "Nov 2", "November 2", or "11/2". Dates without a year use the current NBA season (July–June); numeric dates are month/day. With no date, it uses the next unstarted saved Knicks game; "tonight" or an explicit date stays on that day. It can return fewer candidates when evidence is insufficient. These are model targets, not observed PrizePicks offers or placed entries.
 
-When the public PrizePicks connection is available, /picks also compares fresh cached offers for that exact matchup. /pp_refresh tests collection on the bot's server; /pp_status shows its last result. A refused, stale or incomplete feed does not become a current offer. Available sides and payout terms stay unknown when the source does not provide them.
+When a PrizePicks connection is configured, /picks also compares source offers for that exact matchup. The Odds API connection checks on demand and reuses a recent snapshot to conserve its free allowance; /pp_status shows its connection and saved credit counters. /pp_refresh checks the source on the bot's server. A refused, stale or incomplete feed does not become a current offer. Available sides and payout terms stay unknown when the source does not provide them.
 
 The daily dataset refresh runs at 11:30 AM Eastern. The bot sends a result and coverage summary; unavailable sources stay marked unavailable. /refresh checks again on demand.
 
@@ -181,6 +181,8 @@ def prizepicks_status_reply(status, *, compact=False):
     """Only operational metadata, never response bodies, cookies or account data."""
     status = status if isinstance(status, dict) else {}
     phase = status.get('phase')
+    odds_api = status.get('provider') == 'the_odds_api'
+    prefix = 'PrizePicks via The Odds API' if odds_api else 'PrizePicks public feed'
     descriptions = {
         'disabled': 'PrizePicks public feed: disabled.',
         'ready': 'PrizePicks public feed: responding.',
@@ -192,8 +194,18 @@ def prizepicks_status_reply(status, *, compact=False):
         'partial': 'PrizePicks public feed: incomplete response; current offers are held.',
         'no_saved_game': 'PrizePicks public feed: no saved upcoming Knicks game is available.',
         'closed': 'PrizePicks public feed: worker is stopped.',
+        'not_configured': 'PrizePicks public feed: an API key is needed in the bot server settings.',
+        'configuration_error': 'PrizePicks public feed: source configuration needs correction.',
+        'quota_exhausted': 'PrizePicks public feed: the available credit allowance is exhausted.',
+        'budget_exhausted': 'PrizePicks public feed: the saved monthly credit limit has been reached.',
+        'quota_unknown': 'PrizePicks public feed: credit allowance could not be verified.',
+        'invalid_key': 'PrizePicks public feed: the data-provider API key was not accepted.',
+        'not_authorized': 'PrizePicks public feed: the data-provider API key was not accepted.',
+        'event_unavailable': 'PrizePicks public feed: the saved matchup is not available at the data provider.',
+        'stale': 'PrizePicks public feed: saved source lines have expired; current comparisons are held.',
     }
     first = descriptions.get(phase, 'PrizePicks public feed: waiting for a verified server check.')
+    first = first.replace('PrizePicks public feed', prefix)
     code = status.get('http_status')
     if type(code) is int and 100 <= code <= 599:
         first += f' HTTP {code}.'
@@ -205,10 +217,21 @@ def prizepicks_status_reply(status, *, compact=False):
         'pagination_limit_exceeded', 'invalid_empty_pagination', 'pagination_page_exceeds_total',
         'unsafe_or_incoherent_pagination', 'pagination_completeness_unverified', 'invalid_response_age',
         'stale_source_response', 'response_size_limit', 'invalid_json_response',
-        'pagination_count_changed_during_read', 'pagination_changed_during_read', 'pagination_count_incomplete'}
+        'pagination_count_changed_during_read', 'pagination_changed_during_read', 'pagination_count_incomplete',
+        'api_key_missing', 'invalid_api_key', 'invalid_provider', 'quota_exhausted', 'budget_exhausted',
+        'monthly_budget_exhausted', 'provider_quota_exhausted', 'quota_unknown', 'provider_event_not_found',
+        'provider_event_ambiguous', 'provider_event_mismatch', 'invalid_event_schema', 'invalid_odds_schema',
+        'stale_market', 'invalid_market_clock', 'credit_budget_exhausted', 'provider_credits_exhausted',
+        'event_identity_mismatch', 'event_identity_unverified', 'event_identity_ambiguous',
+        'invalid_provider_schema', 'duplicate_bookmaker', 'duplicate_market',
+        'duplicate_or_conflicting_selection', 'invalid_provider_event_id', 'stale_market_cache'}
     if isinstance(error_code, str) and error_code in safe_codes:
         first += ' Check: ' + error_code + '.'
     if compact:
+        if odds_api:
+            if phase == 'not_configured':
+                return first + ' Add THE_ODDS_API_KEY as an Akash secret; /pp_refresh then tests the source.'
+            return first + ' Checks run on demand; /pp_status shows saved usage.'
         return first + ' Automatic checks continue; /pp_status shows the last server result.'
     lines = [first, 'This connection is checked by the deployed bot.']
     if status.get('checked_at'):
@@ -222,9 +245,20 @@ def prizepicks_status_reply(status, *, compact=False):
             lines.append(f'{label}: {number}.')
     if status.get('next_check_at'):
         lines.append('Next allowed check: ' + _prizepicks_time(status['next_check_at']) + '.')
+    if odds_api:
+        for field, label in (('credits_remaining', 'Provider credits remaining'),
+                             ('local_credits_reserved', 'Saved credit reservations this month'),
+                             ('monthly_credit_limit', 'Bot monthly credit limit')):
+            number = status.get(field)
+            if type(number) is int and 0 <= number <= 100000000:
+                lines.append(f'{label}: {number}.')
+        lines.append('Source checks run on /picks or /pp_refresh; fresh snapshots are reused to conserve credits.')
+        if phase == 'not_configured':
+            lines.append('Add THE_ODDS_API_KEY as an Akash secret on the chatbot service, then restart it.')
     if phase == 'blocked':
         lines.append('The source refusal is retained; the bot does not retry through alternate hosts or account sessions.')
-    lines.append('Only public line collection is configured. No entry is placed.')
+    lines.append('Only read-only offer collection is configured. No entry is placed.' if odds_api
+                 else 'Only public line collection is configured. No entry is placed.')
     return '\n'.join(lines)
 
 
@@ -1441,7 +1475,9 @@ class TelegramBot:
         """Reuse an immutable owner-scoped source snapshot; never make an entry."""
         digest = hashlib.sha256(json.dumps({'game': game['id'], 'legs': legs},
                                            sort_keys=True, allow_nan=False).encode()).hexdigest()
-        source = f'PrizePicks public feed; telegram:{chat_id}; game:{game["id"]}; snapshot:{digest}'
+        via_odds_api = bool(legs) and all(leg.get('source_kind') == 'PrizePicks via The Odds API' for leg in legs)
+        provider_label = 'PrizePicks via The Odds API' if via_odds_api else 'PrizePicks public feed'
+        source = f'{provider_label}; telegram:{chat_id}; game:{game["id"]}; snapshot:{digest}'
         with self.store.connect() as db:
             existing = db.execute('SELECT id FROM boards WHERE source=? ORDER BY created_at DESC LIMIT 1',
                                   (source,)).fetchone()
@@ -1491,7 +1527,7 @@ class TelegramBot:
         return result
 
     async def _prizepicks_cached_reply(self, game, chat_id, *, count=4):
-        """Use only this exact game's fresh public snapshot, without HTTP work."""
+        """Use only this exact game's fresh source snapshot, without HTTP work."""
         if self.prizepicks_feed is None:
             return '', False
         if not isinstance(game, dict) or not game.get('id'):
@@ -1516,7 +1552,9 @@ class TelegramBot:
                 return json.dumps(rows, sort_keys=True, allow_nan=False)
             original_key = snapshot_key(bundle)
             stamp = offers[0].get('retrieved_at') or status.get('last_success_at')
-            lines = [f"Game date: {game['date']} Eastern.", "From PrizePicks' public feed",
+            provider_heading = ('From PrizePicks via The Odds API'
+                                if status.get('provider') == 'the_odds_api' else "From PrizePicks' public feed")
+            lines = [f"Game date: {game['date']} Eastern.", provider_heading,
                      f"{len(offers)} cached offer records for {game['home_team']} vs {game['away_team']}. "
                      f"Retrieved {_prizepicks_time(stamp)}."]
             legs = self._prizepicks_comparison_legs(bundle, game)
@@ -1537,6 +1575,9 @@ class TelegramBot:
                 lines.append(format_shortlist(shortlist).replace('No uploaded side', 'No fetched side'))
                 lines.append(f'Compared {len(legs)} explicitly confirmed sides, using one source offer per player/statistic; '
                              'alternative offers remain in the saved feed snapshot. No entry placed.')
+                if status.get('provider') == 'the_odds_api':
+                    lines.append('Five main market types were requested: points, rebounds, assists, made threes and PRA. '
+                                 'Provider prices are excluded from the master analysis; confirm actual PrizePicks offer and payout terms.')
             else:
                 from board_shortlist import MARKET_NAMES
                 for offer in offers[:8]:
@@ -1568,7 +1609,8 @@ class TelegramBot:
             return 'PrizePicks public feed is not configured in this deployment.'
         try:
             if refresh:
-                status = await self.prizepicks_feed.refresh(force=True)
+                async with asyncio.timeout(9):
+                    status = await self.prizepicks_feed.refresh(force=True)
             else:
                 status = await asyncio.to_thread(self.prizepicks_feed.status)
             text = prizepicks_status_reply(status)
@@ -1587,7 +1629,7 @@ class TelegramBot:
             return 'The PrizePicks server check could not finish. Saved master targets remain available through /picks.'
 
     async def _independent_picks_reply(self, request, chat_id, original_text=None):
-        """Read the saved master; regular workers own network/data refreshes."""
+        """Read the master first, then check a configured on-demand offer source."""
         from independent_picks import build_independent_picks, format_independent_picks
         typing = asyncio.create_task(self._typing(chat_id))
         try:
@@ -1601,8 +1643,18 @@ class TelegramBot:
                                     owner_key=f'telegram:{chat_id}', kind='independent')
             master_text = format_independent_picks(report)
             if self.prizepicks_feed is not None:
+                game = report.get('game')
+                ensure = getattr(self.prizepicks_feed, 'ensure_for_game', None)
+                if isinstance(game, dict) and game.get('id') and callable(ensure):
+                    try:
+                        async with asyncio.timeout(9):
+                            await ensure(game)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as error:
+                        log.warning('On-demand PrizePicks source check incomplete (%s).', type(error).__name__)
                 offered_text, available = await self._prizepicks_cached_reply(
-                    report.get('game'), chat_id, count=report.get('requested_count', 4))
+                    game, chat_id, count=report.get('requested_count', 4))
                 if available:
                     return offered_text + '\n\nMy own calculated targets from your master\n\n' + master_text
                 if offered_text:
