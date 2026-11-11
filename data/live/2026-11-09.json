@@ -123,18 +123,18 @@
     },
     {
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "source_content_sha256": "4d464ad094f5a0bbd73990bf2c8e5d7d434674797f70abb4af6b7a396e0d3907",
-      "source_published_at": "2026-11-10T15:28:26Z"
+      "source_content_sha256": "d1b53cb6959c2bd124f85f715f4bf7eae8b270b59d6a4b802f9d837057567335",
+      "source_published_at": "2026-11-11T14:53:41Z"
     },
     {
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
-      "source_content_sha256": "9c4e88a5b9635c34dd2f1cc56875b139bbb6014cd3617ae05f2297ecb25086a1",
-      "source_published_at": "2026-11-10T12:55:08+00:00"
+      "source_content_sha256": "a6dbdd77a6dd5020acaaff5e4a8bf9909ba845afccc89f53fa128ebd7d2d67c2",
+      "source_published_at": "2026-11-11T12:33:32+00:00"
     }
   ],
   "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
   "inventory_verified": true,
-  "inventory_verified_at": "2026-11-11T04:03:14.353319+00:00",
+  "inventory_verified_at": "2026-11-11T15:59:05.890526+00:00",
   "pending_game_ids": [],
   "player_games": [
     {
@@ -7036,12 +7036,12 @@
     }
   ],
   "publication_source": "SportsDataverse public ESPN extract",
-  "published_at": "2026-11-10T12:55:08+00:00",
-  "publisher_file_data_through_date": "2026-11-09",
+  "published_at": "2026-11-11T12:33:32+00:00",
+  "publisher_file_data_through_date": "2026-11-10",
   "schema_version": 1,
-  "scope_revision": "ebad7904202cd96d727f3076a29cb036d8348d6ea6457a92828896848c153ceb",
+  "scope_revision": "5260224e89089a22102b7e4f6bf2982256fd2fbeea5a6b7259bfe5200d37d1de",
   "source": "espn",
-  "source_content_sha256": "9c4e88a5b9635c34dd2f1cc56875b139bbb6014cd3617ae05f2297ecb25086a1",
+  "source_content_sha256": "a6dbdd77a6dd5020acaaff5e4a8bf9909ba845afccc89f53fa128ebd7d2d67c2",
   "source_data_through_date": "2026-11-09",
   "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
   "upstream_full_game_validated": true
