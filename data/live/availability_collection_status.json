@@ -1,11 +1,11 @@
 {
-  "attempted_at": "2026-11-11T20:08:01.334431+00:00",
+  "attempted_at": "2026-11-11T21:53:20.068604+00:00",
   "phase": "checked",
   "schema_version": 1,
   "scope": "Collector health only; successful collection does not establish complete current player availability.",
   "sources": {
     "official_pdf": {
-      "attempted_at": "2026-11-11T20:08:01.334431+00:00",
+      "attempted_at": "2026-11-11T21:53:20.068604+00:00",
       "error_type": "ReadTimeout",
       "http_status": null,
       "index_url": "https://official.nba.com/nba-injury-report-2026-27-season/",
@@ -15,7 +15,7 @@
       "status": "unavailable"
     },
     "structured_extracts": {
-      "attempted_at": "2026-11-11T20:08:01.334431+00:00",
+      "attempted_at": "2026-11-11T21:53:20.068604+00:00",
       "error_type": "ValueError",
       "http_status": null,
       "note": "Source collection failed; existing evidence was not removed or relabeled.",
