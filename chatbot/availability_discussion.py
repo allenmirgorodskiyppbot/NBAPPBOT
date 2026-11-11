@@ -60,6 +60,8 @@ def _history_turns(history):
 
 def _focused_history(history, player, day):
     """Only our typed, player/date-scoped reply makes a generic follow-up focused."""
+    if not player or not day:
+        return False
     for value in reversed(_history_turns(history)):
         if value['role'] != 'assistant':
             continue
@@ -88,6 +90,11 @@ def can_handle_availability(question, turn, history=None):
         r'restrict\w*|limit\w*|cap(?:ped)?|clearance|ruled (?:out|in))\b', text, re.I)
     if historical_minutes and not status_or_limit:
         # A request for observed workload is still a statistics question.
+        return False
+    if (re.search(r'\b(?:blowout|foul trouble|benched)\b', text, re.I)
+            and not status_or_limit
+            and not _focused_history(history, slots['player'], _day(slots, _now()))):
+        # Sitting late in a game is a basketball risk, not an injury report.
         return False
     if _SIGNAL.search(text):
         return True

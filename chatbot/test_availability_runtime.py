@@ -97,6 +97,13 @@ class AvailabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(can_handle_availability(question, turn))
         self.assertTrue(can_handle_availability('should we trust his average minutes if he is questionable?', turn))
 
+    def test_blowout_rest_without_an_injury_question_keeps_its_basketball_risk_route(self):
+        from availability_discussion import can_handle_availability
+        turn = {'slots': {'player': PLAYER, 'stat': 'pr', 'line': 15.5,
+                          'game_date': '2026-11-11'}, 'entities': {'players': [PLAYER]}}
+        self.assertFalse(can_handle_availability('What if he sits in a blowout?', turn))
+        self.assertTrue(can_handle_availability('What if he is questionable and sits in a blowout?', turn))
+
 
 if __name__ == '__main__':
     unittest.main()
