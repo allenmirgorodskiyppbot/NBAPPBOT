@@ -40,6 +40,12 @@ def normalize_stat(value):
         return raw
     if raw in STAT_ALIASES:
         return STAT_ALIASES[raw]
+    from conversation import _combo_syntax
+    combined, error = _combo_syntax(raw)
+    if error:
+        return None
+    if combined in STAT_COMPONENTS:
+        return combined
     key = re.sub(r'[^a-z0-9]+', ' ', raw).strip()
     return _ALIASES.get(key) or STAT_ALIASES.get(key)
 

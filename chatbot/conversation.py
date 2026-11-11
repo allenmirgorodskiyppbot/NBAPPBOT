@@ -32,8 +32,9 @@ _ASK = re.compile(r'\b(?:choose|picks?|recommend\w*|lean|good|bad|like|take|bet|
 _EXPLAIN = re.compile(r'\b(?:why|explain|reason\w*|clarif\w*|meaning|mean by|tell me more|elaborate|more detail|'
                       r'how come|what makes|what if|risk\w*|blowout|benched|'
                       r'bench|minutes limit|revenge|old team|concerns?|worr(?:y|ied)|'
+                      r'questionable|doubtful|probable|availability|injur\w*|status|'
                       r'what could go wrong|how confident|change your mind|would change|'
-                      r'what do you mean|what does that mean)\b', re.I)
+                      r'what should we do|what do you mean|what does that mean)\b', re.I)
 _FOLLOWUP = re.compile(r'^\s*(?:and\b|but\b|why\b|how\b|what about\b|'
                        r'actually\b|no\b|not\b|nah\b|instead\b|i mean\b|'
                        r'up or down\b|more or less\b|over or under\b)|'
@@ -150,6 +151,41 @@ def _date(text, now):
             'conflicting_dates' if len(unique) > 1 else None, spans)
 
 
+def _combo_syntax(text):
+    """Read a whole explicit combination; never accept a valid prefix of a typo."""
+    components = {'p': 'pts', 'points': 'pts', 'point': 'pts', 'pts': 'pts',
+                  'r': 'reb', 'rebounds': 'reb', 'rebound': 'reb', 'reb': 'reb', 'rebs': 'reb',
+                  'a': 'ast', 'assists': 'ast', 'assist': 'ast', 'ast': 'ast', 'asts': 'ast',
+                  'steals': 'stl', 'steal': 'stl', 'stl': 'stl',
+                  'blocks': 'blk', 'block': 'blk', 'blk': 'blk'}
+    combinations = {frozenset(value): key for key, value in STAT_COMPONENTS.items() if len(value) > 1}
+    symbolic = list(re.finditer(r'(?<!\w)(?:\+\s*)?[a-z]+(?:\s*\+\s*[a-z]+)+(?:\s*\+)?(?!\w)', text))
+    spaced = list(re.finditer(r'(?<!\w)[pra](?:\s+[a-z])+(?!\w)', text))
+    # Slashes, repeated operators and dangling operators must not resurrect a
+    # previous market. A combination requires complete statistical components.
+    if re.search(r'(?<!\w)[pra]\s*[/&-]\s*[a-z](?!\w)', text):
+        return text, 'ambiguous_market'
+    replacements = []
+    for match in symbolic + spaced:
+        raw = match.group().strip()
+        tokens = re.split(r'\s*\+\s*|\s+', raw)
+        if not any(token in components or token in {'pra', 'pr', 'pa', 'ra'} for token in tokens):
+            continue
+        values = [components.get(token) for token in tokens]
+        if (any(value is None for value in values) or len(values) != len(set(values))
+                or frozenset(values) not in combinations):
+            return text, 'ambiguous_market'
+        if any(match.start() < end and start < match.end() for start, end, _ in replacements):
+            return text, 'ambiguous_market'
+        if any(token in {'p', 'r', 'a'} for token in tokens):
+            replacements.append((*match.span(), combinations[frozenset(values)]))
+    if re.search(r'(?<!\w)(?:pra|pr|pa|ra|[pra])\s*\+(?!\s*[a-z])', text):
+        return text, 'ambiguous_market'
+    for start, end, stat in sorted(replacements, reverse=True):
+        text = text[:start] + stat + text[end:]
+    return text, None
+
+
 def _market(text):
     """Resolve explicitly named full-game markets, preserving ambiguity."""
     lower = text.casefold().replace('–', '-').replace('—', '-')
@@ -158,6 +194,22 @@ def _market(text):
         return None, 'unsupported_market'
     if re.search(r'\b(?:2[- ]?(?:pt|point)|two[- ]point)\s*(?:attempts?|att|made)\b', lower):
         return None, 'unsupported_market'
+    lower, combo_error = _combo_syntax(lower)
+    if combo_error:
+        return None, combo_error
+    abbreviated = {match.group() for match in re.finditer(r'\b(?:pra|pr|pa|ra)\b', lower)}
+    if len(abbreviated) > 1:
+        return None, 'ambiguous_market'
+    if abbreviated:
+        # A second, incompatible explicit statistic is not just an explanation
+        # of the first abbreviation. Keep the old offer out of this ambiguity.
+        selected = next(iter(abbreviated))
+        words = set(re.findall(r'\b(?:points?|pts|rebounds?|rebs?|assists?|asts?)\b', lower))
+        explicit = {('pts' if word.startswith(('point', 'pts')) else
+                     'reb' if word.startswith('reb') else 'ast') for word in words}
+        if explicit and (not explicit <= set(STAT_COMPONENTS[selected])
+                         or re.search(r'\b(?:or|versus|vs|instead|rather|than)\b', lower)):
+            return None, 'ambiguous_market'
     patterns = [
         ('tpa', r'\b(?:3pta|tpa|(?:3[- ]?(?:pt|point)|three[- ]point|three[- ]pointer)s?\s*(?:attempts?|att)|three attempts)\b'),
         ('fga', r'\b(?:fga|fg\s*(?:attempts?|attempted)|field[- ]goals?\s*(?:attempts?|attempted)|shot attempts?)\b'),
@@ -220,6 +272,23 @@ def _line(text, date_spans, eligible):
     if len(values) > 1:
         return None, 'multiple_lines'
     return (values[0], None) if values else (None, None)
+
+
+def _workload_context(text):
+    """Hide a conditional/reported minutes amount from offered-market parsing."""
+    masked = list(text)
+    pattern = (r'(?<![\w.])(?:(?:over|under|more|less|fewer|at most|at least)\s+(?:than\s+)?)?'
+               + _NUMBER + r'\s*[- ]?\s*(?:minutes?|mins?)\b')
+    found = False
+    for match in re.finditer(pattern, text, re.I):
+        prefix = re.split(r'[!?;,]', text[:match.start()])[-1]
+        suffix = text[match.end():]
+        contextual = re.search(r'\b(?:if|assuming|suppose|only|limited|restricted|capped)\b', prefix, re.I)
+        restriction = re.match(r'\s*(?:playing[ -]time\s+)?(?:restriction|limit|cap)\b', suffix, re.I)
+        if contextual or restriction:
+            masked[match.start():match.end()] = ' ' * (match.end() - match.start())
+            found = True
+    return ''.join(masked), found
 
 
 def _side(text):
@@ -557,7 +626,8 @@ def _apply_user(text, state, names, now, context_date=None):
     # Mobile dictation/typing commonly joins a comparison and its number.
     # Separate only known market syntax; never rewrite names or arbitrary prose.
     text = re.sub(r'\b(more|less|over|under|actually|not)(?=\d)', r'\1 ', text, flags=re.I)
-    text = re.sub(r'(?<=\d)(?=(?:points?|pts|rebounds?|rebs?|assists?|asts?|threes|pra)\b)',
+    text = re.sub(r'\b(kat)(?=\d)', r'\1 ', text, flags=re.I)
+    text = re.sub(r'(?<=\d)(?=(?:points?|pts|rebounds?|rebs?|assists?|asts?|threes|pra|pr|pa|ra)\b|[pra]\s*\+)',
                   ' ', text, flags=re.I)
     entities = _scan(text, names)
     players = entities['players']
@@ -592,7 +662,8 @@ def _apply_user(text, state, names, now, context_date=None):
         game_date = context_date
     pick_index, reference_error, reference_spans = _pick_reference(text, state['recent_picks'])
     spans += reference_spans
-    stat, market_error = _market(text)
+    market_text, workload_context = _workload_context(text)
+    stat, market_error = _market(market_text)
     clarification_answer = False
     pending = state.get('pending_clarification')
     # A short answer to our own question has a narrower meaning than the same
@@ -611,15 +682,15 @@ def _apply_user(text, state, names, now, context_date=None):
                     (re.fullmatch(r'\s*' + _NUMBER + r'\s*[!?]?\s*', text)
                      or re.search(_NUMBER + r'\s*,?\s*(?:not|instead of|rather than)\s+' + _NUMBER, text, re.I))) or reference_spans
                     or game_date or date_error or new_game or clarification_answer)
-    explanation = bool(_EXPLAIN.search(text))
+    explanation = bool(_EXPLAIN.search(text) or workload_context)
     preference = _selection_preference(text, names)
     social = bool(_SOCIAL.fullmatch(text))
     both_teams = _constraint(text)
     count = _count(text)
-    asks = bool(_ASK.search(text) or clarification_answer)
+    asks = bool(_ASK.search(market_text) or clarification_answer)
     research = bool(_RESEARCH.search(text))
-    line, line_error = _line(text, spans, bool(asks or stat or market_error or followup or players))
-    side, choosing = _side(text)
+    line, line_error = _line(market_text, spans, bool(asks or stat or market_error or followup or players))
+    side, choosing = _side(market_text)
     # Minutes are also explanatory workload, not necessarily a newly proposed
     # betting market. A follow-up about playing time keeps the existing prop
     # unless the user supplies a threshold or explicitly switches markets.

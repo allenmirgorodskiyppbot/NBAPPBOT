@@ -1426,6 +1426,12 @@ async def answer_question(store, request, progress, master=None, *, natural_dial
                 # prop resolver recognized words such as "after that".
                 conversation_turn = {**conversation_turn, 'intent':'chat', 'slots':{},
                                      'recent_picks':[], 'complete_prop':False, 'clarification':None}
+        from availability_discussion import can_handle_availability
+        if can_handle_availability(request.message, conversation_turn, history=history):
+            # A conditional availability discussion needs saved status context,
+            # not model routing or another live schedule request.
+            return await answer_conversation(store, master, request, progress, generated_evidence_reply,
+                turn=conversation_turn, natural_dialogue=natural_dialogue)
         known_news = master is not None and news_summary_topic(request.message)
         if known_news:
             conversation_turn = {**conversation_turn, 'intent':'research'}
