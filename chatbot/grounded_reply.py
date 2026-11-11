@@ -1217,7 +1217,7 @@ def _unsupported_probability(text, cards):
 def _unsupported_research_stability(text, cards):
     """Historical centers and line counts do not measure player stability."""
     research = {card.get('entity') for card in cards if card.get('kind') in
-                {'research_projection','prop_baseline','prop_sample'}}
+                {'research_projection','prop_baseline','prop_sample','saved_observations'}}
     research.discard(None)
     if not research:
         return False

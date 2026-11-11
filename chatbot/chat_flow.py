@@ -613,6 +613,23 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
                                 fallback=_conversational_fallback(turn, request.message), compact=natural_dialogue)
 
 
+def is_exact_fast_turn(question, turn):
+    """Recognize explicit shorthand/operational input, not inherited questions.
+
+    This is a latency shortcut only. Open-ended language goes through semantic
+    planning, even when the legacy parser found a prior player and threshold.
+    """
+    if re.fullmatch(r'\s*(?:hi|hello|hey|thanks?|thank you|thank u|ty|thx|ok(?:ay)?|cool|got it|sounds good|nice)[.!?\s]*', question, re.I):
+        return True
+    if turn.get('intent') in {'lineup_constraint', 'upcoming_game'}:
+        return True
+    if not turn.get('complete_prop') or not (turn.get('entities') or {}).get('players'):
+        return False
+    # Full, short quote inputs can be computed even while the model is busy.
+    return bool(re.search(r'\d', question) and len(question.split()) <= 12
+                and not re.search(r'\b(?:why|explain|compare|difference|what if|how|because)\b', question, re.I))
+
+
 async def try_fast_answer(store, master, request, progress=None, *, prefer_natural=False):
     """Return a checked routine answer before model readiness/queue guards.
 
@@ -620,14 +637,16 @@ async def try_fast_answer(store, master, request, progress=None, *, prefer_natur
     checks still decide whether a prop is eligible, so missing verification
     returns a Pass rather than an invented current recommendation.
     """
-    turn = None
+    history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
+    turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
+                                   preferences=getattr(request, 'lineup_preferences', None))
+    from availability_discussion import can_handle_availability
+    availability = can_handle_availability(request.message, turn, history=history)
+    if not availability and not is_exact_fast_turn(request.message, turn):
+        return None
     if prefer_natural:
-        history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
-        turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
-                                       preferences=getattr(request, 'lineup_preferences', None))
         if not turn.get('clarification') and turn['intent'] in {'prop','explanation','preference','upcoming_game'}:
-            from availability_discussion import can_handle_availability
-            if not can_handle_availability(request.message, turn, history=history):
+            if not availability:
                 return None
     return await answer_conversation(store, master, request, progress if progress is not None else {},
                                      None, turn=turn, fast_only=True)

@@ -10,6 +10,7 @@ import test_chat_flow as fixtures
 from feeds import canonical_game
 from pick_discussion import build_pick_discussion
 from season_calendar import import_calendar
+from semantic_plan import validate_plan
 
 
 class CompactFactRenderingTests(unittest.IsolatedAsyncioTestCase):
@@ -23,8 +24,12 @@ class CompactFactRenderingTests(unittest.IsolatedAsyncioTestCase):
         self.model_extra_fields={}
         self.model_reply=('If minutes fall, shot opportunities can fall too. '
                           'The saved sample offers context, rather than a reliable forecast.')
+        self.plan=AsyncMock(return_value=validate_plan({'goal':'research','reads':[
+            {'tool':'next_game','args':{'team':'NYK'}},
+            {'tool':'team_games','args':{'team':'NYK','window':1}}], 'reply':''}))
         for name,value in [
-                ('semantic_dialogue.infer_dialogue_route',AsyncMock(return_value={'route':'next_game','team':'NYK'})),
+                ('semantic_plan.infer_plan',self.plan),
+                ('conversation_readers._clock',lambda value:fixtures.NOW),
                 ('app.refresh_pregame_schedule',AsyncMock()),
                 ('efficient_ai.efficient_chat',AsyncMock(side_effect=self.model_response))]:
             mock=patch(name,value);mock.start();self.addCleanup(mock.stop)
@@ -66,24 +71,23 @@ class CompactFactRenderingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('application displays exact quantities separately',prompt)
         self.assertIn('do not',prompt.lower())
 
-    async def test_preview_renders_real_database_numbers_beside_qualitative_model_interpretation(self):
+    async def test_factual_preview_renders_exact_reader_numbers_without_presentation_call(self):
         before=self.snapshot()
         result=await app.answer_chat_message(None,app.ChatRequest(message='whats upcoming'),{},self.master)
-        self.assertEqual(len(self.payloads),1)
-        self.assert_compact_contract(self.payloads[0])
-        self.assertIsNone(re.search(r'\d',self.model_reply))
+        self.assertEqual(len(self.payloads),0)
+        self.plan.assert_awaited_once()
         with self.master.connect() as db:
             score=db.execute('SELECT home_score FROM games WHERE id=?',
                              (canonical_game('2026-11-01','NYK','BOS'),)).fetchone()[0]
         self.assertEqual(score,121)
-        self.assertIn(f'NYK: {score:g} scored / 110 allowed per game',result['answer'])
-        self.assertIn('stored finals through 2026-11-01',result['answer'])
+        self.assertRegex(result['answer'],rf'{score:g} points scored')
+        self.assertRegex(result['answer'],r'(?:110 allowed per game|allowed an average of 110 points per game)')
+        self.assertIn('saved final NYK games through 2026-11-01',result['answer'])
         self.assertIn('2026',result['answer'])
         self.assertIn('8:00 PM Eastern',result['answer'])
         self.assertIn('current timing is unverified',result['answer'])
-        self.assertIn(self.model_reply,result['answer'])
-        self.assertTrue(result['ai_used'])
-        self.assertEqual(result['response_mode'],'generated')
+        self.assertFalse(result['ai_used'])
+        self.assertEqual(result['response_mode'],'general_facts')
         self.assertEqual(self.snapshot(),before)
         self.network.assert_not_awaited()
 
@@ -92,17 +96,21 @@ class CompactFactRenderingTests(unittest.IsolatedAsyncioTestCase):
             'side':'more','game_date':'2026-11-07'},now=fixtures.NOW)
         self.assertTrue(report['available'])
         self.assertEqual(report['decision'],'pass')
+        self.plan.return_value=validate_plan({'goal':'evaluate','reads':[
+            {'tool':'prop_assessment','args':{'player':'Jalen Brunson','stat':'pts','line':25.5,
+                                           'date':'2026-11-07','side':'more'}}], 'reply':''})
         before=self.snapshot()
         result=await app.answer_chat_message(None,app.ChatRequest(
             message='Jalen Brunson more25.5points for November7?'),{},self.master)
-        self.assertEqual(len(self.payloads),1)
-        self.assert_compact_contract(self.payloads[0])
-        self.assertIn('Pass 25.5 points (2026-11-07)',result['answer'])
+        self.assertEqual(len(self.payloads),0)
+        self.plan.assert_awaited_once()
+        self.assertIn('25.5 points',result['answer'])
+        self.assertIn('Pass',result['answer'])
+        self.assertIn('2026-11-07',result['answer'])
         self.assertIn(report['reason'],result['answer'])
-        self.assertIn(f"average {report['baseline']['reference_projection']:g}",result['answer'])
-        self.assertIn(self.model_reply,result['answer'])
-        self.assertEqual(result['discussion']['line'],25.5)
-        self.assertEqual(result['discussion']['decision'],'pass')
+        self.assertIn(f"mean {report['baseline']['reference_projection']:g}",result['answer'])
+        self.assertEqual(result['response_mode'],'general_facts')
+        self.assertFalse(result['ai_used'])
         self.assertNotIn('999',result['answer'])
         self.assertEqual(self.snapshot(),before)
         self.network.assert_not_awaited()

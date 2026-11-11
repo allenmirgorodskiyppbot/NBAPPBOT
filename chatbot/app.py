@@ -195,7 +195,8 @@ def observe_ai_result(result):
     category = result.get('ai_failure_category')
     if category:
         record_ai_failure(category)
-    elif result.get('ai_used', True):
+    elif result.get('ai_used', True) or (result.get('conversation_diagnostics', {}).get('model_calls')
+                                        and not result.get('conversation_diagnostics', {}).get('failure')):
         app.state.last_ai_success = dt.datetime.now(dt.timezone.utc).isoformat()
 
 
@@ -278,8 +279,6 @@ async def telegram_answer(text, history=None, lineup_preferences=None):
     from conversation import resolve_conversation
     discussion = await asyncio.to_thread(resolve_conversation, state.store, state.master, text, history or [],
                                          preferences=lineup_preferences)
-    if discussion.get('clarification'):
-        return discussion['clarification']
     conversational = discussion['intent'] != 'research'
     source_lookup = explicit_source_request(text)
     from current_research import wants_current_research
@@ -1411,7 +1410,7 @@ async def answer_question(store, request, progress, master=None, *, natural_dial
     from current_research import wants_current_research
     derived_lookup = not source_lookup and wants_current_research(request.message)
     conversation_turn = None
-    if not source_lookup and not derived_lookup:
+    if not source_lookup and (not derived_lookup or natural_dialogue):
         from conversation import resolve_conversation
         from chat_flow import answer_conversation
         conversation_turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
@@ -1433,20 +1432,23 @@ async def answer_question(store, request, progress, master=None, *, natural_dial
             return await answer_conversation(store, master, request, progress, generated_evidence_reply,
                 turn=conversation_turn, natural_dialogue=natural_dialogue)
         known_news = master is not None and news_summary_topic(request.message)
+        if natural_dialogue and not known_news:
+            from general_dialogue import answer_general_question
+            result = await answer_general_question(master, request, progress, turn=conversation_turn)
+            if result is not None:
+                app.state.last_ai_request = result.get('conversation_diagnostics', {})
+                return result
+            # Failed interpretation must not launch another routing/generation
+            # chain or replay an inherited prop's full schedule warning.
+            from chat_flow import is_exact_fast_turn
+            if not is_exact_fast_turn(request.message, conversation_turn):
+                return {'answer':'I couldn’t finish interpreting that question. Please restate the specific point you want me to explain or check.',
+                        'sources':[], 'ai_used':False, 'ai_failure_category':'interpretation',
+                        'response_mode':'general_clarification'}
+            return await answer_conversation(store, master, request, progress, None,
+                turn=conversation_turn, fast_only=True, natural_dialogue=False)
         if known_news:
             conversation_turn = {**conversation_turn, 'intent':'research'}
-        if (natural_dialogue and not known_news and not conversation_turn.get('clarification')
-                and conversation_turn['intent'] in {'chat','research'}):
-            from semantic_dialogue import infer_dialogue_route
-            from chat_flow import apply_semantic_route, semantic_focus
-            focus = semantic_focus(conversation_turn, history)
-            route = await infer_dialogue_route(request, master, progress,
-                resolved_context=focus)
-            if route is None:
-                return {'answer':'I couldn’t reliably resolve that question. Do you mean the next Knicks game, '
-                                  'a particular pick, or a player statistic?',
-                        'sources':[], 'ai_used':False, 'response_mode':'clarification'}
-            conversation_turn = apply_semantic_route(conversation_turn, route, request.message, focus=focus)
         if (not conversation_turn.get('clarification') and
                 (conversation_turn.get('complete_prop') or conversation_turn.get('recent_picks')
                  or natural_dialogue and conversation_turn.get('intent') == 'upcoming_game')):

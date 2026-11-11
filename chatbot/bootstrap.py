@@ -35,6 +35,7 @@ APP_FILES = [
     'official_injury_pdf.py', 'supplemental_data.py',
     'game_stat_completion.py',
     'dataset_update.py', 'upcoming_game.py', 'published_game_inventory.py', 'semantic_dialogue.py',
+    'general_dialogue.py', 'semantic_plan.py', 'conversation_readers.py', 'dialogue_authority.py',
     'season_schedule_refresh.py',
 ]
 
