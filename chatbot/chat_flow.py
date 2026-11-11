@@ -456,6 +456,11 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
         preferences=getattr(request, 'lineup_preferences', None))
     if turn.get('clarification'):
         return {'answer':turn['clarification'], 'sources':[], 'ai_used':False}
+    from availability_discussion import can_handle_availability, build_availability_discussion
+    if can_handle_availability(request.message, turn, history=history):
+        progress['detail'] = 'Reading the player status and its effect on the pick'
+        return await asyncio.to_thread(build_availability_discussion, master,
+            turn.get('slots') or {}, request.message, history=history)
     intent = turn['intent']
     if intent == 'upcoming_game':
         from upcoming_game import build_preview
@@ -621,6 +626,8 @@ async def try_fast_answer(store, master, request, progress=None, *, prefer_natur
         turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
                                        preferences=getattr(request, 'lineup_preferences', None))
         if not turn.get('clarification') and turn['intent'] in {'prop','explanation','preference','upcoming_game'}:
-            return None
+            from availability_discussion import can_handle_availability
+            if not can_handle_availability(request.message, turn, history=history):
+                return None
     return await answer_conversation(store, master, request, progress if progress is not None else {},
                                      None, turn=turn, fast_only=True)
