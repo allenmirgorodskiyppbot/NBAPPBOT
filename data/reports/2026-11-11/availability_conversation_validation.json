@@ -1,0 +1,69 @@
+{
+  "checked_date": "2026-11-11",
+  "timezone": "America/New_York",
+  "source_ref": "fadc3201adde85c2c5e678f77be5780d97cb0f7f",
+  "deployed_parent": "bc8a593317512379648f01c36e0620858c390729",
+  "release_branch": "fix/kat-availability-followups-20261111",
+  "code_scope": "Pre-API runtime maintenance; no external PrizePicks provider integration",
+  "reported_case": {
+    "first_question": "kat 15.5 p+r",
+    "wrong_previous_market": "PTS+REB+AST",
+    "followup": "kat is listed as questionable what should we do?",
+    "observed_failure": "Repeated full prop/schedule verification warnings instead of a focused availability discussion",
+    "reported_ai_timeout_seconds": 35.1
+  },
+  "fixes": [
+    "PR/PA/RA/PRA shorthand and malformed-combination validation",
+    "Preserve the correct explicit user market despite prior wrong assistant history",
+    "Keep conditional/reported numeric minutes out of offer thresholds; retain explicit minutes props",
+    "Focused status, why-wait and conditional-playing explanations from saved dated evidence",
+    "Pre-model Telegram and web answer routing without schedule/network/AI work for focused status questions",
+    "Attributed user reports, local negation, latest explicit status clauses, official Out precedence and stale-report limits",
+    "Historical minutes requests retain their statistics path; no automatic offer-feed modules bundled"
+  ],
+  "validation": {
+    "focused": {
+      "passed": 154,
+      "failed": 0,
+      "seconds": 20.068
+    },
+    "exact_replay": {
+      "scope": "Controlled synthetic master and source fixtures; no live injury or actual deployed speed asserted",
+      "queries": [
+        "kat is listed as questionable what should we do?",
+        "why wait?",
+        "what if he plays?",
+        "what if he only plays 20 minutes?"
+      ],
+      "resolved_stat": "pr",
+      "resolved_line": 15.5,
+      "master_unchanged": true,
+      "model_calls": 0,
+      "external_network_calls": 0
+    },
+    "full_ci": {
+      "status": "success",
+      "passed": 1760,
+      "failed": 0,
+      "seconds": 195.879,
+      "run_id": 43091488127,
+      "job_id": 130769409719,
+      "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/43091488127",
+      "head_sha": "fadc3201adde85c2c5e678f77be5780d97cb0f7f"
+    },
+    "deploy_merge_tree_matches_source": true,
+    "live_akash_verified": false,
+    "corrected_regression": {
+      "prior_ci_run": 43090694528,
+      "prior_source_ref": "d77b1f566ac857ba770686f91917d1182b7b7bac",
+      "issue": "Ordinary blowout-rest questions were captured by the new availability route.",
+      "fix": "Keep the existing basketball-risk route unless a player availability concern or typed availability context is present.",
+      "original_regression_assertion_preserved": true
+    }
+  },
+  "limits": [
+    "Actual current prop qualification still depends on saved data readiness and availability evidence.",
+    "No current injury designation is inferred solely from a user message.",
+    "This validation does not establish the outcome or betting edge of any pick."
+  ]
+}

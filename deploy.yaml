@@ -19,10 +19,8 @@ services:
     env:
     - NBA_DATA_SOURCE=manual
     - DAILY_NBA_REFRESH=1
-    - PRIZEPICKS_FEED_ENABLED=1
-    - PRIZEPICKS_FEED_PROVIDER=auto
     - NEWS_SOURCE=rss
-    - SOURCE_REF=d7fc84343e017a122d0dfe42cb9aee8a1dd0c0db
+    - SOURCE_REF=fadc3201adde85c2c5e678f77be5780d97cb0f7f
     - DATA_DIR=/data
     - TELEGRAM_BOT_TOKEN=
     - TELEGRAM_ALLOWED_USER_ID=
