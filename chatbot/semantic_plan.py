@@ -26,6 +26,25 @@ MAX_REPLY_CHARS = 800
 MAX_CLARIFICATION_CHARS = 240
 MAX_READS = 3
 GOALS = ('explain', 'evaluate', 'research', 'compare', 'chat', 'clarify')
+DIALOGUE_FAILURE_CATEGORIES = frozenset({
+    'unsupported_backend', 'missing_or_invalid_api_key', 'missing_local_url', 'invalid_hosted_model',
+    'access_refused', 'rate_limited', 'timeout', 'connection_error', 'provider_error',
+    'invalid_response', 'incomplete_response', 'request_error', 'invalid_timeout',
+    'invalid_payload', 'invalid_messages', 'input_too_large',
+    'invalid_response_contract', 'response_contract_too_large',
+})
+
+
+def dialogue_failure_category(error):
+    """Carry safe transport diagnostics without promoting exception text."""
+    from dialogue_model import DialogueModelError
+    if isinstance(error, DialogueModelError):
+        return error.category if error.category in DIALOGUE_FAILURE_CATEGORIES else None
+    if isinstance(error, (TimeoutError, httpx.TimeoutException)):
+        return 'timeout'
+    return None
+
+
 DOMAIN_CONTEXT = ('PR=points+rebounds; PA=points+assists; RA=rebounds+assists; PRA=all three. '
                   'FGA=2PA+3PA, excludes FTA; FTA=free-throw attempts. Points come from made shots and free throws. '
                   '3PM=made threes; 3PA=attempted threes. These are distinct valid markets. '
@@ -36,7 +55,7 @@ DOMAIN_CONTEXT = ('PR=points+rebounds; PA=points+assists; RA=rebounds+assists; P
 _CORE_TOOLS = ('player_games', 'player_profile', 'team_games', 'next_game', 'schedule',
                'availability', 'prop_assessment', 'research_table')
 _CORE_CAPABILITIES = (
-    'player_games(player,stat,window=5,opponent?,phase?,season?): final Played logs; career=all stored. '
+    'player_games(player,stat,window,opponent?,phase?,season?): window=1..100 OR "career"(all stored games); season=single YYYY-YY. '
     'player_profile(player,window=20): past averages. team_games(team,window=5): PAST final scores ONLY. '
     'next_game(team=NYK,date?,after_date?): fixture on/after date, or strictly after after_date. '
     'schedule(team=NYK,start_date?,end_date?,limit=10): calendar, including later fixtures. '
@@ -399,6 +418,8 @@ def validate_plan(value):
 
 async def infer_plan(request, *, focus=None, invoke=None, progress=None):
     """One model call, with no data scan or capability to mutate the bot."""
+    if isinstance(progress, dict):
+        progress.pop('dialogue_failure_category', None)
     try:
         payload = plan_payload(request, focus)
         if payload is None:
@@ -411,13 +432,14 @@ async def infer_plan(request, *, focus=None, invoke=None, progress=None):
                 if inspect.isawaitable(value):
                     value = await value
             else:
-                from efficient_ai import efficient_chat
-                endpoint = os.getenv('OLLAMA_URL', 'http://model:11434').rstrip('/')
-                async with httpx.AsyncClient(timeout=httpx.Timeout(PLAN_TIMEOUT_SECONDS, connect=3)) as client:
-                    value = await efficient_chat(client, payload, None, endpoint)
+                from dialogue_model import invoke_dialogue
+                value = await invoke_dialogue(payload, timeout=PLAN_TIMEOUT_SECONDS)
             return validate_plan(value)
     except asyncio.CancelledError:
         raise
     except Exception as error:
+        category = dialogue_failure_category(error)
+        if category and isinstance(progress, dict):
+            progress['dialogue_failure_category'] = category
         log.info('Conversation plan unavailable: %s', type(error).__name__)
         return None

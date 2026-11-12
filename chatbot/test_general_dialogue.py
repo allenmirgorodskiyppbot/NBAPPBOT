@@ -356,6 +356,15 @@ class GeneralDialogueTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result is None or '36.5 rebounds + assists' not in result['answer'])
         self.assertRegex(result['answer'].lower(), r'(?:numeric offered line|which|what)')
 
+    async def test_unique_reader_alias_resolves_the_same_validated_offer(self):
+        message = 'Would you choose the higher side here?'
+        task = {'tool': 'prop_assessment', 'args': {
+            'player': 'Brunson', 'stat': 'pts', 'line': 25.5, 'date': DATE}}
+        result = await self.answer(message, infer=self.planned('evaluate', [task]), turn=self.turn(message))
+        self.assertIn('Jalen Brunson', result['answer'])
+        self.assertIn('25.5', result['answer'])
+        self.assertEqual(result['response_mode'], 'general_facts')
+
     async def test_reported_clearance_does_not_replace_saved_official_out_or_set_minutes(self):
         from structured_availability import (normalize_official_pdf, build_availability_document,
                                              import_availability_document)

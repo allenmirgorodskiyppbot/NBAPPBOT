@@ -97,6 +97,9 @@ class ModelReplyError(RuntimeError):
 
 
 def ai_failure(error):
+    from semantic_plan import dialogue_failure_category
+    if category := dialogue_failure_category(error):
+        return category
     if isinstance(error, (TimeoutError, httpx.TimeoutException)):
         return 'timeout'
     if isinstance(error, httpx.HTTPStatusError):
@@ -115,6 +118,12 @@ def ai_failure_message(category):
         explanation = 'The AI request timed out.'
     elif category == 'connection_error':
         explanation = 'The chatbot could not reach the AI model.'
+    elif category == 'access_refused':
+        explanation = 'The selected AI service refused the connection. Check its server credentials.'
+    elif category == 'rate_limited':
+        explanation = 'The selected AI service is limiting requests. Try again shortly.'
+    elif category in {'unsupported_backend', 'missing_or_invalid_api_key', 'missing_local_url', 'invalid_hosted_model'}:
+        explanation = 'The selected conversation engine needs its server configuration checked.'
     elif category.startswith('model_http_'):
         explanation = 'The AI server returned HTTP ' + category.removeprefix('model_http_') + '.'
     elif category == 'empty_model_answer':
@@ -144,7 +153,8 @@ async def ai_status():
     state = app.state
     failure = getattr(state, 'last_ai_failure', {})
     started = getattr(state, 'ai_started_at', None)
-    return {'phase': state.phase, 'model': MODEL, 'active': started is not None,
+    from dialogue_model import backend_status
+    return {'phase': state.phase, 'model': MODEL, 'conversation_engine': backend_status(), 'active': started is not None,
             'busy': state.chat_lock.locked(),
             'active_elapsed_seconds': round(time.monotonic() - started, 1) if started is not None else 0,
             'last_failure_category': failure.get('category'), 'last_failure_time': failure.get('at'),
@@ -263,6 +273,22 @@ def master_context(master):
     return result
 
 
+def conversation_ready(state):
+    from dialogue_model import backend_status
+    engine = backend_status()
+    if engine['backend'] == 'openai':
+        return engine['configured'] and getattr(state, 'master', None) is not None
+    return engine['configured'] and state.phase == 'ready'
+
+
+def conversation_not_ready(state):
+    from dialogue_model import backend_status
+    engine = backend_status()
+    if not engine['configured']:
+        return 'The selected conversation engine is not configured. Check its server settings; /ai_status shows safe details.'
+    return 'The AI model is not ready yet: ' + state.detail
+
+
 async def telegram_answer(text, history=None, lineup_preferences=None):
     state = app.state
     original_text, original_history = str(text), history or []
@@ -273,7 +299,7 @@ async def telegram_answer(text, history=None, lineup_preferences=None):
         fast_request = ChatRequest(message=str(text)[:3000], history=history or [],
                                    lineup_preferences=lineup_preferences or {})
         fast_result = await try_fast_answer(state.store, state.master, fast_request,
-            prefer_natural=getattr(state, 'phase', None) == 'ready' and not state.chat_lock.locked())
+            prefer_natural=conversation_ready(state) and not state.chat_lock.locked())
         if fast_result is not None:
             return fast_result['answer']
     from conversation import resolve_conversation
@@ -303,8 +329,8 @@ async def telegram_answer(text, history=None, lineup_preferences=None):
         matchup = await asyncio.to_thread(answer_matchup_question, state.store, text, history or [], state.master)
         if matchup is not None:
             return matchup['answer']
-    if state.phase != 'ready':
-        return ('The AI model is not ready yet: ' + state.detail +
+    if not conversation_ready(state):
+        return (conversation_not_ready(state) +
                 '. /summary shows collected injury reports without waiting for AI. '
                 'Data updates and /today, /news, /results, /analyze continue independently.')
     if state.chat_lock.locked():
@@ -838,23 +864,27 @@ async def answer_news_question(request, progress, master, topic):
         {'role': 'user', 'content': final_answer_prompt(json.dumps({'question': request.message.strip()[:800],
                     'maximum_reports': max_items, 'schema': schema, 'collected_evidence': context}, ensure_ascii=False))}]
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=15)) as client:
-            from efficient_ai import efficient_chat
-            body = await efficient_chat(client, {
-                'model': MODEL, 'messages': messages, 'format': schema, 'stream': False,
-                'think': False, 'keep_alive': -1,
-                'options': {'temperature': 0, 'num_ctx': 4096, 'num_predict': 96,
-                            'num_thread': int(os.getenv('MODEL_THREADS', '4'))}}, master, OLLAMA_URL)
-            message = model_message(body)
-            content = message.get('content')
-            if not isinstance(content, str) or not content.strip() or message.get('tool_calls'):
-                raise ModelReplyError('empty_model_answer' if not content else 'invalid_model_response')
-            selected = json.loads(content)
-            numbers = selected.get('reports') if isinstance(selected, dict) else None
-            if (not isinstance(numbers, list) or not 1 <= len(numbers) <= max_items
-                    or any(type(number) is not int or not 1 <= number <= len(context['reports']) for number in numbers)
-                    or len(set(numbers)) != len(numbers)):
-                raise ModelReplyError('invalid_model_response')
+        payload = {'model': MODEL, 'messages': messages, 'format': schema, 'stream': False,
+                   'think': False, 'keep_alive': -1,
+                   'options': {'temperature': 0, 'num_ctx': 4096, 'num_predict': 96,
+                               'num_thread': int(os.getenv('MODEL_THREADS', '4'))}}
+        from dialogue_model import backend_status, invoke_dialogue
+        if backend_status()['backend'] == 'openai':
+            body = await invoke_dialogue(payload, timeout=45)
+        else:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=15)) as client:
+                from efficient_ai import efficient_chat
+                body = await efficient_chat(client, payload, master, OLLAMA_URL)
+        message = model_message(body)
+        content = message.get('content')
+        if not isinstance(content, str) or not content.strip() or message.get('tool_calls'):
+            raise ModelReplyError('empty_model_answer' if not content else 'invalid_model_response')
+        selected = json.loads(content)
+        numbers = selected.get('reports') if isinstance(selected, dict) else None
+        if (not isinstance(numbers, list) or not 1 <= len(numbers) <= max_items
+                or any(type(number) is not int or not 1 <= number <= len(context['reports']) for number in numbers)
+                or len(set(numbers)) != len(numbers)):
+            raise ModelReplyError('invalid_model_response')
         return {'answer': cited_news_summary(context, numbers, limit=limit), 'sources': sources}
     except asyncio.CancelledError:
         raise
@@ -1407,6 +1437,11 @@ async def answer_question(store, request, progress, master=None, *, natural_dial
                                      answer_assignment_question, research_context, ScopedNewsStore)
     history = [message.model_dump() for message in request.history]
     source_lookup = explicit_source_request(request.message)
+    if source_lookup and natural_dialogue:
+        from dialogue_model import backend_status
+        if backend_status()['backend'] == 'openai' and app.state.phase != 'ready':
+            return {'answer':'The original worksheet reader is still starting. You can ask about saved player statistics or the Knicks schedule while it loads.',
+                    'sources':[], 'ai_used':False, 'response_mode':'worksheet_starting'}
     from current_research import wants_current_research
     derived_lookup = not source_lookup and wants_current_research(request.message)
     conversation_turn = None
@@ -1604,7 +1639,14 @@ async def health():
 @app.get('/api/status')
 async def status():
     state = app.state
-    return {'phase': state.phase, 'detail': state.detail, 'model': MODEL,
+    from dialogue_model import backend_status
+    engine = backend_status()
+    hosted = engine['backend'] == 'openai' and conversation_ready(state)
+    phase = ('configuration' if not engine['configured'] else 'ready' if hosted else state.phase)
+    detail = (conversation_not_ready(state) if not engine['configured'] else
+              'Hosted conversation configured; provider connection is not verified by this status.' if hosted else state.detail)
+    return {'phase': phase, 'detail': detail,
+            'model': engine.get('model', MODEL) if hosted else MODEL, 'conversation_engine': engine,
             'sheets': len(state.store.sheets) if state.store else 0,
             'password_configured': password_configured()}
 
@@ -1618,8 +1660,8 @@ async def session():
 async def chat(request: ChatRequest):
     if not request.message.strip():
         raise HTTPException(422, 'Enter a question.')
-    if app.state.phase != 'ready':
-        raise HTTPException(503, app.state.detail)
+    if not conversation_ready(app.state):
+        raise HTTPException(503, conversation_not_ready(app.state))
     if app.state.active:
         raise HTTPException(429, 'The model is answering another question. Please try again shortly.')
     for job_id, job in list(app.state.jobs.items()):

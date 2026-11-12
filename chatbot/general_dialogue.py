@@ -14,8 +14,6 @@ import os
 import re
 import time
 
-import httpx
-
 log = logging.getLogger('knicks.general_dialogue')
 TOTAL_SECONDS = 95
 SYNTHESIS_SECONDS = 45
@@ -60,14 +58,20 @@ def _focus(turn):
 
 def _renumber(reads):
     cards = []
+    groups = []
     for result in reads:
+        group = []
         for original in result.get('cards') or []:
             if not isinstance(original, dict) or not original.get('text'):
                 continue
             card = copy.deepcopy(original)
             card['id'] = 'E' + str(len(cards) + 1)
             cards.append(card)
-    return cards
+            group.append(card)
+        groups.append(group)
+    # Preserve every requested entity's summary before adding detailed logs.
+    return [group[level] for level in range(max((len(group) for group in groups), default=0))
+            for group in groups if level < len(group)]
 
 
 def _validation_cards(cards, reads, focus, *, allow_decisions):
@@ -179,9 +183,8 @@ def _threads():
 
 
 async def _synthesize(payload):
-    from efficient_ai import efficient_chat
-    async with httpx.AsyncClient(timeout=httpx.Timeout(SYNTHESIS_SECONDS, connect=3)) as client:
-        return await efficient_chat(client, payload, None, os.getenv('OLLAMA_URL', 'http://model:11434').rstrip('/'))
+    from dialogue_model import invoke_dialogue
+    return await invoke_dialogue(payload, timeout=SYNTHESIS_SECONDS)
 
 
 def _result(answer, *, sources=(), mode='facts', ai_used=False, diagnostics=None):
@@ -198,6 +201,30 @@ def _fallback(reads, diagnostics):
                    mode='clarification', diagnostics=diagnostics)
 
 
+def _connection_failure(category, reads, diagnostics):
+    """A connection failure is not an unclear question or discarded data."""
+    messages = {
+        'access_refused': 'The AI provider refused access. Check the selected engine’s credentials; /ai_status shows details.',
+        'rate_limited': 'The AI provider is temporarily limiting requests. Please try again shortly.',
+        'timeout': 'The AI connection timed out. Please try again.',
+        'connection_error': 'The bot couldn’t reach its AI provider. Please try again shortly.',
+        'provider_error': 'The AI provider could not complete the request. Please try again shortly.',
+        'invalid_response': 'The AI provider returned an unreadable reply. Please try again.',
+        'incomplete_response': 'The AI provider returned an incomplete reply. Please try again.',
+    }
+    text = messages.get(category, 'The conversation engine could not complete its request. Check /ai_status for details.')
+    if category in {'unsupported_backend', 'missing_or_invalid_api_key', 'missing_local_url', 'invalid_hosted_model'}:
+        text = 'The conversation engine is not configured correctly. Check its server settings; /ai_status shows safe details.'
+    diagnostics['dialogue_failure_category'] = category
+    if reads:
+        result = _fallback(reads, diagnostics)
+        result['answer'] = text + '\n\nSaved records:\n' + result['answer']
+    else:
+        result = _result(text, mode='connection_error', diagnostics=diagnostics)
+    result['ai_failure_category'] = category
+    return result
+
+
 async def answer_general_question(master, request, progress, *, turn=None, infer=None,
                                   synthesize=None, read=None, now=None):
     """One semantic plan, at most three typed reads and one optional explanation.
@@ -205,10 +232,13 @@ async def answer_general_question(master, request, progress, *, turn=None, infer
     Injection seams accept the same validated protocol as production. Neither
     planner prose accompanying reads nor unvalidated synthesis is displayed.
     """
-    from semantic_plan import infer_plan, validate_plan
+    from semantic_plan import (infer_plan, validate_plan, dialogue_failure_category,
+                               DIALOGUE_FAILURE_CATEGORIES)
     from conversation_readers import execute_read
     started = time.monotonic()
     diagnostics = {'model_calls': 0, 'reads': 0, 'phase': 'planning'}
+    if isinstance(progress, dict):
+        progress.pop('dialogue_failure_category', None)
     if turn is None and master is not None:
         from conversation import resolve_conversation
         history = [item.model_dump() if hasattr(item, 'model_dump') else item for item in getattr(request, 'history', [])]
@@ -223,6 +253,9 @@ async def answer_general_question(master, request, progress, *, turn=None, infer
             diagnostics['model_calls'] += 1
             plan = validate_plan(await _call(infer or infer_plan, request, focus=focus, progress=progress))
             if plan is None:
+                category = progress.get('dialogue_failure_category') if isinstance(progress, dict) else None
+                if category in DIALOGUE_FAILURE_CATEGORIES:
+                    return _connection_failure(category, reads, diagnostics)
                 return None  # Caller may still provide an exact deterministic lookup.
             goal = plan['goal']
             diagnostics['goal'] = goal
@@ -254,6 +287,15 @@ async def answer_general_question(master, request, progress, *, turn=None, infer
                     from master import normalized_name
                     args = task['args']
                     same_player = not args.get('player') or normalized_name(args['player']) == normalized_name(slots.get('player', ''))
+                    if not same_player and args.get('player') and slots.get('player'):
+                        from conversation_readers import _player
+                        try:
+                            canonical_player = _player(master, args['player'])[0]
+                            same_player = normalized_name(canonical_player) == normalized_name(slots['player'])
+                            if same_player:
+                                args['player'] = canonical_player
+                        except ValueError:
+                            pass
                     same_stat = not args.get('stat') or normalize_stat(args['stat']) == normalize_stat(slots.get('stat', ''))
                     if not (same_player and same_stat and slots.get('line') == args['line']):
                         return _result('What is the offered line for this player and statistic?',
@@ -292,6 +334,11 @@ async def answer_general_question(master, request, progress, *, turn=None, infer
     except Exception as error:
         diagnostics['failure'] = type(error).__name__
         log.info('General conversation fallback: phase=%s error=%s', diagnostics['phase'], type(error).__name__)
+        category = dialogue_failure_category(error)
+        if category:
+            if isinstance(progress, dict):
+                progress['dialogue_failure_category'] = category
+            return _connection_failure(category, reads, diagnostics)
     finally:
         diagnostics['elapsed_seconds'] = round(time.monotonic() - started, 2)
     return _fallback(reads, diagnostics) if reads else None

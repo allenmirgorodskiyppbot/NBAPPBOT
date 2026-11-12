@@ -48,15 +48,15 @@ CAPABILITIES = (
     'Filters must be exact supported column names. Use separate reads to compare players or statistics. No SQL, code, writes or network.'
 )
 PLAN_CAPABILITIES = (
-    'player_games(player,stat,window=5,opponent?,phase?,season?): played logs; career=all STORED history. '
+    'player_games(player,stat,window,opponent?,phase?,season?): window=1..100 OR "career"(all stored games); season=single YYYY-YY. '
     'player_profile(player,window=20): saved averages. '
     'team_games(team,window=5): PAST scores only. '
-    'next_game(team=NYK,date?,after_date?): first fixture on/after date(today default) or STRICTLY AFTER after_date. '
-    'schedule(team=NYK,start_date?,end_date?,limit=10): season fixtures; inclusive bounds. '
+    'next_game(team=NYK,date?,after_date?): fixture on/after date(today default) OR strictly after after_date. '
+    'schedule(team=NYK,start_date?,end_date?,limit=10): inclusive calendar bounds. '
     'availability(player,date?): dated status, unknown if absent. '
     'prop_assessment(player,stat,line,date?,side?): authoritative More/Less/Pass. '
     'research_table(table,filters,limit=3): exact derivatives. '
-    'ISO dates. No SQL/code/writes.'
+    'ISO dates; read-only.'
 )
 _EXTRA_COMPONENTS = {name: (name,) for name in ('fgm', 'ftm', 'fta', 'fouls', 'plus_minus')}
 _COMPONENTS = {**STAT_COMPONENTS, **_EXTRA_COMPONENTS}

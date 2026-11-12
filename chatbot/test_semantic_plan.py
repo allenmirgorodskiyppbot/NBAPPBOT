@@ -260,14 +260,12 @@ class SemanticPlanInferenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(secret, '\n'.join(logs.output))
         self.assertIn('RuntimeError', '\n'.join(logs.output))
 
-    async def test_default_transport_uses_existing_local_model_and_no_master_scan(self):
-        with patch.dict(os.environ, {'OLLAMA_URL': 'http://local-test:11434/'}), patch(
-                'efficient_ai.efficient_chat', new=AsyncMock(return_value=body(plan()))) as call:
+    async def test_default_transport_uses_bounded_backend_seam(self):
+        with patch('dialogue_model.invoke_dialogue', new=AsyncMock(return_value=body(plan()))) as call:
             result = await plans.infer_plan(self.request())
         self.assertEqual(result['goal'], 'explain')
         call.assert_awaited_once()
-        self.assertIsNone(call.await_args.args[2])
-        self.assertEqual(call.await_args.args[3], 'http://local-test:11434')
+        self.assertEqual(call.await_args.kwargs['timeout'], plans.PLAN_TIMEOUT_SECONDS)
 
 
 if __name__ == '__main__':
