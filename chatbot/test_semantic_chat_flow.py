@@ -186,9 +186,11 @@ class SemanticChatFlowTests(unittest.IsolatedAsyncioTestCase):
             'player': 'Julius Randle', 'stat': 'tpm', 'line': 1.5, 'date': '2026-11-02'}}])
         before = self.snapshot()
         result = await self.ask('Julius Randle more1.5threes good?')
-        self.assertEqual(self.tasks[0]['args']['line'], 1.5)
+        self.assertEqual(self.tasks, [])
+        self.plan.assert_not_awaited()
         self.assertIn('Julius Randle', result['answer'])
-        self.assertEqual(result['response_mode'], 'general_facts')
+        self.assertIn('1.5', result['answer'])
+        self.assertEqual(result['response_mode'], 'computed_prop')
         self.synthesis.assert_not_awaited()
         self.assertEqual(self.snapshot(), before)
 

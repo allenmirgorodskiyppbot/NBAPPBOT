@@ -1466,6 +1466,11 @@ async def answer_question(store, request, progress, master=None, *, natural_dial
             # not model routing or another live schedule request.
             return await answer_conversation(store, master, request, progress, generated_evidence_reply,
                 turn=conversation_turn, natural_dialogue=natural_dialogue)
+        if natural_dialogue:
+            from chat_flow import answer_exact_prop_quote
+            quote = await answer_exact_prop_quote(store, master, request, progress, turn=conversation_turn)
+            if quote is not None:
+                return quote
         known_news = master is not None and news_summary_topic(request.message)
         if natural_dialogue and not known_news:
             from general_dialogue import answer_general_question

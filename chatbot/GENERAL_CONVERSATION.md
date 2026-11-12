@@ -11,6 +11,13 @@ Clarification questions retain the player and market for a later short answer.
 Changing a player or statistic clears the previous quote. Conceptual questions
 and subject changes do not automatically repeat the last pick's schedule hold.
 
+Complete, unambiguous quote entries such as `kat 35.5 pra` are assessed directly
+from saved data before AI planning or model-readiness checks. A short `why?`
+immediately after that computed answer also recalculates the assessment from
+saved records. Both paths retain the current-game freshness and qualification
+checks. Risk scenarios, competing markets, research scopes and unresolved dates
+continue through their appropriate conversation paths.
+
 ## Conversation engine
 
 The default remains local Ollama. Actual trials of the configured Qwen3 4B
