@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "application_source_ref": "246e1a319fd1280651b687784a20abe44029fca8",
+  "application_source_ref": "ea57ff2b8e673ae0c384dfeb5aac3c5bf66267d7",
   "user_selected_backend": "ollama",
   "local_model": "qwen3:4b-instruct-2507-q4_K_M",
   "hosted_option_enabled": false,
   "openai_api_key_required": false,
   "ci": {
-    "run_id": 43261630591,
-    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/43261630591",
-    "passed": 1907,
+    "run_id": 43272680084,
+    "url": "https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/43272680084",
+    "passed": 1921,
     "failed": 0,
     "conclusion": "success"
   },
@@ -16,5 +16,15 @@
   "live_akash_verified": false,
   "deployment_requires_user_source_ref_update": true,
   "paid_api_calls_made": false,
-  "scope": "Deployment metadata and documentation only. Existing private credentials, persistent data, reminders and refresh behavior are preserved."
+  "scope": "Deployment metadata and documentation only. Existing private credentials, persistent data, reminders and refresh behavior are preserved.",
+  "previous_source_ref": "246e1a319fd1280651b687784a20abe44029fca8",
+  "quote_timeout_repair": {
+    "trigger": "kat 35.5 pra",
+    "cause": "Ready-mode routing sent an already resolved prop through AI planning.",
+    "behavior": "Complete explicit quotes and a matching immediate short why follow-up use application-controlled saved-data assessment without model or live HTTP requests.",
+    "targeted_checks": 105,
+    "regression_cases": 14,
+    "freshness_checks_retained": true,
+    "model_changed": false
+  }
 }

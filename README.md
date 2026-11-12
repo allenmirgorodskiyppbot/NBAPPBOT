@@ -9,12 +9,14 @@ refreshes, reminders, calculations and entry grading run independently of AI rep
 
 ## November 12 general conversation — local AI selected
 
-Tested application `SOURCE_REF`: `246e1a319fd1280651b687784a20abe44029fca8`.
-The [regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/43261630591) passed **1,907 tests, zero failures**. The deployment template explicitly selects `DIALOGUE_BACKEND=ollama` and keeps `qwen3:4b-instruct-2507-q4_K_M`. No OpenAI API key is needed. Apply the source reference in the existing Akash deployment to load the code; preserve its private credentials and `/data` volume.
+Tested application `SOURCE_REF`: `ea57ff2b8e673ae0c384dfeb5aac3c5bf66267d7`.
+The [regression run](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/actions/runs/43272680084) passed **1,921 tests, zero failures**. The deployment template explicitly selects `DIALOGUE_BACKEND=ollama` and keeps `qwen3:4b-instruct-2507-q4_K_M`. No OpenAI API key is needed. Apply the source reference in the existing Akash deployment to load the code; preserve its private credentials and `/data` volume.
 
 The general conversation layer can select typed master-data readers and keep clarification context across short follow-ups. A changed market clears the previous quote; conceptual explanations do not automatically repeat the last pick's schedule hold. Arithmetic and current pick qualification remain application-controlled. Daily updates, ninety-minute reminders and screenshot/manual offers keep their existing paths.
 
-Actual local Qwen 4B and 7B trials still showed misunderstanding of some questions. Code-test success does not establish reliable answers to every new question. The optional hosted connection remains disabled under the selected local mode. See the [conversation documentation](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/blob/246e1a319fd1280651b687784a20abe44029fca8/chatbot/GENERAL_CONVERSATION.md) and [validation report](data/reports/2026-11-12/general_conversation_validation.json). No live Akash verification is asserted by this release.
+Complete, unambiguous prop entries such as `kat 35.5 pra` now use the saved-data assessment before model planning or readiness checks. A short `why?` immediately after a matching computed answer also recalculates from the master without AI. Freshness holds stay enforced. Ambiguous markets, scenarios, research requests and unresolved dates retain their separate conversation handling. This repairs the reported timeout without raising the AI timeout or changing the local model.
+
+Actual local Qwen 4B and 7B trials still showed misunderstanding of some questions. Code-test success does not establish reliable answers to every new question. The optional hosted connection remains disabled under the selected local mode. See the [conversation documentation](https://github.com/allenmirgorodskiyppbot/NBAPPBOT/blob/ea57ff2b8e673ae0c384dfeb5aac3c5bf66267d7/chatbot/GENERAL_CONVERSATION.md) and [validation report](data/reports/2026-11-12/general_conversation_validation.json). No live Akash verification is asserted by this release.
 
 ## November 11 conversation and availability repair
 
