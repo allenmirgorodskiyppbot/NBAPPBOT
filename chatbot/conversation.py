@@ -622,6 +622,117 @@ def _assistant_cards(text, names, now):
     return cards[:12]
 
 
+def _assistant_clarification_reference(text, state, names, prior_user=''):
+    """Keep a targeted clarification's subject, never its factual/numeric claims.
+
+    The model may ask for a newly named market in wording the previous user
+    parser did not recognize. Its question can identify that market for the
+    next user answer. An assistant number, date, status or side cannot supply an
+    offered value or verified observation through this path.
+    """
+    requests = []
+    for sentence in re.split(r'(?<=[.!?])\s+|\n+', str(text)):
+        if not sentence.rstrip().endswith('?'):
+            continue
+        clause = sentence.strip()
+        full_question = clause
+        # Remove a conditional workload aside before reading the requested
+        # market. In particular, "RA line if he plays 25 minutes" is RA; its
+        # minutes are not a second market or a newly quoted line.
+        if re.match(r'^(?:if|assuming|provided)\b', clause, re.I) and ',' in clause:
+            _, clause = clause.split(',', 1)
+            clause = clause.strip()
+        aside = re.search(r'\b(?:if|assuming|provided|when)\b', clause, re.I)
+        if aside:
+            clause = clause[:aside.start()].rstrip() + '?'
+        if not re.search(r'\b(?:line|threshold|market|statistic|stat)\b', clause, re.I):
+            continue
+        if not re.match(r'^(?:(?:so|and)[, ]+)?(?:what(?:[’\x27]s|\s+(?:is|are))?\b(?!\s+(?:makes?|does?|happens?|changes?|if)\b)|'
+                        r'which\b|whose\b|how\s+(?:many|much)\b|'
+                        r'(?:can|could|would)\s+you\s+(?:give|share|provide|send|confirm|specify|tell)\b|'
+                        r'(?:do|did)\s+you\s+mean\b|'
+                        r'is\b(?=[^?]{0,100}\b(?:line|threshold|market|statistic)\b[^?]{0,30}\bfor\b))', clause, re.I):
+            continue
+        if re.search(r'\b(?:better|worse|safer|riskier|measure|difference|advantage|affects?|prefer|interpret|meaning|'
+                     r'historical|averag\w*|median|career|published|usual)\b', clause, re.I):
+            continue
+        entities = _scan(clause, names)
+        players = entities['players']
+        identity_clause = clause
+        if not players:
+            # A conditional's single named player can supply "his" in the
+            # main question. Explicit main-question identity takes precedence;
+            # another player's injury/role in a condition is not the subject.
+            players = _scan(full_question, names)['players']
+            identity_clause = full_question
+        ambiguous = _ambiguous_names(identity_clause, names, players)
+        stat, error = _market(clause)
+        alternatives = {market for part in re.split(r'\b(?:or|versus|vs)\b', clause, flags=re.I)
+                        for market, problem in [_market(part)] if market and not problem}
+        if len(alternatives) > 1:
+            stat, error = None, 'ambiguous_market'
+        identity_missing = bool(re.search(r'\b(?:which\s+player|whose)\b', clause, re.I))
+        for possessive in re.finditer(r'\b([A-Za-z][A-Za-z-]*(?:\s+[A-Z][A-Za-z-]*){0,3})[’\x27]s\b', identity_clause):
+            candidate = possessive[1]
+            if candidate.casefold() not in {'what', 'who', 'that', 'this', 'it', 'player', 'team', 'game', 'line', 'market'}:
+                if not _scan(candidate, names)['players']:
+                    identity_missing = True
+        for named_subject in re.finditer(r'\bfor\s+([A-Z][A-Za-z-]*(?:\s+[A-Z][A-Za-z-]*){0,3})\b', identity_clause):
+            candidate = named_subject[1]
+            subject = _scan(candidate, names)
+            words = _words(candidate)
+            if (len(words) >= 2 and words[0] not in _MONTHS
+                    and not subject['players'] and not subject['teams'] and not _market(candidate)[0]):
+                identity_missing = True
+        requests.append({'players': players, 'ambiguous': ambiguous, 'stat': stat,
+                         'error': error, 'identity_missing': identity_missing,
+                         'asks_stat': bool(re.search(r'\b(?:which|what)\s+(?:statistic|stat|market)\b', clause, re.I))})
+    if not requests:
+        return
+    slots = state['slots']
+    players = {player for request in requests for player in request['players']}
+    stats = {request['stat'] for request in requests if request['stat']}
+    ambiguous_players = {player for request in requests for player in request['ambiguous']}
+    identity_missing = any(request['identity_missing'] for request in requests)
+    ambiguous_market = len(stats) > 1 or any(request['error'] for request in requests)
+    old_player, old_stat = slots.get('player'), slots.get('stat')
+    if len(players) > 1 or ambiguous_players or identity_missing:
+        for field in ('player', 'line', 'side', 'opponent'):
+            slots.pop(field, None)
+        state['ambiguous_players'] = sorted(players | ambiguous_players)[:4]
+        state['recent_picks'] = []
+        state['selected_pick_index'] = None
+    elif len(players) == 1:
+        player = next(iter(players))
+        if player != old_player:
+            for field in ('stat', 'line', 'side', 'opponent'):
+                slots.pop(field, None)
+        slots['player'] = player
+        state['ambiguous_players'] = []
+    elif state.get('ambiguous_players'):
+        slots.pop('player', None)
+    category_change = bool(re.search(r'\b(?:another|different|new)\s+(?:stat|statistic|market|category)\b|'
+                                     r'\b(?:change|switch)\b[^.!?]{0,35}\b(?:stat|statistic|market|category)\b', prior_user, re.I))
+    if ambiguous_market or (not stats and (category_change or any(request['asks_stat'] for request in requests))):
+        slots.pop('stat', None)
+        if old_stat:
+            slots.pop('line', None)
+            slots.pop('side', None)
+    elif len(stats) == 1:
+        stat = next(iter(stats))
+        if old_stat and stat != old_stat:
+            slots.pop('line', None)
+            slots.pop('side', None)
+        slots['stat'] = stat
+    # Old proposal cards cannot restore a quote after the assistant requests a
+    # different subject/market. They remain proposals in the original history.
+    if (slots.get('player') != old_player or slots.get('stat') != old_stat
+            or len(players) > 1 or ambiguous_market or identity_missing):
+        state['recent_picks'] = []
+        state['selected_pick_index'] = None
+        state['pending_clarification'] = None
+
+
 def _apply_user(text, state, names, now, context_date=None):
     # Mobile dictation/typing commonly joins a comparison and its number.
     # Separate only known market syntax; never rewrite names or arbitrary prose.
@@ -1004,6 +1115,7 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
         current['constraints'].update({key: saved[key] for key in ('both_teams', 'preferred_stat') if key in saved})
         if 'pick_count' in saved:
             current['slots']['pick_count'] = saved['pick_count']
+        prior_user = ''
         for turn in (history or [])[-HISTORY_TURNS:]:
             item = _turn(turn)
             if not item:
@@ -1014,6 +1126,7 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
                     # Health/data commands are not new prop offers or dates.
                     continue
                 _contextual_user(master, item['content'], current, names, now)
+                prior_user = item['content']
             else:
                 game_context = preview_game_context(master, item['content'], now)
                 if game_context:
@@ -1038,6 +1151,7 @@ def resolve_conversation(store, master, text, history=None, state=None, now=None
                         current['ambiguous_players'] = list(dict.fromkeys(card['player'] for card in cards))[:4]
                         for field in ('player', 'stat', 'line', 'side'):
                             current['slots'].pop(field, None)
+                _assistant_clarification_reference(item['content'], current, names, prior_user)
     result = _contextual_user(master, str(text)[:3000], current, names, now)
     result['original_question'] = str(text)[:3000]
     current['updated_at'] = now.isoformat()

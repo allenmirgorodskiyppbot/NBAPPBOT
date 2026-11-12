@@ -613,6 +613,128 @@ async def answer_conversation(store, master, request, progress, generate, turn=N
                                 fallback=_conversational_fallback(turn, request.message), compact=natural_dialogue)
 
 
+def is_exact_prop_quote(question, turn):
+    """Recognize an explicitly supplied quote that needs no language model.
+
+    Resolution already checked the player, market and threshold. A complete
+    inherited prop does not turn a risk question, comparison or requested sample
+    into a newly offered quote, even when it contains a number.
+    """
+    if (not turn.get('complete_prop') or turn.get('clarification') or turn.get('errors')
+            or len((turn.get('entities') or {}).get('players') or []) != 1
+            or turn.get('intent') not in {'prop', 'explanation'}):
+        return False
+    from conversation import _EXPLAIN, _RESEARCH, _date, _line, _market, _now, _workload_context
+    if (_EXPLAIN.search(question) or _RESEARCH.search(question)
+            or _workload_context(question)[1] or _wants_model(question)
+            or re.search(r'\b(?:if|assuming|provided|unless|suppose|supposing|hypothetical|'
+                         r'limited|restricted|capped)\b|\b\d+\s*games?\b|'
+                         r'\b(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|'
+                         r'thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|'
+                         r'weekends?|weeks?)\b', question, re.I)):
+        return False
+    # A date-only edit can keep an earlier line in the resolved slots. Require
+    # an actual threshold in this input after the parser masks date tokens.
+    canonical = (turn.get('entities') or {}).get('question') or question
+    _, date_error, date_spans = _date(canonical, _now(None))
+    fresh_line, line_error = _line(canonical, date_spans, True)
+    if date_error or line_error or fresh_line is None or fresh_line != turn.get('slots', {}).get('line'):
+        return False
+    # The legacy market resolver gives some specific fields precedence. Do not
+    # let "FGA or points" become an unconditional FGA assessment through that
+    # precedence. Numeric corrections without a competing market remain valid.
+    market_text = re.sub(r'(?<=\d)(?=(?:points?|pts|rebounds?|rebs?|assists?|asts?|threes|'
+                         r'pra|pr|pa|ra|fga|fgm|tpa|tpm|fta|ftm|stocks|stl|blk|tov)\b|[pra]\s*\+)',
+                         ' ', question, flags=re.I)
+    parts = re.split(r'\b(?:or|versus|vs|not|instead of|rather than)\b', market_text, flags=re.I)
+    alternatives = {market for part in parts for market, error in [_market(part)] if market and not error}
+    if len(alternatives) > 1:
+        return False
+    and_parts = re.split(r'\band\b', market_text, flags=re.I)
+    joined = {market for part in and_parts for market, error in [_market(part)] if market and not error}
+    if len(joined) > 1:
+        combinations = {frozenset({'pts', 'reb'}): 'pr', frozenset({'pts', 'ast'}): 'pa',
+                        frozenset({'reb', 'ast'}): 'ra', frozenset({'pts', 'reb', 'ast'}): 'pra',
+                        frozenset({'stl', 'blk'}): 'stocks'}
+        if combinations.get(frozenset(joined)) != turn.get('slots', {}).get('stat'):
+            return False
+    return bool(re.search(r'\d', question) and len(question.split()) <= 12
+                and not re.search(r'\b(?:why|explain|compare|difference|what if|how|because)\b', question, re.I))
+
+
+def is_computed_quote_followup(question, turn, history):
+    """A short why can refer to the immediately preceding computed assessment.
+
+    The marker supplies provenance/reference identity only. All evidence and the
+    decision are recalculated; neither an old average nor an old side is trusted.
+    """
+    if (not re.fullmatch(r'\s*why(?:\s+(?:pass|hold|that|this|more|less))?\s*[?!.]*\s*', question, re.I)
+            or not turn.get('complete_prop') or turn.get('clarification') or turn.get('errors')
+            or not history):
+        return False
+    last = history[-1]
+    if hasattr(last, 'model_dump'):
+        last = last.model_dump()
+    if not isinstance(last, dict) or last.get('role') != 'assistant':
+        return False
+    content = str(last.get('content') or '')
+    marker = re.match(r'^Game date: (\d{4}-\d{2}-\d{2}) Eastern\.\n\n', content)
+    if not marker:
+        return False
+    from pick_discussion import _now, EASTERN
+    slots = turn.get('slots') or {}
+    day = slots.get('date') or slots.get('game_date') or _now(None).astimezone(EASTERN).date().isoformat()
+    if marker[1] != day:
+        return False
+    try:
+        label = f"{slots['player']} {slots['line']:g} {MARKET_NAMES[slots['stat']]}"
+    except (KeyError, TypeError, ValueError):
+        return False
+    body = content[marker.end():]
+    return body.startswith((label + ' — ', 'I lean More on ' + label + ',', 'I lean Less on ' + label + ','))
+
+
+async def answer_exact_prop_quote(store, master, request, progress=None, *, turn=None):
+    """Compute a valid explicit quote before readiness, queue or AI planning.
+
+    This uses the existing saved-data assessment and its strict eligibility
+    checks. It makes no model call or live schedule request.
+    """
+    history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
+    if turn is None:
+        turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
+                                      preferences=getattr(request, 'lineup_preferences', None))
+    followup = is_computed_quote_followup(request.message, turn, history)
+    if not is_exact_prop_quote(request.message, turn) and not followup:
+        return None
+    # A fresh explicit threshold is assessed from its resolved inputs. Older
+    # uploaded/independent research selections remain in dialogue history, but
+    # cannot redirect this new quote back to a previous research-mode choice.
+    turn = {**turn, 'intent': 'prop', 'recent_picks': [],
+            'state': {**(turn.get('state') or {}), 'selected_pick_index': None}}
+    result = await answer_conversation(store, master, request, progress if progress is not None else {},
+                                      None, turn=turn, fast_only=True, natural_dialogue=False)
+    if result is not None:
+        result.update(ai_used=False, response_mode='computed_prop_explanation' if followup else 'computed_prop')
+        day = (result.get('discussion') or {}).get('date')
+        if day:
+            result['answer'] = f'Game date: {day} Eastern.\n\n' + result['answer']
+    return result
+
+
+def is_exact_fast_turn(question, turn):
+    """Recognize explicit shorthand/operational input, not inherited questions.
+
+    This is a latency shortcut only. Open-ended language goes through semantic
+    planning, even when the legacy parser found a prior player and threshold.
+    """
+    if re.fullmatch(r'\s*(?:hi|hello|hey|thanks?|thank you|thank u|ty|thx|ok(?:ay)?|cool|got it|sounds good|nice)[.!?\s]*', question, re.I):
+        return True
+    if turn.get('intent') in {'lineup_constraint', 'upcoming_game'}:
+        return True
+    return is_exact_prop_quote(question, turn)
+
+
 async def try_fast_answer(store, master, request, progress=None, *, prefer_natural=False):
     """Return a checked routine answer before model readiness/queue guards.
 
@@ -620,14 +742,20 @@ async def try_fast_answer(store, master, request, progress=None, *, prefer_natur
     checks still decide whether a prop is eligible, so missing verification
     returns a Pass rather than an invented current recommendation.
     """
-    turn = None
+    history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
+    turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
+                                   preferences=getattr(request, 'lineup_preferences', None))
+    from availability_discussion import can_handle_availability
+    availability = can_handle_availability(request.message, turn, history=history)
+    if not availability:
+        quote = await answer_exact_prop_quote(store, master, request, progress, turn=turn)
+        if quote is not None:
+            return quote
+    if not availability and not is_exact_fast_turn(request.message, turn):
+        return None
     if prefer_natural:
-        history = [m.model_dump() if hasattr(m, 'model_dump') else m for m in request.history]
-        turn = await asyncio.to_thread(resolve_conversation, store, master, request.message, history,
-                                       preferences=getattr(request, 'lineup_preferences', None))
         if not turn.get('clarification') and turn['intent'] in {'prop','explanation','preference','upcoming_game'}:
-            from availability_discussion import can_handle_availability
-            if not can_handle_availability(request.message, turn, history=history):
+            if not availability:
                 return None
     return await answer_conversation(store, master, request, progress if progress is not None else {},
                                      None, turn=turn, fast_only=True)
