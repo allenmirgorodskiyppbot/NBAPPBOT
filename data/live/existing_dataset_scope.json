@@ -12,19 +12,21 @@
       "provider_id_unique": true,
       "season": "2026-27",
       "season_type": "Regular Season",
-      "source_content_sha256": "c50c68cd6eb2624c95b1a27e148b323ec6b07de50b157bfc4c501e1c1ae73034",
+      "source_content_sha256": "4853787c88a0b2bf0d53adf387636bfad003d2f5d21104716cd790417debd864",
       "source_dates": [
         "2026-11-06",
         "2026-11-12",
-        "2026-11-15"
+        "2026-11-15",
+        "2026-11-17"
       ],
       "source_game_ids": [
         "nba:2026-11-06:BOS:CHA",
         "nba:2026-11-12:CHA:PHX",
-        "nba:2026-11-15:CHA:LAC"
+        "nba:2026-11-15:CHA:LAC",
+        "nba:2026-11-17:CHA:LAL"
       ],
       "source_player_name": "Grant Williams",
-      "source_published_at": "2026-11-17T12:32:05+00:00",
+      "source_published_at": "2026-11-18T12:32:20+00:00",
       "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "upstream_full_game_validated": true
     },
@@ -38,7 +40,7 @@
       "provider_id_unique": true,
       "season": "2026-27",
       "season_type": "Regular Season",
-      "source_content_sha256": "c50c68cd6eb2624c95b1a27e148b323ec6b07de50b157bfc4c501e1c1ae73034",
+      "source_content_sha256": "4853787c88a0b2bf0d53adf387636bfad003d2f5d21104716cd790417debd864",
       "source_dates": [
         "2026-11-07"
       ],
@@ -46,7 +48,7 @@
         "nba:2026-11-07:DEN:IND"
       ],
       "source_player_name": "Julian Strawther",
-      "source_published_at": "2026-11-17T12:32:05+00:00",
+      "source_published_at": "2026-11-18T12:32:20+00:00",
       "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "upstream_full_game_validated": true
     },
@@ -60,7 +62,7 @@
       "provider_id_unique": true,
       "season": "2026-27",
       "season_type": "Regular Season",
-      "source_content_sha256": "c50c68cd6eb2624c95b1a27e148b323ec6b07de50b157bfc4c501e1c1ae73034",
+      "source_content_sha256": "4853787c88a0b2bf0d53adf387636bfad003d2f5d21104716cd790417debd864",
       "source_dates": [
         "2026-11-04"
       ],
@@ -68,7 +70,7 @@
         "nba:2026-11-04:BKN:CHA"
       ],
       "source_player_name": "Kon Knueppel",
-      "source_published_at": "2026-11-17T12:32:05+00:00",
+      "source_published_at": "2026-11-18T12:32:20+00:00",
       "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "upstream_full_game_validated": true
     },
@@ -82,7 +84,7 @@
       "provider_id_unique": true,
       "season": "2026-27",
       "season_type": "Regular Season",
-      "source_content_sha256": "c50c68cd6eb2624c95b1a27e148b323ec6b07de50b157bfc4c501e1c1ae73034",
+      "source_content_sha256": "4853787c88a0b2bf0d53adf387636bfad003d2f5d21104716cd790417debd864",
       "source_dates": [
         "2026-11-08",
         "2026-11-11",
@@ -96,7 +98,7 @@
         "nba:2026-11-16:CHI:CLE"
       ],
       "source_player_name": "Nic Claxton",
-      "source_published_at": "2026-11-17T12:32:05+00:00",
+      "source_published_at": "2026-11-18T12:32:20+00:00",
       "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "upstream_full_game_validated": true
     },
@@ -110,7 +112,7 @@
       "provider_id_unique": true,
       "season": "2026-27",
       "season_type": "Regular Season",
-      "source_content_sha256": "c50c68cd6eb2624c95b1a27e148b323ec6b07de50b157bfc4c501e1c1ae73034",
+      "source_content_sha256": "4853787c88a0b2bf0d53adf387636bfad003d2f5d21104716cd790417debd864",
       "source_dates": [
         "2026-11-07",
         "2026-11-09",
@@ -126,7 +128,7 @@
         "nba:2026-11-15:IND:PHI"
       ],
       "source_player_name": "T.J. McConnell",
-      "source_published_at": "2026-11-17T12:32:05+00:00",
+      "source_published_at": "2026-11-18T12:32:20+00:00",
       "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "upstream_full_game_validated": true
     }
@@ -2284,6 +2286,14 @@
         "player_id": "name:johntonje"
       },
       {
+        "aliases": [
+          "Jonas Aidoo"
+        ],
+        "espn_player_id": "4684682",
+        "player": "Jonas Aidoo",
+        "player_id": "name:jonasaidoo"
+      },
+      {
         "nba_player_id": "1628371",
         "player": "Jonathan Isaac"
       },
@@ -4407,7 +4417,7 @@
     ],
     "policy": "All current NBA players may refresh from validated published source identities; existing historical players are retained. Named defender populations still require actual measured pair evidence.",
     "population": "all_current_nba_players",
-    "revision": "b946adacb6f69a7ff921c88a61c4122247ae2e8e88620b1722aa7c30a09e10d9",
+    "revision": "bc6d40673d27d74ea8b78cf0e3991116cc7f92df1e4784add97c33931e199751",
     "schema_version": 1,
     "source": "User-supplied Knicks_2026_27_Completed.xlsx, existing Player_Games scope",
     "teams": [
@@ -4444,11 +4454,11 @@
     ]
   },
   "season": "2026-27",
-  "source_checked_at": "2026-11-18T04:04:19.128277+00:00",
-  "source_content_sha256": "c50c68cd6eb2624c95b1a27e148b323ec6b07de50b157bfc4c501e1c1ae73034",
-  "source_data_through_date": "2026-11-16",
-  "source_published_at": "2026-11-17T12:32:05+00:00",
+  "source_checked_at": "2026-11-18T16:10:54.396932+00:00",
+  "source_content_sha256": "4853787c88a0b2bf0d53adf387636bfad003d2f5d21104716cd790417debd864",
+  "source_data_through_date": "2026-11-17",
+  "source_published_at": "2026-11-18T12:32:20+00:00",
   "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
   "upstream_full_game_validated": true,
-  "validated_player_rows": 5478
+  "validated_player_rows": 5604
 }
