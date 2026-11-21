@@ -2473,7 +2473,7 @@
       "season_type": "Regular Season",
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "starter": 0,
-      "stl": 0,
+      "stl": 1,
       "team": "MIA",
       "tov": 1,
       "tpa": 4,
@@ -2539,7 +2539,7 @@
       "season_type": "Regular Season",
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "starter": 0,
-      "stl": 2,
+      "stl": 1,
       "team": "MIA",
       "tov": 1,
       "tpa": 2,
@@ -5047,7 +5047,7 @@
       "season_type": "Regular Season",
       "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
       "starter": 1,
-      "stl": 3,
+      "stl": 2,
       "team": "TOR",
       "tov": 2,
       "tpa": 8,
@@ -10434,12 +10434,12 @@
     }
   ],
   "publication_source": "SportsDataverse public ESPN extract",
-  "published_at": "2026-11-20T12:29:55+00:00",
-  "publisher_file_data_through_date": "2026-11-19",
+  "published_at": "2026-11-21T12:33:29+00:00",
+  "publisher_file_data_through_date": "2026-11-20",
   "schema_version": 1,
   "scope_revision": "216b2b16f7d50e6f6f89d0ba0f1c63ebe75f5e3abb79fc1cc9cdd4f99d4860e9",
   "source": "espn",
-  "source_content_sha256": "1570eefbef738bf4ea265433304ab9e8cc363d624e06923a80990cb8e0782b81",
+  "source_content_sha256": "0826d4004f8ecd52093d0e0156a32777cbd92d1d1d50e0ff320cccf2964aff5c",
   "source_data_through_date": "2026-11-18",
   "source_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
   "team_inventory_verified": {
@@ -10450,22 +10450,22 @@
       "inventory_sources": [
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
-          "source_content_sha256": "7b8dab157004596598cd393b120a81278ddb65c13c4725eb8bbfa285f821e393",
-          "source_published_at": "2026-11-20T15:16:15Z"
+          "source_content_sha256": "bd32445405611adcd37d417584ba4ee086c77581dc9e779c5c8efd021c952d8b",
+          "source_published_at": "2026-11-21T15:16:04Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-          "source_content_sha256": "1d9ecb9405535498f44f8f3c235ef714c640c859c5fc6f0b285832f70717f3be",
-          "source_published_at": "2026-11-20T15:58:21Z"
+          "source_content_sha256": "da8e3e0a2b08177808ac70e9326e97e1d6bb00dc7f1ebe49290391c850c2a437",
+          "source_published_at": "2026-11-21T15:04:26Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
-          "source_content_sha256": "1570eefbef738bf4ea265433304ab9e8cc363d624e06923a80990cb8e0782b81",
-          "source_published_at": "2026-11-20T12:29:55+00:00"
+          "source_content_sha256": "0826d4004f8ecd52093d0e0156a32777cbd92d1d1d50e0ff320cccf2964aff5c",
+          "source_published_at": "2026-11-21T12:33:29+00:00"
         }
       ],
       "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "inventory_verified_at": "2026-11-21T04:00:05.370070+00:00",
+      "inventory_verified_at": "2026-11-21T15:54:58.610601+00:00",
       "team": "CHA"
     },
     "LAC": {
@@ -10475,22 +10475,22 @@
       "inventory_sources": [
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
-          "source_content_sha256": "7b8dab157004596598cd393b120a81278ddb65c13c4725eb8bbfa285f821e393",
-          "source_published_at": "2026-11-20T15:16:15Z"
+          "source_content_sha256": "bd32445405611adcd37d417584ba4ee086c77581dc9e779c5c8efd021c952d8b",
+          "source_published_at": "2026-11-21T15:16:04Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-          "source_content_sha256": "1d9ecb9405535498f44f8f3c235ef714c640c859c5fc6f0b285832f70717f3be",
-          "source_published_at": "2026-11-20T15:58:21Z"
+          "source_content_sha256": "da8e3e0a2b08177808ac70e9326e97e1d6bb00dc7f1ebe49290391c850c2a437",
+          "source_published_at": "2026-11-21T15:04:26Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
-          "source_content_sha256": "1570eefbef738bf4ea265433304ab9e8cc363d624e06923a80990cb8e0782b81",
-          "source_published_at": "2026-11-20T12:29:55+00:00"
+          "source_content_sha256": "0826d4004f8ecd52093d0e0156a32777cbd92d1d1d50e0ff320cccf2964aff5c",
+          "source_published_at": "2026-11-21T12:33:29+00:00"
         }
       ],
       "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "inventory_verified_at": "2026-11-21T04:00:05.370070+00:00",
+      "inventory_verified_at": "2026-11-21T15:54:58.610601+00:00",
       "team": "LAC"
     },
     "MIN": {
@@ -10500,22 +10500,22 @@
       "inventory_sources": [
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
-          "source_content_sha256": "7b8dab157004596598cd393b120a81278ddb65c13c4725eb8bbfa285f821e393",
-          "source_published_at": "2026-11-20T15:16:15Z"
+          "source_content_sha256": "bd32445405611adcd37d417584ba4ee086c77581dc9e779c5c8efd021c952d8b",
+          "source_published_at": "2026-11-21T15:16:04Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-          "source_content_sha256": "1d9ecb9405535498f44f8f3c235ef714c640c859c5fc6f0b285832f70717f3be",
-          "source_published_at": "2026-11-20T15:58:21Z"
+          "source_content_sha256": "da8e3e0a2b08177808ac70e9326e97e1d6bb00dc7f1ebe49290391c850c2a437",
+          "source_published_at": "2026-11-21T15:04:26Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
-          "source_content_sha256": "1570eefbef738bf4ea265433304ab9e8cc363d624e06923a80990cb8e0782b81",
-          "source_published_at": "2026-11-20T12:29:55+00:00"
+          "source_content_sha256": "0826d4004f8ecd52093d0e0156a32777cbd92d1d1d50e0ff320cccf2964aff5c",
+          "source_published_at": "2026-11-21T12:33:29+00:00"
         }
       ],
       "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "inventory_verified_at": "2026-11-21T04:00:05.370070+00:00",
+      "inventory_verified_at": "2026-11-21T15:54:58.610601+00:00",
       "team": "MIN"
     },
     "NYK": {
@@ -10525,22 +10525,22 @@
       "inventory_sources": [
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
-          "source_content_sha256": "7b8dab157004596598cd393b120a81278ddb65c13c4725eb8bbfa285f821e393",
-          "source_published_at": "2026-11-20T15:16:15Z"
+          "source_content_sha256": "bd32445405611adcd37d417584ba4ee086c77581dc9e779c5c8efd021c952d8b",
+          "source_published_at": "2026-11-21T15:16:04Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-          "source_content_sha256": "1d9ecb9405535498f44f8f3c235ef714c640c859c5fc6f0b285832f70717f3be",
-          "source_published_at": "2026-11-20T15:58:21Z"
+          "source_content_sha256": "da8e3e0a2b08177808ac70e9326e97e1d6bb00dc7f1ebe49290391c850c2a437",
+          "source_published_at": "2026-11-21T15:04:26Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
-          "source_content_sha256": "1570eefbef738bf4ea265433304ab9e8cc363d624e06923a80990cb8e0782b81",
-          "source_published_at": "2026-11-20T12:29:55+00:00"
+          "source_content_sha256": "0826d4004f8ecd52093d0e0156a32777cbd92d1d1d50e0ff320cccf2964aff5c",
+          "source_published_at": "2026-11-21T12:33:29+00:00"
         }
       ],
       "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "inventory_verified_at": "2026-11-21T04:00:05.370070+00:00",
+      "inventory_verified_at": "2026-11-21T15:54:58.610601+00:00",
       "team": "NYK"
     },
     "POR": {
@@ -10550,22 +10550,22 @@
       "inventory_sources": [
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
-          "source_content_sha256": "7b8dab157004596598cd393b120a81278ddb65c13c4725eb8bbfa285f821e393",
-          "source_published_at": "2026-11-20T15:16:15Z"
+          "source_content_sha256": "bd32445405611adcd37d417584ba4ee086c77581dc9e779c5c8efd021c952d8b",
+          "source_published_at": "2026-11-21T15:16:04Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-          "source_content_sha256": "1d9ecb9405535498f44f8f3c235ef714c640c859c5fc6f0b285832f70717f3be",
-          "source_published_at": "2026-11-20T15:58:21Z"
+          "source_content_sha256": "da8e3e0a2b08177808ac70e9326e97e1d6bb00dc7f1ebe49290391c850c2a437",
+          "source_published_at": "2026-11-21T15:04:26Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
-          "source_content_sha256": "1570eefbef738bf4ea265433304ab9e8cc363d624e06923a80990cb8e0782b81",
-          "source_published_at": "2026-11-20T12:29:55+00:00"
+          "source_content_sha256": "0826d4004f8ecd52093d0e0156a32777cbd92d1d1d50e0ff320cccf2964aff5c",
+          "source_published_at": "2026-11-21T12:33:29+00:00"
         }
       ],
       "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "inventory_verified_at": "2026-11-21T04:00:05.370070+00:00",
+      "inventory_verified_at": "2026-11-21T15:54:58.610601+00:00",
       "team": "POR"
     },
     "SAS": {
@@ -10575,22 +10575,22 @@
       "inventory_sources": [
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_schedules/nba_schedule_2027.parquet",
-          "source_content_sha256": "7b8dab157004596598cd393b120a81278ddb65c13c4725eb8bbfa285f821e393",
-          "source_published_at": "2026-11-20T15:16:15Z"
+          "source_content_sha256": "bd32445405611adcd37d417584ba4ee086c77581dc9e779c5c8efd021c952d8b",
+          "source_published_at": "2026-11-21T15:16:04Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-          "source_content_sha256": "1d9ecb9405535498f44f8f3c235ef714c640c859c5fc6f0b285832f70717f3be",
-          "source_published_at": "2026-11-20T15:58:21Z"
+          "source_content_sha256": "da8e3e0a2b08177808ac70e9326e97e1d6bb00dc7f1ebe49290391c850c2a437",
+          "source_published_at": "2026-11-21T15:04:26Z"
         },
         {
           "source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_player_boxscores/player_box_2027.parquet",
-          "source_content_sha256": "1570eefbef738bf4ea265433304ab9e8cc363d624e06923a80990cb8e0782b81",
-          "source_published_at": "2026-11-20T12:29:55+00:00"
+          "source_content_sha256": "0826d4004f8ecd52093d0e0156a32777cbd92d1d1d50e0ff320cccf2964aff5c",
+          "source_published_at": "2026-11-21T12:33:29+00:00"
         }
       ],
       "inventory_verification_source": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_stats_player_game_logs/player_game_logs_2027.parquet",
-      "inventory_verified_at": "2026-11-21T04:00:05.370070+00:00",
+      "inventory_verified_at": "2026-11-21T15:54:58.610601+00:00",
       "team": "SAS"
     }
   },
