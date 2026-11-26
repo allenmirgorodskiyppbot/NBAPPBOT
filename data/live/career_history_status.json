@@ -1,5 +1,5 @@
 {
-  "attempted_at": "2026-11-25T23:37:22.933631+00:00",
+  "attempted_at": "2026-11-26T08:14:57.941997+00:00",
   "manifest_sha256": "0b8fc5fd9221ea4ac87aa2b0c7767fe632244a6fb1c4f71a6eabd084acd98171",
   "observations": 178155,
   "parts": 22,
@@ -8,6 +8,6 @@
   "requested_participants": 515,
   "scope": "Career-history collection only; not current-game readiness.",
   "source_data_through_date": "2026-11-24",
-  "status": "updated",
+  "status": "unchanged",
   "unresolved_targets": []
 }
